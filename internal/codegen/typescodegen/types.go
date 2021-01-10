@@ -3,6 +3,7 @@ package typescodegen
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
@@ -67,11 +68,11 @@ func GoType(column *spanddl.Column) reflect.Type {
 	case spansql.Timestamp:
 		switch {
 		case column.Type.Array:
-			return reflect.TypeOf([]spanner.NullDate(nil))
+			return reflect.TypeOf([]spanner.NullTime(nil))
 		case column.NotNull:
-			return reflect.TypeOf(civil.Date{})
+			return reflect.TypeOf(time.Time{})
 		default:
-			return reflect.TypeOf(spanner.NullDate{})
+			return reflect.TypeOf(spanner.NullTime{})
 		}
 	default:
 		panic(fmt.Sprintf("unhandled base type: %v", column.Type.Base))
