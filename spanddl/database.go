@@ -24,6 +24,21 @@ func (d *Database) Table(name spansql.ID) (*Table, bool) {
 	return nil, false
 }
 
+// InterleavedTables looks up all interleaved tables (non-recursively) for the provided table name.
+func (d *Database) InterleavedTables(name spansql.ID) []*Table {
+	table, ok := d.Table(name)
+	if !ok {
+		return nil
+	}
+	result := make([]*Table, 0, len(d.Tables))
+	for _, candidateTable := range d.Tables {
+		if candidateTable.Interleave != nil && candidateTable.Interleave.Parent == table.Name {
+			result = append(result, candidateTable)
+		}
+	}
+	return result
+}
+
 // Index looks up an index with the provided name.
 func (d *Database) Index(name spansql.ID) (*Index, bool) {
 	for _, index := range d.Indexes {
