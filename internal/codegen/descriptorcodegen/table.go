@@ -3,104 +3,117 @@ package descriptorcodegen
 import (
 	"strconv"
 
+	"github.com/stoewer/go-strcase"
 	"go.einride.tech/aip-spanner/internal/codegen"
 	"go.einride.tech/aip-spanner/spanddl"
 )
 
-func generateTableDescriptorInterface(f *codegen.File, table *spanddl.Table) {
+type TableDescriptorCodeGenerator struct {
+	Table *spanddl.Table
+}
+
+func (g TableDescriptorCodeGenerator) InterfaceType() string {
+	return strcase.UpperCamelCase(string(g.Table.Name)) + "TableDescriptor"
+}
+
+func (g TableDescriptorCodeGenerator) StructType() string {
+	return strcase.LowerCamelCase(string(g.Table.Name)) + "TableDescriptor"
+}
+
+func (g TableDescriptorCodeGenerator) ColumnDescriptorMethod(column *spanddl.Column) string {
+	return strcase.UpperCamelCase(string(column.Name))
+}
+
+func (g TableDescriptorCodeGenerator) TableNameMethod() string {
+	return "TableName"
+}
+
+func (g TableDescriptorCodeGenerator) TableIDMethod() string {
+	return "TableID"
+}
+
+func (g TableDescriptorCodeGenerator) ColumnNamesMethod() string {
+	return "ColumnNames"
+}
+
+func (g TableDescriptorCodeGenerator) ColumnIDsMethod() string {
+	return "ColumnIDs"
+}
+
+func (g TableDescriptorCodeGenerator) ColumnExprsMethod() string {
+	return "ColumnExprs"
+}
+
+func (g TableDescriptorCodeGenerator) GenerateCode(f *codegen.File) {
+	g.generateInterface(f)
+	g.generateStruct(f)
+}
+
+func (g TableDescriptorCodeGenerator) generateInterface(f *codegen.File) {
+	genericColumnDescriptor := GenericColumnDescriptorCodeGenerator{}
+	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
-	f.P("type ", typeOfTableDescriptorInterface(table), " interface {")
-	f.P("TableName() string")
-	f.P("TableID() spansql.ID")
-	f.P("ColumnNames() []string")
-	f.P("ColumnIDs() []spansql.ID")
-	for _, column := range table.Columns {
-		f.P(nameOfColumnDescriptor(column), "() ColumnDescriptor")
+	f.P("type ", g.InterfaceType(), " interface {")
+	f.P(g.TableNameMethod(), "() string")
+	f.P(g.TableIDMethod(), "() ", spansqlPkg, ".ID")
+	f.P(g.ColumnNamesMethod(), "() []string")
+	f.P(g.ColumnIDsMethod(), "() []", spansqlPkg, ".ID")
+	for _, column := range g.Table.Columns {
+		f.P(g.ColumnDescriptorMethod(column), "() ", genericColumnDescriptor.InterfaceType())
 	}
 	f.P("}")
 }
 
-func generateGenericColumnDescriptorInterface(f *codegen.File) {
+func (g TableDescriptorCodeGenerator) generateStruct(f *codegen.File) {
+	genericColumnDescriptor := GenericColumnDescriptorCodeGenerator{}
+	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
-	f.P("type ColumnDescriptor interface {")
-	f.P("ColumnID() spansql.ID")
-	f.P("ColumnName() string")
-	f.P("ColumnType() spansql.Type")
-	f.P("NotNull() bool")
-	f.P("Options() spansql.ColumnOptions")
-	f.P("}")
-}
-
-func generateTableDescriptorStruct(f *codegen.File, table *spanddl.Table) {
-	f.P()
-	f.P("type ", typeOfTableDescriptorStruct(table), " struct {")
-	f.P("tableID spansql.ID")
-	for _, column := range table.Columns {
-		f.P(private(nameOfColumnDescriptor(column)), " ", typeOfColumnDescriptorStruct(table, column))
+	f.P("type ", g.StructType(), " struct {")
+	f.P("tableID ", spansqlPkg, ".ID")
+	for _, column := range g.Table.Columns {
+		f.P(g.columnDescriptorField(column), " ", genericColumnDescriptor.StructType())
 	}
 	f.P("}")
 	f.P()
-	f.P("func (d *", typeOfTableDescriptorStruct(table), ") ", "TableName() string {")
+	f.P("func (d *", g.StructType(), ") ", g.TableNameMethod(), "() string {")
 	f.P("return string(d.tableID)")
 	f.P("}")
 	f.P()
-	f.P("func (d *", typeOfTableDescriptorStruct(table), ") ", "TableID() spansql.ID {")
+	f.P("func (d *", g.StructType(), ") ", g.TableIDMethod(), "() ", spansqlPkg, ".ID {")
 	f.P("return d.tableID")
 	f.P("}")
 	f.P()
-	f.P("func (d *", typeOfTableDescriptorStruct(table), ") ", "ColumnNames() []string {")
+	f.P("func (d *", g.StructType(), ") ", g.ColumnNamesMethod(), "() []string {")
 	f.P("return []string{")
-	for _, column := range table.Columns {
+	for _, column := range g.Table.Columns {
 		f.P(strconv.Quote(string(column.Name)), ",")
 	}
 	f.P("}")
 	f.P("}")
 	f.P()
-	f.P("func (d *", typeOfTableDescriptorStruct(table), ") ", "ColumnIDs() []spansql.ID {")
-	f.P("return []spansql.ID{")
-	for _, column := range table.Columns {
+	f.P("func (d *", g.StructType(), ") ", g.ColumnIDsMethod(), "() []", spansqlPkg, ".ID {")
+	f.P("return []", spansqlPkg, ".ID{")
+	for _, column := range g.Table.Columns {
 		f.P(strconv.Quote(string(column.Name)), ",")
 	}
 	f.P("}")
 	f.P("}")
-	for _, column := range table.Columns {
+	f.P()
+	f.P("func (d *", g.StructType(), ") ", g.ColumnExprsMethod(), "() []", spansqlPkg, ".Expr {")
+	f.P("return []", spansqlPkg, ".Expr{")
+	for _, column := range g.Table.Columns {
+		f.P(spansqlPkg, ".ID(", strconv.Quote(string(column.Name)), "),")
+	}
+	f.P("}")
+	f.P("}")
+	for _, column := range g.Table.Columns {
 		f.P()
-		f.P(
-			"func (d *", typeOfTableDescriptorStruct(table), ") ",
-			nameOfColumnDescriptor(column), "() ColumnDescriptor",
-			" {",
-		)
-		f.P("return &d.", private(nameOfColumnDescriptor(column)))
+		f.P("func (d *", g.StructType(), ") ", g.ColumnDescriptorMethod(column), "() ColumnDescriptor", " {")
+		f.P("return &d.", g.columnDescriptorField(column))
 		f.P("}")
 	}
 }
 
-func generateColumnDescriptorStruct(f *codegen.File, table *spanddl.Table, column *spanddl.Column) {
-	f.P()
-	f.P("type ", typeOfColumnDescriptorStruct(table, column), " struct {")
-	f.P("columnID spansql.ID")
-	f.P("columnType spansql.Type")
-	f.P("notNull bool")
-	f.P("options spansql.ColumnOptions")
-	f.P("}")
-	f.P()
-	f.P("func (d *", typeOfColumnDescriptorStruct(table, column), ") ", "ColumnName() string {")
-	f.P("return string(d.columnID)")
-	f.P("}")
-	f.P()
-	f.P("func (d *", typeOfColumnDescriptorStruct(table, column), ") ", "ColumnID() spansql.ID {")
-	f.P("return d.columnID")
-	f.P("}")
-	f.P()
-	f.P("func (d *", typeOfColumnDescriptorStruct(table, column), ") ", "ColumnType() spansql.Type {")
-	f.P("return d.columnType")
-	f.P("}")
-	f.P()
-	f.P("func (d *", typeOfColumnDescriptorStruct(table, column), ") ", "NotNull() bool {")
-	f.P("return d.notNull")
-	f.P("}")
-	f.P()
-	f.P("func (d *", typeOfColumnDescriptorStruct(table, column), ") ", "Options() spansql.ColumnOptions {")
-	f.P("return d.options")
-	f.P("}")
+func (g TableDescriptorCodeGenerator) columnDescriptorField(column *spanddl.Column) string {
+	return strcase.LowerCamelCase(string(column.Name))
 }
