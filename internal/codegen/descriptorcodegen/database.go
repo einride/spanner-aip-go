@@ -90,7 +90,8 @@ func (g DatabaseDescriptorCodeGenerator) generateGlobalVariable(f *codegen.File)
 			f.P("columnID: ", strconv.Quote(string(column.Name)), ",")
 			f.P("columnType: ", fmt.Sprintf("%#v", column.Type), ",")
 			f.P("notNull: ", column.NotNull, ",")
-			f.P("options: ", fmt.Sprintf("%#v", column.Options), ",")
+			allowCommitTimestamp := column.Options.AllowCommitTimestamp != nil && *column.Options.AllowCommitTimestamp
+			f.P("allowCommitTimestamp: ", allowCommitTimestamp, ",")
 			f.P("},")
 		}
 		f.P("},")

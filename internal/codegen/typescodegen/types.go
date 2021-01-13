@@ -11,6 +11,25 @@ import (
 	"go.einride.tech/aip-spanner/spanddl"
 )
 
+func SpanSQLType(column *spanddl.Column) reflect.Type {
+	switch column.Type.Base {
+	case spansql.Bool:
+		return reflect.TypeOf(spansql.BoolLiteral(true))
+	case spansql.Int64:
+		return reflect.TypeOf(spansql.IntegerLiteral(0))
+	case spansql.Float64:
+		return reflect.TypeOf(spansql.FloatLiteral(0))
+	case spansql.String:
+		return reflect.TypeOf(spansql.StringLiteral(""))
+	case spansql.Bytes:
+		return reflect.TypeOf(spansql.BytesLiteral([]byte(nil)))
+	case spansql.Date, spansql.Timestamp:
+		panic("https://github.com/googleapis/google-cloud-go/issues/3548")
+	default:
+		panic(fmt.Sprintf("unhandled base type: %v", column.Type.Base))
+	}
+}
+
 func GoType(column *spanddl.Column) reflect.Type {
 	switch column.Type.Base {
 	case spansql.Bool:

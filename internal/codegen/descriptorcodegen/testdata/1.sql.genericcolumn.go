@@ -13,14 +13,14 @@ type ColumnDescriptor interface {
 	ColumnName() string
 	ColumnType() spansql.Type
 	NotNull() bool
-	Options() spansql.ColumnOptions
+	AllowCommitTimestamp() bool
 }
 
 type columnDescriptor struct {
-	columnID   spansql.ID
-	columnType spansql.Type
-	notNull    bool
-	options    spansql.ColumnOptions
+	columnID             spansql.ID
+	columnType           spansql.Type
+	notNull              bool
+	allowCommitTimestamp bool
 }
 
 func (d *columnDescriptor) ColumnName() string {
@@ -43,6 +43,6 @@ func (d *columnDescriptor) NotNull() bool {
 	return d.notNull
 }
 
-func (d *columnDescriptor) Options() spansql.ColumnOptions {
-	return d.options
+func (d *columnDescriptor) AllowCommitTimestamp() bool {
+	return d.allowCommitTimestamp
 }

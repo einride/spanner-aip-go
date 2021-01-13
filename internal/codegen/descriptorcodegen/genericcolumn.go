@@ -34,8 +34,8 @@ func (g GenericColumnDescriptorCodeGenerator) NotNullMethod() string {
 	return "NotNull"
 }
 
-func (g GenericColumnDescriptorCodeGenerator) OptionsMethod() string {
-	return "Options"
+func (g GenericColumnDescriptorCodeGenerator) AllowCommitTimestampMethod() string {
+	return "AllowCommitTimestamp"
 }
 
 func (g GenericColumnDescriptorCodeGenerator) GenerateCode(f *codegen.File) {
@@ -51,7 +51,7 @@ func (g GenericColumnDescriptorCodeGenerator) generateInterface(f *codegen.File)
 	f.P(g.ColumnNameMethod(), "() string")
 	f.P(g.ColumnTypeMethod(), "() ", spansqlPkg, ".Type")
 	f.P(g.NotNullMethod(), "() bool")
-	f.P(g.OptionsMethod(), "() ", spansqlPkg, ".ColumnOptions")
+	f.P(g.AllowCommitTimestampMethod(), "() bool")
 	f.P("}")
 }
 
@@ -62,7 +62,7 @@ func (g GenericColumnDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	f.P("columnID ", spansqlPkg, ".ID")
 	f.P("columnType ", spansqlPkg, ".Type")
 	f.P("notNull bool")
-	f.P("options ", spansqlPkg, ".ColumnOptions")
+	f.P("allowCommitTimestamp bool")
 	f.P("}")
 	f.P()
 	f.P("func (d *", g.StructType(), ") ", g.ColumnNameMethod(), "() string {")
@@ -85,7 +85,7 @@ func (g GenericColumnDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	f.P("return d.notNull")
 	f.P("}")
 	f.P()
-	f.P("func (d *", g.StructType(), ") ", g.OptionsMethod(), "() ", spansqlPkg, ".ColumnOptions {")
-	f.P("return d.options")
+	f.P("func (d *", g.StructType(), ") ", g.AllowCommitTimestampMethod(), "() bool {")
+	f.P("return d.allowCommitTimestamp")
 	f.P("}")
 }

@@ -5,6 +5,7 @@ all: \
 	prettier-markdown \
 	go-lint \
 	go-review \
+	go-generate \
 	go-test \
 	go-mod-tidy \
 	git-verify-nodiff
@@ -25,3 +26,8 @@ go-mod-tidy:
 go-test:
 	$(info [$@] running Go tests...)
 	@go test -count 1 -cover -race ./...
+
+.PHONY: go-generate
+go-generate:
+	$(info [$@] generating example code...)
+	@go run ./cmd/aip-spanner-go generate
