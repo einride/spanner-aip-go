@@ -1,0 +1,6 @@
+schema:
+  - "testdata/migrations/freight/*.up.sql"
+
+package:
+  name: freightdb
+  path: ./internal/examples/freightdb

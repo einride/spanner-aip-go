@@ -16,28 +16,28 @@ var descriptor = databaseDescriptor{
 	singers: singersTableDescriptor{
 		tableID: "Singers",
 		singerId: columnDescriptor{
-			columnID:   "SingerId",
-			columnType: spansql.Type{Array: false, Base: 1, Len: 0},
-			notNull:    true,
-			options:    spansql.ColumnOptions{AllowCommitTimestamp: (*bool)(nil)},
+			columnID:             "SingerId",
+			columnType:           spansql.Type{Array: false, Base: 1, Len: 0},
+			notNull:              true,
+			allowCommitTimestamp: false,
 		},
 		firstName: columnDescriptor{
-			columnID:   "FirstName",
-			columnType: spansql.Type{Array: false, Base: 3, Len: 1024},
-			notNull:    false,
-			options:    spansql.ColumnOptions{AllowCommitTimestamp: (*bool)(nil)},
+			columnID:             "FirstName",
+			columnType:           spansql.Type{Array: false, Base: 3, Len: 1024},
+			notNull:              false,
+			allowCommitTimestamp: false,
 		},
 		lastName: columnDescriptor{
-			columnID:   "LastName",
-			columnType: spansql.Type{Array: false, Base: 3, Len: 1024},
-			notNull:    false,
-			options:    spansql.ColumnOptions{AllowCommitTimestamp: (*bool)(nil)},
+			columnID:             "LastName",
+			columnType:           spansql.Type{Array: false, Base: 3, Len: 1024},
+			notNull:              false,
+			allowCommitTimestamp: false,
 		},
 		singerInfo: columnDescriptor{
-			columnID:   "SingerInfo",
-			columnType: spansql.Type{Array: false, Base: 4, Len: 9223372036854775807},
-			notNull:    false,
-			options:    spansql.ColumnOptions{AllowCommitTimestamp: (*bool)(nil)},
+			columnID:             "SingerInfo",
+			columnType:           spansql.Type{Array: false, Base: 4, Len: 9223372036854775807},
+			notNull:              false,
+			allowCommitTimestamp: false,
 		},
 	},
 }
@@ -129,14 +129,14 @@ type ColumnDescriptor interface {
 	ColumnName() string
 	ColumnType() spansql.Type
 	NotNull() bool
-	Options() spansql.ColumnOptions
+	AllowCommitTimestamp() bool
 }
 
 type columnDescriptor struct {
-	columnID   spansql.ID
-	columnType spansql.Type
-	notNull    bool
-	options    spansql.ColumnOptions
+	columnID             spansql.ID
+	columnType           spansql.Type
+	notNull              bool
+	allowCommitTimestamp bool
 }
 
 func (d *columnDescriptor) ColumnName() string {
@@ -159,6 +159,6 @@ func (d *columnDescriptor) NotNull() bool {
 	return d.notNull
 }
 
-func (d *columnDescriptor) Options() spansql.ColumnOptions {
-	return d.options
+func (d *columnDescriptor) AllowCommitTimestamp() bool {
+	return d.allowCommitTimestamp
 }

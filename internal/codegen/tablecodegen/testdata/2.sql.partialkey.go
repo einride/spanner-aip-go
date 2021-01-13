@@ -21,7 +21,7 @@ func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
-		RHS: spansql.StringLiteral(k.SingerId),
+		RHS: spansql.IntegerLiteral(k.SingerId),
 	})
 	return spansql.Paren{Expr: b}
 }
@@ -30,7 +30,7 @@ func (k SingersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Boo
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
-		RHS: spansql.StringLiteral(k.SingerId),
+		RHS: spansql.IntegerLiteral(k.SingerId),
 	})
 	return spansql.Paren{Expr: b}
 }
@@ -62,7 +62,7 @@ func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
-		RHS: spansql.StringLiteral(k.SingerId),
+		RHS: spansql.IntegerLiteral(k.SingerId),
 	})
 	if k.ValidAlbumId {
 		b = spansql.LogicalOp{
@@ -71,7 +71,7 @@ func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {
 			RHS: spansql.ComparisonOp{
 				Op:  spansql.Eq,
 				LHS: spansql.ID("AlbumId"),
-				RHS: spansql.StringLiteral(k.AlbumId),
+				RHS: spansql.IntegerLiteral(k.AlbumId),
 			},
 		}
 	}
@@ -82,7 +82,7 @@ func (k AlbumsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Bool
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
-		RHS: spansql.StringLiteral(k.SingerId),
+		RHS: spansql.IntegerLiteral(k.SingerId),
 	})
 	if k.ValidAlbumId {
 		b = spansql.LogicalOp{
@@ -91,7 +91,7 @@ func (k AlbumsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Bool
 			RHS: spansql.ComparisonOp{
 				Op:  spansql.Eq,
 				LHS: append(prefix, spansql.ID("AlbumId")),
-				RHS: spansql.StringLiteral(k.AlbumId),
+				RHS: spansql.IntegerLiteral(k.AlbumId),
 			},
 		}
 	}
