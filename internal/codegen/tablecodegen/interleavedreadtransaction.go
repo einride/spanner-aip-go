@@ -125,7 +125,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateGetRowMethod(f *codegen
 	f.P("row, err := it.Next()")
 	f.P("if err != nil {")
 	f.P("if err == ", iteratorPkg, ".Done {")
-	f.P(`return nil, `, statusPkg, `.Errorf(`, codesPkg, `.NotFound, "not found: %s", key)`)
+	f.P(`return nil, `, statusPkg, `.Errorf(`, codesPkg, `.NotFound, "not found: %v", key)`)
 	f.P("}")
 	f.P("return nil, err")
 	f.P("}")
