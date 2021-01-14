@@ -9,6 +9,6 @@ require (
 	go.einride.tech/aip v0.20.0
 	google.golang.org/api v0.35.0
 	google.golang.org/grpc v1.34.0
-	gopkg.in/yaml.v2 v2.2.2
+	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.0.3
 )
