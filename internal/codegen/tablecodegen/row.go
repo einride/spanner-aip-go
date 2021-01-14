@@ -209,7 +209,7 @@ func (g RowCodeGenerator) generateColumnNamesFunctions(f *codegen.File) {
 }
 
 func (g RowCodeGenerator) generatePrimaryKeyMethod(f *codegen.File) {
-	primaryKey := PrimaryKeyCodeGenerator(g)
+	primaryKey := KeyCodeGenerator(g)
 	f.P()
 	f.P("func (r *", g.Type(), ") ", g.PrimaryKeyMethod(), "() ", primaryKey.Type(), " {")
 	f.P("return ", primaryKey.Type(), "{")

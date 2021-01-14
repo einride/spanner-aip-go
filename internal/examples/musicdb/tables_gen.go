@@ -38,7 +38,7 @@ func (t SingersReadTransaction) Read(
 
 func (t SingersReadTransaction) Get(
 	ctx context.Context,
-	key SingersPrimaryKey,
+	key SingersKey,
 ) (*SingersRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
@@ -58,7 +58,7 @@ func (t SingersReadTransaction) Get(
 
 func (t SingersReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []SingersPrimaryKey,
+	keys []SingersKey,
 ) ([]*SingersRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
@@ -66,7 +66,7 @@ func (t SingersReadTransaction) BatchGet(
 	}
 	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
 	defer it.Stop()
-	foundRows := make(map[SingersPrimaryKey]*SingersRow, len(keys))
+	foundRows := make(map[SingersKey]*SingersRow, len(keys))
 	if err := it.Do(func(row *SingersRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
@@ -137,25 +137,25 @@ func (i *SingersRowIterator) Do(f func(row *SingersRow) error) error {
 	})
 }
 
-type SingersPrimaryKey struct {
+type SingersKey struct {
 	SingerId int64
 }
 
-func (k SingersPrimaryKey) SpannerKey() spanner.Key {
+func (k SingersKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.SingerId,
 	}
 }
 
-func (k SingersPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k SingersKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k SingersPrimaryKey) Delete() *spanner.Mutation {
+func (k SingersKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
 }
 
-func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k SingersKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -164,7 +164,7 @@ func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SingersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SingersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -173,19 +173,19 @@ func (k SingersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Boo
 	return spansql.Paren{Expr: b}
 }
 
-type SingersPartialKey struct {
+type SingersKeyPrefix struct {
 	SingerId int64
 }
 
-func (k SingersPartialKey) SpannerKey() spanner.Key {
+func (k SingersKeyPrefix) SpannerKey() spanner.Key {
 	return spanner.Key{k.SingerId}
 }
 
-func (k SingersPartialKey) Delete() *spanner.Mutation {
+func (k SingersKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
 }
 
-func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
+func (k SingersKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -194,7 +194,7 @@ func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SingersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SingersKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -204,8 +204,8 @@ func (k SingersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Boo
 }
 
 type SingersKeyRange struct {
-	Start SingersPartialKey
-	End   SingersPartialKey
+	Start SingersKeyPrefix
+	End   SingersKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -342,8 +342,8 @@ func (r *SingersRow) MutationForColumns(columns []string) (string, []string, []i
 	return "Singers", columns, values
 }
 
-func (r *SingersRow) PrimaryKey() SingersPrimaryKey {
-	return SingersPrimaryKey{
+func (r *SingersRow) PrimaryKey() SingersKey {
+	return SingersKey{
 		SingerId: r.SingerId,
 	}
 }
@@ -406,7 +406,7 @@ func (t SingersAndAlbumsReadTransaction) List(
 
 func (t SingersAndAlbumsReadTransaction) Get(
 	ctx context.Context,
-	key SingersPrimaryKey,
+	key SingersKey,
 ) (*SingersAndAlbumsRow, error) {
 	it := t.List(ctx, ListQuery{
 		Where: key.BoolExpr(),
@@ -425,7 +425,7 @@ func (t SingersAndAlbumsReadTransaction) Get(
 
 func (t SingersAndAlbumsReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []SingersPrimaryKey,
+	keys []SingersKey,
 ) ([]*SingersAndAlbumsRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
@@ -443,9 +443,9 @@ func (t SingersAndAlbumsReadTransaction) BatchGet(
 		Limit: int64(len(keys)),
 	})
 	defer it.Stop()
-	foundRows := make(map[SingersPrimaryKey]*SingersAndAlbumsRow, len(keys))
+	foundRows := make(map[SingersKey]*SingersAndAlbumsRow, len(keys))
 	if err := it.Do(func(row *SingersAndAlbumsRow) error {
-		foundRows[row.SingersPrimaryKey()] = row
+		foundRows[row.SingersKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -495,14 +495,14 @@ type SingersAndAlbumsRow struct {
 	Albums     []*AlbumsRow       `spanner:"Albums"`
 }
 
-func (r *SingersAndAlbumsRow) SingersPrimaryKey() SingersPrimaryKey {
-	return SingersPrimaryKey{
+func (r *SingersAndAlbumsRow) SingersKey() SingersKey {
+	return SingersKey{
 		SingerId: r.SingerId,
 	}
 }
 
-func (r SingersAndAlbumsRow) AlbumsPartialKey() AlbumsPartialKey {
-	return AlbumsPartialKey{
+func (r SingersAndAlbumsRow) AlbumsKeyPrefix() AlbumsKeyPrefix {
+	return AlbumsKeyPrefix{
 		SingerId: r.SingerId,
 	}
 }
@@ -562,7 +562,7 @@ func (r SingersAndAlbumsRow) Update() []*spanner.Mutation {
 	n += len(r.Albums)
 	mutations := make([]*spanner.Mutation, 0, n)
 	mutations = append(mutations, r.SingersRow().Update())
-	mutations = append(mutations, r.AlbumsPartialKey().Delete())
+	mutations = append(mutations, r.AlbumsKeyPrefix().Delete())
 	for _, interleavedRow := range r.Albums {
 		mutations = append(mutations, interleavedRow.Insert())
 	}
@@ -593,7 +593,7 @@ func (t AlbumsReadTransaction) Read(
 
 func (t AlbumsReadTransaction) Get(
 	ctx context.Context,
-	key AlbumsPrimaryKey,
+	key AlbumsKey,
 ) (*AlbumsRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
@@ -613,7 +613,7 @@ func (t AlbumsReadTransaction) Get(
 
 func (t AlbumsReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []AlbumsPrimaryKey,
+	keys []AlbumsKey,
 ) ([]*AlbumsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
@@ -621,7 +621,7 @@ func (t AlbumsReadTransaction) BatchGet(
 	}
 	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
 	defer it.Stop()
-	foundRows := make(map[AlbumsPrimaryKey]*AlbumsRow, len(keys))
+	foundRows := make(map[AlbumsKey]*AlbumsRow, len(keys))
 	if err := it.Do(func(row *AlbumsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
@@ -692,27 +692,27 @@ func (i *AlbumsRowIterator) Do(f func(row *AlbumsRow) error) error {
 	})
 }
 
-type AlbumsPrimaryKey struct {
+type AlbumsKey struct {
 	SingerId int64
 	AlbumId  int64
 }
 
-func (k AlbumsPrimaryKey) SpannerKey() spanner.Key {
+func (k AlbumsKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.SingerId,
 		k.AlbumId,
 	}
 }
 
-func (k AlbumsPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k AlbumsKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k AlbumsPrimaryKey) Delete() *spanner.Mutation {
+func (k AlbumsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Albums", k.SpannerKey())
 }
 
-func (k AlbumsPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k AlbumsKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -730,7 +730,7 @@ func (k AlbumsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k AlbumsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k AlbumsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -748,13 +748,13 @@ func (k AlbumsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Bool
 	return spansql.Paren{Expr: b}
 }
 
-type AlbumsPartialKey struct {
+type AlbumsKeyPrefix struct {
 	SingerId     int64
 	AlbumId      int64
 	ValidAlbumId bool
 }
 
-func (k AlbumsPartialKey) SpannerKey() spanner.Key {
+func (k AlbumsKeyPrefix) SpannerKey() spanner.Key {
 	n := 1
 	if k.ValidAlbumId {
 		n++
@@ -767,15 +767,15 @@ func (k AlbumsPartialKey) SpannerKey() spanner.Key {
 	return result
 }
 
-func (k AlbumsPartialKey) SpannerKeySet() spanner.KeySet {
+func (k AlbumsKeyPrefix) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k AlbumsPartialKey) Delete() *spanner.Mutation {
+func (k AlbumsKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("Albums", k.SpannerKey())
 }
 
-func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {
+func (k AlbumsKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -795,7 +795,7 @@ func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k AlbumsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k AlbumsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -816,8 +816,8 @@ func (k AlbumsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Bool
 }
 
 type AlbumsKeyRange struct {
-	Start AlbumsPartialKey
-	End   AlbumsPartialKey
+	Start AlbumsKeyPrefix
+	End   AlbumsKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -937,8 +937,8 @@ func (r *AlbumsRow) MutationForColumns(columns []string) (string, []string, []in
 	return "Albums", columns, values
 }
 
-func (r *AlbumsRow) PrimaryKey() AlbumsPrimaryKey {
-	return AlbumsPrimaryKey{
+func (r *AlbumsRow) PrimaryKey() AlbumsKey {
+	return AlbumsKey{
 		SingerId: r.SingerId,
 		AlbumId:  r.AlbumId,
 	}
@@ -1004,7 +1004,7 @@ func (t AlbumsAndSongsReadTransaction) List(
 
 func (t AlbumsAndSongsReadTransaction) Get(
 	ctx context.Context,
-	key AlbumsPrimaryKey,
+	key AlbumsKey,
 ) (*AlbumsAndSongsRow, error) {
 	it := t.List(ctx, ListQuery{
 		Where: key.BoolExpr(),
@@ -1023,7 +1023,7 @@ func (t AlbumsAndSongsReadTransaction) Get(
 
 func (t AlbumsAndSongsReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []AlbumsPrimaryKey,
+	keys []AlbumsKey,
 ) ([]*AlbumsAndSongsRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
@@ -1041,9 +1041,9 @@ func (t AlbumsAndSongsReadTransaction) BatchGet(
 		Limit: int64(len(keys)),
 	})
 	defer it.Stop()
-	foundRows := make(map[AlbumsPrimaryKey]*AlbumsAndSongsRow, len(keys))
+	foundRows := make(map[AlbumsKey]*AlbumsAndSongsRow, len(keys))
 	if err := it.Do(func(row *AlbumsAndSongsRow) error {
-		foundRows[row.AlbumsPrimaryKey()] = row
+		foundRows[row.AlbumsKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -1092,15 +1092,15 @@ type AlbumsAndSongsRow struct {
 	Songs      []*SongsRow        `spanner:"Songs"`
 }
 
-func (r *AlbumsAndSongsRow) AlbumsPrimaryKey() AlbumsPrimaryKey {
-	return AlbumsPrimaryKey{
+func (r *AlbumsAndSongsRow) AlbumsKey() AlbumsKey {
+	return AlbumsKey{
 		SingerId: r.SingerId,
 		AlbumId:  r.AlbumId,
 	}
 }
 
-func (r AlbumsAndSongsRow) SongsPartialKey() SongsPartialKey {
-	return SongsPartialKey{
+func (r AlbumsAndSongsRow) SongsKeyPrefix() SongsKeyPrefix {
+	return SongsKeyPrefix{
 		SingerId:     r.SingerId,
 		AlbumId:      r.AlbumId,
 		ValidAlbumId: true,
@@ -1157,7 +1157,7 @@ func (r AlbumsAndSongsRow) Update() []*spanner.Mutation {
 	n += len(r.Songs)
 	mutations := make([]*spanner.Mutation, 0, n)
 	mutations = append(mutations, r.AlbumsRow().Update())
-	mutations = append(mutations, r.SongsPartialKey().Delete())
+	mutations = append(mutations, r.SongsKeyPrefix().Delete())
 	for _, interleavedRow := range r.Songs {
 		mutations = append(mutations, interleavedRow.Insert())
 	}
@@ -1188,7 +1188,7 @@ func (t SongsReadTransaction) Read(
 
 func (t SongsReadTransaction) Get(
 	ctx context.Context,
-	key SongsPrimaryKey,
+	key SongsKey,
 ) (*SongsRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
@@ -1208,7 +1208,7 @@ func (t SongsReadTransaction) Get(
 
 func (t SongsReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []SongsPrimaryKey,
+	keys []SongsKey,
 ) ([]*SongsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
@@ -1216,7 +1216,7 @@ func (t SongsReadTransaction) BatchGet(
 	}
 	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
 	defer it.Stop()
-	foundRows := make(map[SongsPrimaryKey]*SongsRow, len(keys))
+	foundRows := make(map[SongsKey]*SongsRow, len(keys))
 	if err := it.Do(func(row *SongsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
@@ -1287,13 +1287,13 @@ func (i *SongsRowIterator) Do(f func(row *SongsRow) error) error {
 	})
 }
 
-type SongsPrimaryKey struct {
+type SongsKey struct {
 	SingerId int64
 	AlbumId  int64
 	TrackId  int64
 }
 
-func (k SongsPrimaryKey) SpannerKey() spanner.Key {
+func (k SongsKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.SingerId,
 		k.AlbumId,
@@ -1301,15 +1301,15 @@ func (k SongsPrimaryKey) SpannerKey() spanner.Key {
 	}
 }
 
-func (k SongsPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k SongsKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k SongsPrimaryKey) Delete() *spanner.Mutation {
+func (k SongsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Songs", k.SpannerKey())
 }
 
-func (k SongsPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k SongsKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -1336,7 +1336,7 @@ func (k SongsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SongsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SongsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -1363,7 +1363,7 @@ func (k SongsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolE
 	return spansql.Paren{Expr: b}
 }
 
-type SongsPartialKey struct {
+type SongsKeyPrefix struct {
 	SingerId     int64
 	AlbumId      int64
 	ValidAlbumId bool
@@ -1371,7 +1371,7 @@ type SongsPartialKey struct {
 	ValidTrackId bool
 }
 
-func (k SongsPartialKey) SpannerKey() spanner.Key {
+func (k SongsKeyPrefix) SpannerKey() spanner.Key {
 	n := 1
 	if k.ValidAlbumId {
 		n++
@@ -1390,15 +1390,15 @@ func (k SongsPartialKey) SpannerKey() spanner.Key {
 	return result
 }
 
-func (k SongsPartialKey) SpannerKeySet() spanner.KeySet {
+func (k SongsKeyPrefix) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k SongsPartialKey) Delete() *spanner.Mutation {
+func (k SongsKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("Songs", k.SpannerKey())
 }
 
-func (k SongsPartialKey) BoolExpr() spansql.BoolExpr {
+func (k SongsKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -1429,7 +1429,7 @@ func (k SongsPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SongsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SongsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -1461,8 +1461,8 @@ func (k SongsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolE
 }
 
 type SongsKeyRange struct {
-	Start SongsPartialKey
-	End   SongsPartialKey
+	Start SongsKeyPrefix
+	End   SongsKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -1593,8 +1593,8 @@ func (r *SongsRow) MutationForColumns(columns []string) (string, []string, []int
 	return "Songs", columns, values
 }
 
-func (r *SongsRow) PrimaryKey() SongsPrimaryKey {
-	return SongsPrimaryKey{
+func (r *SongsRow) PrimaryKey() SongsKey {
+	return SongsKey{
 		SingerId: r.SingerId,
 		AlbumId:  r.AlbumId,
 		TrackId:  r.TrackId,

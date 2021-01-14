@@ -110,7 +110,7 @@ func (g ReadTransactionCodeGenerator) generateListRowsMethod(f *codegen.File) {
 }
 
 func (g ReadTransactionCodeGenerator) generateGetRowMethod(f *codegen.File) {
-	primaryKey := PrimaryKeyCodeGenerator(g)
+	primaryKey := KeyCodeGenerator(g)
 	row := RowCodeGenerator(g)
 	contextPkg := f.Import("context")
 	f.P()
@@ -140,7 +140,7 @@ func (g ReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *codegen.File
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	statusPkg := f.Import("google.golang.org/grpc/status")
 	codesPkg := f.Import("google.golang.org/grpc/codes")
-	primaryKey := PrimaryKeyCodeGenerator(g)
+	primaryKey := KeyCodeGenerator(g)
 	row := RowCodeGenerator(g)
 	f.P()
 	f.P("func (t ", g.Type(), ") ", g.BatchGetMethod(), "(")

@@ -97,8 +97,8 @@ func main() {
 			for _, table := range db.Tables {
 				tablecodegen.ReadTransactionCodeGenerator{Table: table}.GenerateCode(f)
 				tablecodegen.RowIteratorCodeGenerator{Table: table}.GenerateCode(f)
-				tablecodegen.PrimaryKeyCodeGenerator{Table: table}.GenerateCode(f)
-				tablecodegen.PartialKeyCodeGenerator{Table: table}.GenerateCode(f)
+				tablecodegen.KeyCodeGenerator{Table: table}.GenerateCode(f)
+				tablecodegen.KeyPrefixCodeGenerator{Table: table}.GenerateCode(f)
 				tablecodegen.KeyRangeCodeGenerator{Table: table}.GenerateCode(f)
 				tablecodegen.RowCodeGenerator{Table: table}.GenerateCode(f)
 				interleavedTables := db.InterleavedTables(table.Name)

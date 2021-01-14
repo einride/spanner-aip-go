@@ -12,19 +12,19 @@ import (
 	"go.einride.tech/aip-spanner/spanddl"
 )
 
-type PrimaryKeyCodeGenerator struct {
+type KeyCodeGenerator struct {
 	Table *spanddl.Table
 }
 
-func (g PrimaryKeyCodeGenerator) Type() string {
-	return strcase.UpperCamelCase(string(g.Table.Name)) + "PrimaryKey"
+func (g KeyCodeGenerator) Type() string {
+	return strcase.UpperCamelCase(string(g.Table.Name)) + "Key"
 }
 
-func (g PrimaryKeyCodeGenerator) FieldName(keyPart spansql.KeyPart) string {
+func (g KeyCodeGenerator) FieldName(keyPart spansql.KeyPart) string {
 	return strcase.UpperCamelCase(string(keyPart.Column))
 }
 
-func (g PrimaryKeyCodeGenerator) GenerateCode(f *codegen.File) {
+func (g KeyCodeGenerator) GenerateCode(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	f.P()
 	f.P("type ", g.Type(), " struct {")
@@ -49,7 +49,7 @@ func (g PrimaryKeyCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateQualifiedBoolExprMethod(f)
 }
 
-func (g PrimaryKeyCodeGenerator) generateDeleteMethod(f *codegen.File) {
+func (g KeyCodeGenerator) generateDeleteMethod(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	f.P()
 	f.P("func (k ", g.Type(), ") Delete() *", spannerPkg, ".Mutation {")
@@ -57,7 +57,7 @@ func (g PrimaryKeyCodeGenerator) generateDeleteMethod(f *codegen.File) {
 	f.P("}")
 }
 
-func (g PrimaryKeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
+func (g KeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	k0 := g.Table.PrimaryKey[0]
@@ -88,7 +88,7 @@ func (g PrimaryKeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 	f.P("}")
 }
 
-func (g PrimaryKeyCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File) {
+func (g KeyCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File) {
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	k0 := g.Table.PrimaryKey[0]
@@ -119,7 +119,7 @@ func (g PrimaryKeyCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File
 	f.P("}")
 }
 
-func (g PrimaryKeyCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Column {
+func (g KeyCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Column {
 	column, ok := g.Table.Column(keyPart.Column)
 	if !ok {
 		panic(fmt.Errorf("table %s has no column %s", g.Table.Name, keyPart.Column))
@@ -127,7 +127,7 @@ func (g PrimaryKeyCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Col
 	return column
 }
 
-func (g PrimaryKeyCodeGenerator) columnType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
+func (g KeyCodeGenerator) columnType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
 	t := typescodegen.GoType(g.keyColumn(keyPart))
 	if t.PkgPath() != "" {
 		_ = f.Import(t.PkgPath())
@@ -135,7 +135,7 @@ func (g PrimaryKeyCodeGenerator) columnType(f *codegen.File, keyPart spansql.Key
 	return t
 }
 
-func (g PrimaryKeyCodeGenerator) columnSpanSQLType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
+func (g KeyCodeGenerator) columnSpanSQLType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
 	t := typescodegen.SpanSQLType(g.keyColumn(keyPart))
 	if t.PkgPath() != "" {
 		_ = f.Import(t.PkgPath())

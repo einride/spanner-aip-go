@@ -10,11 +10,13 @@ import (
 
 func ExampleAlbumsReadTransaction_Get() {
 	ctx := context.Background()
-	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
+	client, err := spanner.NewClient(
+		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
+	)
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	singer, err := musicdb.Singers(client.Single()).Get(ctx, musicdb.SingersPrimaryKey{
+	singer, err := musicdb.Singers(client.Single()).Get(ctx, musicdb.SingersKey{
 		SingerId: 42,
 	})
 	if err != nil {
@@ -25,11 +27,17 @@ func ExampleAlbumsReadTransaction_Get() {
 
 func ExampleAlbumsReadTransaction_List() {
 	ctx := context.Background()
-	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
+	client, err := spanner.NewClient(
+		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
+	)
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	// SELECT * FROM Singers WHERE LastName = "Sinatra" ORDER BY FirstName DESC LIMIT 5 OFFSET 10
+	// SELECT * FROM Singers
+	// WHERE LastName = "Sinatra"
+	// ORDER BY FirstName DESC
+	// LIMIT 5
+	// OFFSET 10
 	if err := musicdb.Singers(client.Single()).List(ctx, musicdb.ListQuery{
 		Where: spansql.ComparisonOp{
 			Op:  spansql.Eq,
@@ -51,19 +59,21 @@ func ExampleAlbumsReadTransaction_List() {
 
 func Example_readOnlyTransaction_MultipleTables() {
 	ctx := context.Background()
-	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
+	client, err := spanner.NewClient(
+		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
+	)
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
 	tx := client.ReadOnlyTransaction()
 	defer tx.Close()
-	singer, err := musicdb.Singers(tx).Get(ctx, musicdb.SingersPrimaryKey{
+	singer, err := musicdb.Singers(tx).Get(ctx, musicdb.SingersKey{
 		SingerId: 42,
 	})
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	album, err := musicdb.Albums(tx).Get(ctx, musicdb.AlbumsPrimaryKey{
+	album, err := musicdb.Albums(tx).Get(ctx, musicdb.AlbumsKey{
 		SingerId: 42,
 		AlbumId:  24,
 	})

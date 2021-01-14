@@ -21,11 +21,11 @@ func TestInterleavedRowIteratorCodeGenerator_GenerateCode(t *testing.T) {
 					InterleavedTables: interleavedTables,
 				}.GenerateCode(f)
 				for _, interleavedTable := range interleavedTables {
-					PartialKeyCodeGenerator{Table: interleavedTable}.GenerateCode(f)
+					KeyPrefixCodeGenerator{Table: interleavedTable}.GenerateCode(f)
 				}
 			}
 			RowCodeGenerator{Table: table}.GenerateCode(f)
-			PrimaryKeyCodeGenerator{Table: table}.GenerateCode(f)
+			KeyCodeGenerator{Table: table}.GenerateCode(f)
 		}
 		CommonCodeGenerator{}.GenerateCode(f)
 	})

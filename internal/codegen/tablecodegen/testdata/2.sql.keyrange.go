@@ -10,8 +10,8 @@ import (
 )
 
 type SingersKeyRange struct {
-	Start SingersPartialKey
-	End   SingersPartialKey
+	Start SingersKeyPrefix
+	End   SingersKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -23,19 +23,19 @@ func (k SingersKeyRange) SpannerKeySet() spanner.KeySet {
 	}
 }
 
-type SingersPartialKey struct {
+type SingersKeyPrefix struct {
 	SingerId int64
 }
 
-func (k SingersPartialKey) SpannerKey() spanner.Key {
+func (k SingersKeyPrefix) SpannerKey() spanner.Key {
 	return spanner.Key{k.SingerId}
 }
 
-func (k SingersPartialKey) Delete() *spanner.Mutation {
+func (k SingersKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
 }
 
-func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
+func (k SingersKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -44,7 +44,7 @@ func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SingersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SingersKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -54,8 +54,8 @@ func (k SingersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Boo
 }
 
 type AlbumsKeyRange struct {
-	Start AlbumsPartialKey
-	End   AlbumsPartialKey
+	Start AlbumsKeyPrefix
+	End   AlbumsKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -67,13 +67,13 @@ func (k AlbumsKeyRange) SpannerKeySet() spanner.KeySet {
 	}
 }
 
-type AlbumsPartialKey struct {
+type AlbumsKeyPrefix struct {
 	SingerId     int64
 	AlbumId      int64
 	ValidAlbumId bool
 }
 
-func (k AlbumsPartialKey) SpannerKey() spanner.Key {
+func (k AlbumsKeyPrefix) SpannerKey() spanner.Key {
 	n := 1
 	if k.ValidAlbumId {
 		n++
@@ -86,15 +86,15 @@ func (k AlbumsPartialKey) SpannerKey() spanner.Key {
 	return result
 }
 
-func (k AlbumsPartialKey) SpannerKeySet() spanner.KeySet {
+func (k AlbumsKeyPrefix) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k AlbumsPartialKey) Delete() *spanner.Mutation {
+func (k AlbumsKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("Albums", k.SpannerKey())
 }
 
-func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {
+func (k AlbumsKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -114,7 +114,7 @@ func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k AlbumsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k AlbumsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),

@@ -12,7 +12,7 @@ func TestRowCodeGenerator_GenerateCode(t *testing.T) {
 	runGoldenFileTest(t, "row", func(db *spanddl.Database, f *codegen.File) {
 		for _, table := range db.Tables {
 			RowCodeGenerator{Table: table}.GenerateCode(f)
-			PrimaryKeyCodeGenerator{Table: table}.GenerateCode(f)
+			KeyCodeGenerator{Table: table}.GenerateCode(f)
 		}
 	})
 }
