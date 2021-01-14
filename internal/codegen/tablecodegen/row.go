@@ -59,6 +59,8 @@ func (g RowCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateValidateFunction(f)
 	g.generateUnmarshalFunction(f)
 	g.generateMutationFunctions(f)
+	g.generateMutationFunction(f)
+	g.generateMutationForColumnsFunction(f)
 	g.generatePrimaryKeyMethod(f)
 }
 
@@ -120,15 +122,6 @@ func (g RowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
 func (g RowCodeGenerator) generateMutationFunctions(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	f.P()
-	f.P("func (r *", g.Type(), ") MutationForColumns(columns []string) (string, []string, []interface{}) {")
-	f.P("var values []interface{}")
-	f.P("return ", strconv.Quote(string(g.Table.Name)), ", columns, values")
-	f.P("}")
-	f.P()
-	f.P("func (r *", g.Type(), ") Mutation() (string, []string, []interface{}) {")
-	f.P("return r.MutationForColumns(r.", g.ColumnNamesMethod(), "())")
-	f.P("}")
-	f.P()
 	f.P("func (r *", g.Type(), ") Insert() *", spannerPkg, ".Mutation {")
 	f.P("return ", spannerPkg, ".Insert(r.Mutation())")
 	f.P("}")
@@ -151,6 +144,39 @@ func (g RowCodeGenerator) generateMutationFunctions(f *codegen.File) {
 	f.P()
 	f.P("func (r *", g.Type(), ") UpdateColumns(columns []string) *", spannerPkg, ".Mutation {")
 	f.P("return ", spannerPkg, ".Update(r.MutationForColumns(columns))")
+	f.P("}")
+}
+
+func (g RowCodeGenerator) generateMutationFunction(f *codegen.File) {
+	f.P()
+	f.P("func (r *", g.Type(), ") Mutation() (string, []string, []interface{}) {")
+	f.P("return ", strconv.Quote(string(g.Table.Name)), ", r.", g.ColumnNamesMethod(), "(), []interface{}{")
+	for _, column := range g.Table.Columns {
+		f.P("r.", g.ColumnFieldName(column), ",")
+	}
+	f.P("}")
+	f.P("}")
+}
+
+func (g RowCodeGenerator) generateMutationForColumnsFunction(f *codegen.File) {
+	fmtPkg := f.Import("fmt")
+	f.P()
+	f.P("func (r *", g.Type(), ") MutationForColumns(columns []string) (string, []string, []interface{}) {")
+	f.P("if len(columns) == 0 {")
+	f.P("columns = r.", g.ColumnNamesMethod(), "()")
+	f.P("}")
+	f.P("values := make([]interface{}, 0, len(columns))")
+	f.P("for _, column := range columns {")
+	f.P("switch column {")
+	for _, column := range g.Table.Columns {
+		f.P("case ", strconv.Quote(string(column.Name)), ":")
+		f.P("values = append(values, r.", g.ColumnFieldName(column), ")")
+	}
+	f.P("default:")
+	f.P(`panic(`, fmtPkg, `.Errorf("table `, g.Table.Name, ` does not have column %s", column))`)
+	f.P("}")
+	f.P("}")
+	f.P("return ", strconv.Quote(string(g.Table.Name)), ", columns, values")
 	f.P("}")
 }
 

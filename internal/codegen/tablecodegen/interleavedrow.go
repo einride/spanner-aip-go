@@ -31,7 +31,7 @@ func (g InterleavedRowCodeGenerator) UnmarshalSpannerRowMethod() string {
 }
 
 func (g InterleavedRowCodeGenerator) PrimaryKeyMethod() string {
-	return "PrimaryKey"
+	return PrimaryKeyCodeGenerator{g.Table}.Type()
 }
 
 func (g InterleavedRowCodeGenerator) Type() string {
@@ -58,7 +58,82 @@ func (g InterleavedRowCodeGenerator) GenerateCode(f *codegen.File) {
 	}
 	f.P("}")
 	g.generatePrimaryKeyMethod(f)
+	g.generateInterleavedPartialKeysMethods(f)
 	g.generateUnmarshalFunction(f)
+	g.generateRowMethod(f)
+	g.generateInsertMutationMethod(f)
+	g.generateUpdateMutationMethod(f)
+}
+
+func (g InterleavedRowCodeGenerator) generateInsertMutationMethod(f *codegen.File) {
+	spannerPkg := f.Import("cloud.google.com/go/spanner")
+	row := RowCodeGenerator{Table: g.Table}
+	f.P()
+	f.P("func (r ", g.Type(), ") Insert() []*", spannerPkg, ".Mutation {")
+	f.P("n := 1")
+	for _, interleavedTable := range g.InterleavedTables {
+		f.P("n+=len(r.", g.InterleavedRowsField(interleavedTable), ")")
+	}
+	f.P("mutations := make([]*", spannerPkg, ".Mutation, 0, n)")
+	f.P("mutations = append(mutations, r.", row.Type(), "().Insert())")
+	for _, interleavedTable := range g.InterleavedTables {
+		f.P("for _, interleavedRow := range r.", g.InterleavedRowsField(interleavedTable), " {")
+		f.P("mutations = append(mutations, interleavedRow.Insert())")
+		f.P("}")
+	}
+	f.P("return mutations")
+	f.P("}")
+}
+
+func (g InterleavedRowCodeGenerator) generateInterleavedPartialKeysMethods(f *codegen.File) {
+	for _, interleavedTable := range g.InterleavedTables {
+		partialKey := PartialKeyCodeGenerator{Table: interleavedTable}
+		f.P()
+		f.P("func (r ", g.Type(), ") ", partialKey.Type(), "() ", partialKey.Type(), " {")
+		f.P("return ", partialKey.Type(), "{")
+		for i, keyPart := range g.Table.PrimaryKey {
+			f.P(partialKey.FieldName(keyPart), ": r.", partialKey.FieldName(keyPart), ",")
+			if i > 0 {
+				f.P("Valid", partialKey.FieldName(keyPart), ": true,")
+			}
+		}
+		f.P("}")
+		f.P("}")
+	}
+}
+
+func (g InterleavedRowCodeGenerator) generateUpdateMutationMethod(f *codegen.File) {
+	spannerPkg := f.Import("cloud.google.com/go/spanner")
+	row := RowCodeGenerator{Table: g.Table}
+	f.P()
+	f.P("func (r ", g.Type(), ") Update() []*", spannerPkg, ".Mutation {")
+	f.P("n := ", 1+len(g.InterleavedTables), " // one delete mutation per interleaved table")
+	for _, interleavedTable := range g.InterleavedTables {
+		f.P("n+=len(r.", g.InterleavedRowsField(interleavedTable), ")")
+	}
+	f.P("mutations := make([]*", spannerPkg, ".Mutation, 0, n)")
+	f.P("mutations = append(mutations, r.", row.Type(), "().Update())")
+	for _, interleavedTable := range g.InterleavedTables {
+		partialKey := PartialKeyCodeGenerator{Table: interleavedTable}
+		f.P("mutations = append(mutations, r.", partialKey.Type(), "().Delete())")
+		f.P("for _, interleavedRow := range r.", g.InterleavedRowsField(interleavedTable), " {")
+		f.P("mutations = append(mutations, interleavedRow.Insert())")
+		f.P("}")
+	}
+	f.P("return mutations")
+	f.P("}")
+}
+
+func (g InterleavedRowCodeGenerator) generateRowMethod(f *codegen.File) {
+	row := RowCodeGenerator{Table: g.Table}
+	f.P()
+	f.P("func (r ", g.Type(), ") ", row.Type(), "() *", row.Type(), " {")
+	f.P("return &", row.Type(), "{")
+	for _, column := range row.Table.Columns {
+		f.P(row.ColumnFieldName(column), ": r.", row.ColumnFieldName(column), ",")
+	}
+	f.P("}")
+	f.P("}")
 }
 
 func (g InterleavedRowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
