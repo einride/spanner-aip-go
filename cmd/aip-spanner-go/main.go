@@ -88,37 +88,13 @@ func main() {
 		}
 		log.Println("wrote:", filename)
 		if len(db.Tables) > 0 {
-			filename := filepath.Join(databaseConfig.Package.Path, "tables_gen.go")
+			filename := filepath.Join(databaseConfig.Package.Path, "database_gen.go")
 			f := codegen.NewFile(codegen.FileConfig{
 				Filename:    filename,
 				Package:     databaseConfig.Package.Name,
 				GeneratedBy: generatedBy,
 			})
-			for _, table := range db.Tables {
-				tablecodegen.ReadTransactionCodeGenerator{Table: table}.GenerateCode(f)
-				tablecodegen.RowIteratorCodeGenerator{Table: table}.GenerateCode(f)
-				tablecodegen.KeyCodeGenerator{Table: table}.GenerateCode(f)
-				tablecodegen.KeyPrefixCodeGenerator{Table: table}.GenerateCode(f)
-				tablecodegen.KeyRangeCodeGenerator{Table: table}.GenerateCode(f)
-				tablecodegen.RowCodeGenerator{Table: table}.GenerateCode(f)
-				interleavedTables := db.InterleavedTables(table.Name)
-				if len(interleavedTables) == 0 {
-					continue
-				}
-				tablecodegen.InterleavedReadTransactionCodeGenerator{
-					Table:             table,
-					InterleavedTables: interleavedTables,
-				}.GenerateCode(f)
-				tablecodegen.InterleavedRowIteratorCodeGenerator{
-					Table:             table,
-					InterleavedTables: interleavedTables,
-				}.GenerateCode(f)
-				tablecodegen.InterleavedRowCodeGenerator{
-					Table:             table,
-					InterleavedTables: interleavedTables,
-				}.GenerateCode(f)
-			}
-			tablecodegen.CommonCodeGenerator{}.GenerateCode(f)
+			tablecodegen.DatabaseCodeGenerator{Database: &db}.GenerateCode(f)
 			content, err := f.Content()
 			if err != nil {
 				log.Panic(err)
