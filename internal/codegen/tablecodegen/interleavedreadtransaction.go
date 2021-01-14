@@ -110,7 +110,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 }
 
 func (g InterleavedReadTransactionCodeGenerator) generateGetRowMethod(f *codegen.File) {
-	primaryKey := PrimaryKeyCodeGenerator{Table: g.Table}
+	primaryKey := KeyCodeGenerator{Table: g.Table}
 	row := InterleavedRowCodeGenerator(g)
 	common := CommonCodeGenerator{}
 	contextPkg := f.Import("context")
@@ -139,7 +139,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateGetRowMethod(f *codegen
 }
 
 func (g InterleavedReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *codegen.File) {
-	primaryKey := PrimaryKeyCodeGenerator{Table: g.Table}
+	primaryKey := KeyCodeGenerator{Table: g.Table}
 	interleavedRow := InterleavedRowCodeGenerator(g)
 	common := CommonCodeGenerator{}
 	contextPkg := f.Import("context")

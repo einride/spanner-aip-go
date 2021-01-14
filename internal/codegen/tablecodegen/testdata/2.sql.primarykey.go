@@ -9,25 +9,25 @@ import (
 	"cloud.google.com/go/spanner/spansql"
 )
 
-type SingersPrimaryKey struct {
+type SingersKey struct {
 	SingerId int64
 }
 
-func (k SingersPrimaryKey) SpannerKey() spanner.Key {
+func (k SingersKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.SingerId,
 	}
 }
 
-func (k SingersPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k SingersKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k SingersPrimaryKey) Delete() *spanner.Mutation {
+func (k SingersKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
 }
 
-func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k SingersKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -36,7 +36,7 @@ func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SingersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SingersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),
@@ -45,27 +45,27 @@ func (k SingersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Boo
 	return spansql.Paren{Expr: b}
 }
 
-type AlbumsPrimaryKey struct {
+type AlbumsKey struct {
 	SingerId int64
 	AlbumId  int64
 }
 
-func (k AlbumsPrimaryKey) SpannerKey() spanner.Key {
+func (k AlbumsKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.SingerId,
 		k.AlbumId,
 	}
 }
 
-func (k AlbumsPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k AlbumsKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k AlbumsPrimaryKey) Delete() *spanner.Mutation {
+func (k AlbumsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Albums", k.SpannerKey())
 }
 
-func (k AlbumsPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k AlbumsKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -83,7 +83,7 @@ func (k AlbumsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k AlbumsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k AlbumsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),

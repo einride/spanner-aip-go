@@ -137,31 +137,31 @@ func (r *SingersRow) MutationForColumns(columns []string) (string, []string, []i
 	return "Singers", columns, values
 }
 
-func (r *SingersRow) PrimaryKey() SingersPrimaryKey {
-	return SingersPrimaryKey{
+func (r *SingersRow) PrimaryKey() SingersKey {
+	return SingersKey{
 		SingerId: r.SingerId,
 	}
 }
 
-type SingersPrimaryKey struct {
+type SingersKey struct {
 	SingerId int64
 }
 
-func (k SingersPrimaryKey) SpannerKey() spanner.Key {
+func (k SingersKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.SingerId,
 	}
 }
 
-func (k SingersPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k SingersKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k SingersPrimaryKey) Delete() *spanner.Mutation {
+func (k SingersKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
 }
 
-func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k SingersKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -170,7 +170,7 @@ func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SingersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SingersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),

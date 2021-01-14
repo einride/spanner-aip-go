@@ -10,8 +10,8 @@ import (
 )
 
 type SingersKeyRange struct {
-	Start SingersPartialKey
-	End   SingersPartialKey
+	Start SingersKeyPrefix
+	End   SingersKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -23,19 +23,19 @@ func (k SingersKeyRange) SpannerKeySet() spanner.KeySet {
 	}
 }
 
-type SingersPartialKey struct {
+type SingersKeyPrefix struct {
 	SingerId int64
 }
 
-func (k SingersPartialKey) SpannerKey() spanner.Key {
+func (k SingersKeyPrefix) SpannerKey() spanner.Key {
 	return spanner.Key{k.SingerId}
 }
 
-func (k SingersPartialKey) Delete() *spanner.Mutation {
+func (k SingersKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
 }
 
-func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
+func (k SingersKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
@@ -44,7 +44,7 @@ func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SingersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SingersKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("SingerId")),

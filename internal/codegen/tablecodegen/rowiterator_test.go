@@ -13,7 +13,7 @@ func TestRowIteratorCodeGenerator_GenerateCode(t *testing.T) {
 		for _, table := range db.Tables {
 			RowIteratorCodeGenerator{Table: table}.GenerateCode(f)
 			RowCodeGenerator{Table: table}.GenerateCode(f)
-			PrimaryKeyCodeGenerator{Table: table}.GenerateCode(f)
+			KeyCodeGenerator{Table: table}.GenerateCode(f)
 		}
 	})
 }

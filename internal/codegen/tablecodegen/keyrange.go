@@ -16,7 +16,7 @@ func (g KeyRangeCodeGenerator) Type() string {
 
 func (g KeyRangeCodeGenerator) GenerateCode(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
-	partialKey := PartialKeyCodeGenerator(g)
+	partialKey := KeyPrefixCodeGenerator(g)
 	f.P()
 	f.P("type ", g.Type(), " struct {")
 	f.P("Start ", partialKey.Type())

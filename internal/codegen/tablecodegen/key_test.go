@@ -11,7 +11,7 @@ func TestPrimaryKeyCodeGenerator_GenerateCode(t *testing.T) {
 	t.Parallel()
 	runGoldenFileTest(t, "primarykey", func(db *spanddl.Database, f *codegen.File) {
 		for _, table := range db.Tables {
-			PrimaryKeyCodeGenerator{Table: table}.GenerateCode(f)
+			KeyCodeGenerator{Table: table}.GenerateCode(f)
 		}
 	})
 }

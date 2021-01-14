@@ -14,7 +14,7 @@ func TestReadTransactionCodeGenerator_GenerateCode(t *testing.T) {
 			ReadTransactionCodeGenerator{Table: table}.GenerateCode(f)
 			RowIteratorCodeGenerator{Table: table}.GenerateCode(f)
 			RowCodeGenerator{Table: table}.GenerateCode(f)
-			PrimaryKeyCodeGenerator{Table: table}.GenerateCode(f)
+			KeyCodeGenerator{Table: table}.GenerateCode(f)
 		}
 		CommonCodeGenerator{}.GenerateCode(f)
 	})

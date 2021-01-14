@@ -12,7 +12,7 @@ func TestKeyRangeCodeGenerator_GenerateCode(t *testing.T) {
 	runGoldenFileTest(t, "keyrange", func(db *spanddl.Database, f *codegen.File) {
 		for _, table := range db.Tables {
 			KeyRangeCodeGenerator{Table: table}.GenerateCode(f)
-			PartialKeyCodeGenerator{Table: table}.GenerateCode(f)
+			KeyPrefixCodeGenerator{Table: table}.GenerateCode(f)
 		}
 	})
 }

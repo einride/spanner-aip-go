@@ -31,7 +31,7 @@ func (g InterleavedRowCodeGenerator) UnmarshalSpannerRowMethod() string {
 }
 
 func (g InterleavedRowCodeGenerator) PrimaryKeyMethod() string {
-	return PrimaryKeyCodeGenerator{g.Table}.Type()
+	return KeyCodeGenerator{g.Table}.Type()
 }
 
 func (g InterleavedRowCodeGenerator) Type() string {
@@ -87,7 +87,7 @@ func (g InterleavedRowCodeGenerator) generateInsertMutationMethod(f *codegen.Fil
 
 func (g InterleavedRowCodeGenerator) generateInterleavedPartialKeysMethods(f *codegen.File) {
 	for _, interleavedTable := range g.InterleavedTables {
-		partialKey := PartialKeyCodeGenerator{Table: interleavedTable}
+		partialKey := KeyPrefixCodeGenerator{Table: interleavedTable}
 		f.P()
 		f.P("func (r ", g.Type(), ") ", partialKey.Type(), "() ", partialKey.Type(), " {")
 		f.P("return ", partialKey.Type(), "{")
@@ -114,7 +114,7 @@ func (g InterleavedRowCodeGenerator) generateUpdateMutationMethod(f *codegen.Fil
 	f.P("mutations := make([]*", spannerPkg, ".Mutation, 0, n)")
 	f.P("mutations = append(mutations, r.", row.Type(), "().Update())")
 	for _, interleavedTable := range g.InterleavedTables {
-		partialKey := PartialKeyCodeGenerator{Table: interleavedTable}
+		partialKey := KeyPrefixCodeGenerator{Table: interleavedTable}
 		f.P("mutations = append(mutations, r.", partialKey.Type(), "().Delete())")
 		f.P("for _, interleavedRow := range r.", g.InterleavedRowsField(interleavedTable), " {")
 		f.P("mutations = append(mutations, interleavedRow.Insert())")
@@ -168,7 +168,7 @@ func (g InterleavedRowCodeGenerator) generateUnmarshalFunction(f *codegen.File) 
 }
 
 func (g InterleavedRowCodeGenerator) generatePrimaryKeyMethod(f *codegen.File) {
-	primaryKey := PrimaryKeyCodeGenerator{g.Table}
+	primaryKey := KeyCodeGenerator{g.Table}
 	row := RowCodeGenerator{Table: g.Table}
 	f.P()
 	f.P("func (r *", g.Type(), ") ", g.PrimaryKeyMethod(), "() ", primaryKey.Type(), " {")

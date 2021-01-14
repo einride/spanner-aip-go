@@ -39,7 +39,7 @@ func (t ShippersReadTransaction) Read(
 
 func (t ShippersReadTransaction) Get(
 	ctx context.Context,
-	key ShippersPrimaryKey,
+	key ShippersKey,
 ) (*ShippersRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
@@ -59,7 +59,7 @@ func (t ShippersReadTransaction) Get(
 
 func (t ShippersReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []ShippersPrimaryKey,
+	keys []ShippersKey,
 ) ([]*ShippersRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
@@ -67,7 +67,7 @@ func (t ShippersReadTransaction) BatchGet(
 	}
 	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
 	defer it.Stop()
-	foundRows := make(map[ShippersPrimaryKey]*ShippersRow, len(keys))
+	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
 	if err := it.Do(func(row *ShippersRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
@@ -138,25 +138,25 @@ func (i *ShippersRowIterator) Do(f func(row *ShippersRow) error) error {
 	})
 }
 
-type ShippersPrimaryKey struct {
+type ShippersKey struct {
 	ShipperId string
 }
 
-func (k ShippersPrimaryKey) SpannerKey() spanner.Key {
+func (k ShippersKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.ShipperId,
 	}
 }
 
-func (k ShippersPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k ShippersKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k ShippersPrimaryKey) Delete() *spanner.Mutation {
+func (k ShippersKey) Delete() *spanner.Mutation {
 	return spanner.Delete("shippers", k.SpannerKey())
 }
 
-func (k ShippersPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k ShippersKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -165,7 +165,7 @@ func (k ShippersPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k ShippersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k ShippersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -174,19 +174,19 @@ func (k ShippersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Bo
 	return spansql.Paren{Expr: b}
 }
 
-type ShippersPartialKey struct {
+type ShippersKeyPrefix struct {
 	ShipperId string
 }
 
-func (k ShippersPartialKey) SpannerKey() spanner.Key {
+func (k ShippersKeyPrefix) SpannerKey() spanner.Key {
 	return spanner.Key{k.ShipperId}
 }
 
-func (k ShippersPartialKey) Delete() *spanner.Mutation {
+func (k ShippersKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("shippers", k.SpannerKey())
 }
 
-func (k ShippersPartialKey) BoolExpr() spansql.BoolExpr {
+func (k ShippersKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -195,7 +195,7 @@ func (k ShippersPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k ShippersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k ShippersKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -205,8 +205,8 @@ func (k ShippersPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Bo
 }
 
 type ShippersKeyRange struct {
-	Start ShippersPartialKey
-	End   ShippersPartialKey
+	Start ShippersKeyPrefix
+	End   ShippersKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -340,8 +340,8 @@ func (r *ShippersRow) MutationForColumns(columns []string) (string, []string, []
 	return "shippers", columns, values
 }
 
-func (r *ShippersRow) PrimaryKey() ShippersPrimaryKey {
-	return ShippersPrimaryKey{
+func (r *ShippersRow) PrimaryKey() ShippersKey {
+	return ShippersKey{
 		ShipperId: r.ShipperId,
 	}
 }
@@ -370,7 +370,7 @@ func (t SitesReadTransaction) Read(
 
 func (t SitesReadTransaction) Get(
 	ctx context.Context,
-	key SitesPrimaryKey,
+	key SitesKey,
 ) (*SitesRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
@@ -390,7 +390,7 @@ func (t SitesReadTransaction) Get(
 
 func (t SitesReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []SitesPrimaryKey,
+	keys []SitesKey,
 ) ([]*SitesRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
@@ -398,7 +398,7 @@ func (t SitesReadTransaction) BatchGet(
 	}
 	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
 	defer it.Stop()
-	foundRows := make(map[SitesPrimaryKey]*SitesRow, len(keys))
+	foundRows := make(map[SitesKey]*SitesRow, len(keys))
 	if err := it.Do(func(row *SitesRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
@@ -469,27 +469,27 @@ func (i *SitesRowIterator) Do(f func(row *SitesRow) error) error {
 	})
 }
 
-type SitesPrimaryKey struct {
+type SitesKey struct {
 	ShipperId string
 	SiteId    string
 }
 
-func (k SitesPrimaryKey) SpannerKey() spanner.Key {
+func (k SitesKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.ShipperId,
 		k.SiteId,
 	}
 }
 
-func (k SitesPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k SitesKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k SitesPrimaryKey) Delete() *spanner.Mutation {
+func (k SitesKey) Delete() *spanner.Mutation {
 	return spanner.Delete("sites", k.SpannerKey())
 }
 
-func (k SitesPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k SitesKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -507,7 +507,7 @@ func (k SitesPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SitesPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SitesKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -525,13 +525,13 @@ func (k SitesPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolE
 	return spansql.Paren{Expr: b}
 }
 
-type SitesPartialKey struct {
+type SitesKeyPrefix struct {
 	ShipperId   string
 	SiteId      string
 	ValidSiteId bool
 }
 
-func (k SitesPartialKey) SpannerKey() spanner.Key {
+func (k SitesKeyPrefix) SpannerKey() spanner.Key {
 	n := 1
 	if k.ValidSiteId {
 		n++
@@ -544,15 +544,15 @@ func (k SitesPartialKey) SpannerKey() spanner.Key {
 	return result
 }
 
-func (k SitesPartialKey) SpannerKeySet() spanner.KeySet {
+func (k SitesKeyPrefix) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k SitesPartialKey) Delete() *spanner.Mutation {
+func (k SitesKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("sites", k.SpannerKey())
 }
 
-func (k SitesPartialKey) BoolExpr() spansql.BoolExpr {
+func (k SitesKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -572,7 +572,7 @@ func (k SitesPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SitesPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k SitesKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -593,8 +593,8 @@ func (k SitesPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolE
 }
 
 type SitesKeyRange struct {
-	Start SitesPartialKey
-	End   SitesPartialKey
+	Start SitesKeyPrefix
+	End   SitesKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -778,8 +778,8 @@ func (r *SitesRow) MutationForColumns(columns []string) (string, []string, []int
 	return "sites", columns, values
 }
 
-func (r *SitesRow) PrimaryKey() SitesPrimaryKey {
-	return SitesPrimaryKey{
+func (r *SitesRow) PrimaryKey() SitesKey {
+	return SitesKey{
 		ShipperId: r.ShipperId,
 		SiteId:    r.SiteId,
 	}
@@ -809,7 +809,7 @@ func (t ShipmentsReadTransaction) Read(
 
 func (t ShipmentsReadTransaction) Get(
 	ctx context.Context,
-	key ShipmentsPrimaryKey,
+	key ShipmentsKey,
 ) (*ShipmentsRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
@@ -829,7 +829,7 @@ func (t ShipmentsReadTransaction) Get(
 
 func (t ShipmentsReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []ShipmentsPrimaryKey,
+	keys []ShipmentsKey,
 ) ([]*ShipmentsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
@@ -837,7 +837,7 @@ func (t ShipmentsReadTransaction) BatchGet(
 	}
 	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
 	defer it.Stop()
-	foundRows := make(map[ShipmentsPrimaryKey]*ShipmentsRow, len(keys))
+	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
 	if err := it.Do(func(row *ShipmentsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
@@ -908,27 +908,27 @@ func (i *ShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) error {
 	})
 }
 
-type ShipmentsPrimaryKey struct {
+type ShipmentsKey struct {
 	ShipperId  string
 	ShipmentId string
 }
 
-func (k ShipmentsPrimaryKey) SpannerKey() spanner.Key {
+func (k ShipmentsKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.ShipperId,
 		k.ShipmentId,
 	}
 }
 
-func (k ShipmentsPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k ShipmentsKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k ShipmentsPrimaryKey) Delete() *spanner.Mutation {
+func (k ShipmentsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("shipments", k.SpannerKey())
 }
 
-func (k ShipmentsPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k ShipmentsKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -946,7 +946,7 @@ func (k ShipmentsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k ShipmentsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k ShipmentsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -964,13 +964,13 @@ func (k ShipmentsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.B
 	return spansql.Paren{Expr: b}
 }
 
-type ShipmentsPartialKey struct {
+type ShipmentsKeyPrefix struct {
 	ShipperId       string
 	ShipmentId      string
 	ValidShipmentId bool
 }
 
-func (k ShipmentsPartialKey) SpannerKey() spanner.Key {
+func (k ShipmentsKeyPrefix) SpannerKey() spanner.Key {
 	n := 1
 	if k.ValidShipmentId {
 		n++
@@ -983,15 +983,15 @@ func (k ShipmentsPartialKey) SpannerKey() spanner.Key {
 	return result
 }
 
-func (k ShipmentsPartialKey) SpannerKeySet() spanner.KeySet {
+func (k ShipmentsKeyPrefix) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k ShipmentsPartialKey) Delete() *spanner.Mutation {
+func (k ShipmentsKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("shipments", k.SpannerKey())
 }
 
-func (k ShipmentsPartialKey) BoolExpr() spansql.BoolExpr {
+func (k ShipmentsKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -1011,7 +1011,7 @@ func (k ShipmentsPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k ShipmentsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k ShipmentsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -1032,8 +1032,8 @@ func (k ShipmentsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.B
 }
 
 type ShipmentsKeyRange struct {
-	Start ShipmentsPartialKey
-	End   ShipmentsPartialKey
+	Start ShipmentsKeyPrefix
+	End   ShipmentsKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -1253,8 +1253,8 @@ func (r *ShipmentsRow) MutationForColumns(columns []string) (string, []string, [
 	return "shipments", columns, values
 }
 
-func (r *ShipmentsRow) PrimaryKey() ShipmentsPrimaryKey {
-	return ShipmentsPrimaryKey{
+func (r *ShipmentsRow) PrimaryKey() ShipmentsKey {
+	return ShipmentsKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
 	}
@@ -1331,7 +1331,7 @@ func (t ShipmentsAndLineItemsReadTransaction) List(
 
 func (t ShipmentsAndLineItemsReadTransaction) Get(
 	ctx context.Context,
-	key ShipmentsPrimaryKey,
+	key ShipmentsKey,
 ) (*ShipmentsAndLineItemsRow, error) {
 	it := t.List(ctx, ListQuery{
 		Where: key.BoolExpr(),
@@ -1350,7 +1350,7 @@ func (t ShipmentsAndLineItemsReadTransaction) Get(
 
 func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []ShipmentsPrimaryKey,
+	keys []ShipmentsKey,
 ) ([]*ShipmentsAndLineItemsRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
@@ -1368,9 +1368,9 @@ func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 		Limit: int64(len(keys)),
 	})
 	defer it.Stop()
-	foundRows := make(map[ShipmentsPrimaryKey]*ShipmentsAndLineItemsRow, len(keys))
+	foundRows := make(map[ShipmentsKey]*ShipmentsAndLineItemsRow, len(keys))
 	if err := it.Do(func(row *ShipmentsAndLineItemsRow) error {
-		foundRows[row.ShipmentsPrimaryKey()] = row
+		foundRows[row.ShipmentsKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -1427,15 +1427,15 @@ type ShipmentsAndLineItemsRow struct {
 	LineItems            []*LineItemsRow    `spanner:"line_items"`
 }
 
-func (r *ShipmentsAndLineItemsRow) ShipmentsPrimaryKey() ShipmentsPrimaryKey {
-	return ShipmentsPrimaryKey{
+func (r *ShipmentsAndLineItemsRow) ShipmentsKey() ShipmentsKey {
+	return ShipmentsKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
 	}
 }
 
-func (r ShipmentsAndLineItemsRow) LineItemsPartialKey() LineItemsPartialKey {
-	return LineItemsPartialKey{
+func (r ShipmentsAndLineItemsRow) LineItemsKeyPrefix() LineItemsKeyPrefix {
+	return LineItemsKeyPrefix{
 		ShipperId:       r.ShipperId,
 		ShipmentId:      r.ShipmentId,
 		ValidShipmentId: true,
@@ -1532,7 +1532,7 @@ func (r ShipmentsAndLineItemsRow) Update() []*spanner.Mutation {
 	n += len(r.LineItems)
 	mutations := make([]*spanner.Mutation, 0, n)
 	mutations = append(mutations, r.ShipmentsRow().Update())
-	mutations = append(mutations, r.LineItemsPartialKey().Delete())
+	mutations = append(mutations, r.LineItemsKeyPrefix().Delete())
 	for _, interleavedRow := range r.LineItems {
 		mutations = append(mutations, interleavedRow.Insert())
 	}
@@ -1563,7 +1563,7 @@ func (t LineItemsReadTransaction) Read(
 
 func (t LineItemsReadTransaction) Get(
 	ctx context.Context,
-	key LineItemsPrimaryKey,
+	key LineItemsKey,
 ) (*LineItemsRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
@@ -1583,7 +1583,7 @@ func (t LineItemsReadTransaction) Get(
 
 func (t LineItemsReadTransaction) BatchGet(
 	ctx context.Context,
-	keys []LineItemsPrimaryKey,
+	keys []LineItemsKey,
 ) ([]*LineItemsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
@@ -1591,7 +1591,7 @@ func (t LineItemsReadTransaction) BatchGet(
 	}
 	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
 	defer it.Stop()
-	foundRows := make(map[LineItemsPrimaryKey]*LineItemsRow, len(keys))
+	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
 	if err := it.Do(func(row *LineItemsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
@@ -1662,13 +1662,13 @@ func (i *LineItemsRowIterator) Do(f func(row *LineItemsRow) error) error {
 	})
 }
 
-type LineItemsPrimaryKey struct {
+type LineItemsKey struct {
 	ShipperId  string
 	ShipmentId string
 	LineNumber int64
 }
 
-func (k LineItemsPrimaryKey) SpannerKey() spanner.Key {
+func (k LineItemsKey) SpannerKey() spanner.Key {
 	return spanner.Key{
 		k.ShipperId,
 		k.ShipmentId,
@@ -1676,15 +1676,15 @@ func (k LineItemsPrimaryKey) SpannerKey() spanner.Key {
 	}
 }
 
-func (k LineItemsPrimaryKey) SpannerKeySet() spanner.KeySet {
+func (k LineItemsKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k LineItemsPrimaryKey) Delete() *spanner.Mutation {
+func (k LineItemsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("line_items", k.SpannerKey())
 }
 
-func (k LineItemsPrimaryKey) BoolExpr() spansql.BoolExpr {
+func (k LineItemsKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -1711,7 +1711,7 @@ func (k LineItemsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k LineItemsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k LineItemsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -1738,7 +1738,7 @@ func (k LineItemsPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.B
 	return spansql.Paren{Expr: b}
 }
 
-type LineItemsPartialKey struct {
+type LineItemsKeyPrefix struct {
 	ShipperId       string
 	ShipmentId      string
 	ValidShipmentId bool
@@ -1746,7 +1746,7 @@ type LineItemsPartialKey struct {
 	ValidLineNumber bool
 }
 
-func (k LineItemsPartialKey) SpannerKey() spanner.Key {
+func (k LineItemsKeyPrefix) SpannerKey() spanner.Key {
 	n := 1
 	if k.ValidShipmentId {
 		n++
@@ -1765,15 +1765,15 @@ func (k LineItemsPartialKey) SpannerKey() spanner.Key {
 	return result
 }
 
-func (k LineItemsPartialKey) SpannerKeySet() spanner.KeySet {
+func (k LineItemsKeyPrefix) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
-func (k LineItemsPartialKey) Delete() *spanner.Mutation {
+func (k LineItemsKeyPrefix) Delete() *spanner.Mutation {
 	return spanner.Delete("line_items", k.SpannerKey())
 }
 
-func (k LineItemsPartialKey) BoolExpr() spansql.BoolExpr {
+func (k LineItemsKeyPrefix) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
@@ -1804,7 +1804,7 @@ func (k LineItemsPartialKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k LineItemsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+func (k LineItemsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: append(prefix, spansql.ID("shipper_id")),
@@ -1836,8 +1836,8 @@ func (k LineItemsPartialKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.B
 }
 
 type LineItemsKeyRange struct {
-	Start LineItemsPartialKey
-	End   LineItemsPartialKey
+	Start LineItemsKeyPrefix
+	End   LineItemsKeyPrefix
 	Kind  spanner.KeyRangeKind
 }
 
@@ -2010,8 +2010,8 @@ func (r *LineItemsRow) MutationForColumns(columns []string) (string, []string, [
 	return "line_items", columns, values
 }
 
-func (r *LineItemsRow) PrimaryKey() LineItemsPrimaryKey {
-	return LineItemsPrimaryKey{
+func (r *LineItemsRow) PrimaryKey() LineItemsKey {
+	return LineItemsKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
 		LineNumber: r.LineNumber,

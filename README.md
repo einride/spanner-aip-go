@@ -32,12 +32,13 @@ $ go get -u go.einride.tech/aip-spanner
 Use a YAML config file to specify the schema to generate code from:
 
 ```yaml
-- name: music
-  schema:
-    - "testdata/migrations/music/*.up.sql"
-  package:
-    name: musicdb
-    path: ./internal/examples/musicdb
+databases:
+	- name: music
+		schema:
+			- "testdata/migrations/music/*.up.sql"
+		package:
+			name: musicdb
+			path: ./internal/examples/musicdb
 ```
 
 ### Reading data
@@ -56,15 +57,17 @@ import (
 
 func main() {
 	ctx := context.Background()
-	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
+	client, err := spanner.NewClient(
+		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
+	)
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	singer, err := musicdb.Singers(client.Single()).Get(ctx, musicdb.SingersPrimaryKey{
+	singer, err := musicdb.Singers(client.Single()).Get(ctx, musicdb.SingersKey{
 		SingerId: 42,
 	})
 	if err != nil {
-		panic(err)
+		panic(err) // TODO: Handle error.
 	}
 	_ = singer // TODO: Use singer.
 }
@@ -85,11 +88,17 @@ import (
 
 func main() {
 	ctx := context.Background()
-	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
+	client, err := spanner.NewClient(
+		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
+	)
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	// SELECT * FROM Singers WHERE LastName = "Sinatra" ORDER BY FirstName DESC LIMIT 5 OFFSET 10
+	// SELECT * FROM Singers
+	// WHERE LastName = "Sinatra"
+	// ORDER BY FirstName DESC
+	// LIMIT 5
+	// OFFSET 10
 	if err := musicdb.Singers(client.Single()).List(ctx, musicdb.ListQuery{
 		Where: spansql.ComparisonOp{
 			Op:  spansql.Eq,
