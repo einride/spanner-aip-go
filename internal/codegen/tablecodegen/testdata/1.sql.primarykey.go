@@ -23,6 +23,10 @@ func (k SingersPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k SingersPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Singers", k.SpannerKey())
+}
+
 func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,

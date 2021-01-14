@@ -107,15 +107,6 @@ func (r *SingersRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *SingersRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "Singers", columns, values
-}
-
-func (r *SingersRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *SingersRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -140,6 +131,37 @@ func (r *SingersRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
 }
 
+func (r *SingersRow) Mutation() (string, []string, []interface{}) {
+	return "Singers", r.ColumnNames(), []interface{}{
+		r.SingerId,
+		r.FirstName,
+		r.LastName,
+		r.SingerInfo,
+	}
+}
+
+func (r *SingersRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "SingerId":
+			values = append(values, r.SingerId)
+		case "FirstName":
+			values = append(values, r.FirstName)
+		case "LastName":
+			values = append(values, r.LastName)
+		case "SingerInfo":
+			values = append(values, r.SingerInfo)
+		default:
+			panic(fmt.Errorf("table Singers does not have column %s", column))
+		}
+	}
+	return "Singers", columns, values
+}
+
 func (r *SingersRow) PrimaryKey() SingersPrimaryKey {
 	return SingersPrimaryKey{
 		SingerId: r.SingerId,
@@ -158,6 +180,10 @@ func (k SingersPrimaryKey) SpannerKey() spanner.Key {
 
 func (k SingersPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
+}
+
+func (k SingersPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Singers", k.SpannerKey())
 }
 
 func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {

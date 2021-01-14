@@ -31,6 +31,10 @@ func (k SingersPartialKey) SpannerKey() spanner.Key {
 	return spanner.Key{k.SingerId}
 }
 
+func (k SingersPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Singers", k.SpannerKey())
+}
+
 func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -84,6 +88,10 @@ func (k AlbumsPartialKey) SpannerKey() spanner.Key {
 
 func (k AlbumsPartialKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
+}
+
+func (k AlbumsPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Albums", k.SpannerKey())
 }
 
 func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {

@@ -151,6 +151,10 @@ func (k SingersPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k SingersPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Singers", k.SpannerKey())
+}
+
 func (k SingersPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -175,6 +179,10 @@ type SingersPartialKey struct {
 
 func (k SingersPartialKey) SpannerKey() spanner.Key {
 	return spanner.Key{k.SingerId}
+}
+
+func (k SingersPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Singers", k.SpannerKey())
 }
 
 func (k SingersPartialKey) BoolExpr() spansql.BoolExpr {
@@ -279,15 +287,6 @@ func (r *SingersRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *SingersRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "Singers", columns, values
-}
-
-func (r *SingersRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *SingersRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -310,6 +309,37 @@ func (r *SingersRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
 
 func (r *SingersRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
+}
+
+func (r *SingersRow) Mutation() (string, []string, []interface{}) {
+	return "Singers", r.ColumnNames(), []interface{}{
+		r.SingerId,
+		r.FirstName,
+		r.LastName,
+		r.SingerInfo,
+	}
+}
+
+func (r *SingersRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "SingerId":
+			values = append(values, r.SingerId)
+		case "FirstName":
+			values = append(values, r.FirstName)
+		case "LastName":
+			values = append(values, r.LastName)
+		case "SingerInfo":
+			values = append(values, r.SingerInfo)
+		default:
+			panic(fmt.Errorf("table Singers does not have column %s", column))
+		}
+	}
+	return "Singers", columns, values
 }
 
 func (r *SingersRow) PrimaryKey() SingersPrimaryKey {
@@ -415,7 +445,7 @@ func (t SingersAndAlbumsReadTransaction) BatchGet(
 	defer it.Stop()
 	foundRows := make(map[SingersPrimaryKey]*SingersAndAlbumsRow, len(keys))
 	if err := it.Do(func(row *SingersAndAlbumsRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.SingersPrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -465,8 +495,14 @@ type SingersAndAlbumsRow struct {
 	Albums     []*AlbumsRow       `spanner:"Albums"`
 }
 
-func (r *SingersAndAlbumsRow) PrimaryKey() SingersPrimaryKey {
+func (r *SingersAndAlbumsRow) SingersPrimaryKey() SingersPrimaryKey {
 	return SingersPrimaryKey{
+		SingerId: r.SingerId,
+	}
+}
+
+func (r SingersAndAlbumsRow) AlbumsPartialKey() AlbumsPartialKey {
+	return AlbumsPartialKey{
 		SingerId: r.SingerId,
 	}
 }
@@ -499,6 +535,38 @@ func (r *SingersAndAlbumsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 		}
 	}
 	return nil
+}
+
+func (r SingersAndAlbumsRow) SingersRow() *SingersRow {
+	return &SingersRow{
+		SingerId:   r.SingerId,
+		FirstName:  r.FirstName,
+		LastName:   r.LastName,
+		SingerInfo: r.SingerInfo,
+	}
+}
+
+func (r SingersAndAlbumsRow) Insert() []*spanner.Mutation {
+	n := 1
+	n += len(r.Albums)
+	mutations := make([]*spanner.Mutation, 0, n)
+	mutations = append(mutations, r.SingersRow().Insert())
+	for _, interleavedRow := range r.Albums {
+		mutations = append(mutations, interleavedRow.Insert())
+	}
+	return mutations
+}
+
+func (r SingersAndAlbumsRow) Update() []*spanner.Mutation {
+	n := 2 // one delete mutation per interleaved table
+	n += len(r.Albums)
+	mutations := make([]*spanner.Mutation, 0, n)
+	mutations = append(mutations, r.SingersRow().Update())
+	mutations = append(mutations, r.AlbumsPartialKey().Delete())
+	for _, interleavedRow := range r.Albums {
+		mutations = append(mutations, interleavedRow.Insert())
+	}
+	return mutations
 }
 
 type AlbumsReadTransaction struct {
@@ -640,6 +708,10 @@ func (k AlbumsPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k AlbumsPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Albums", k.SpannerKey())
+}
+
 func (k AlbumsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -697,6 +769,10 @@ func (k AlbumsPartialKey) SpannerKey() spanner.Key {
 
 func (k AlbumsPartialKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
+}
+
+func (k AlbumsPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Albums", k.SpannerKey())
 }
 
 func (k AlbumsPartialKey) BoolExpr() spansql.BoolExpr {
@@ -809,15 +885,6 @@ func (r *AlbumsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *AlbumsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "Albums", columns, values
-}
-
-func (r *AlbumsRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *AlbumsRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -840,6 +907,34 @@ func (r *AlbumsRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
 
 func (r *AlbumsRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
+}
+
+func (r *AlbumsRow) Mutation() (string, []string, []interface{}) {
+	return "Albums", r.ColumnNames(), []interface{}{
+		r.SingerId,
+		r.AlbumId,
+		r.AlbumTitle,
+	}
+}
+
+func (r *AlbumsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "SingerId":
+			values = append(values, r.SingerId)
+		case "AlbumId":
+			values = append(values, r.AlbumId)
+		case "AlbumTitle":
+			values = append(values, r.AlbumTitle)
+		default:
+			panic(fmt.Errorf("table Albums does not have column %s", column))
+		}
+	}
+	return "Albums", columns, values
 }
 
 func (r *AlbumsRow) PrimaryKey() AlbumsPrimaryKey {
@@ -948,7 +1043,7 @@ func (t AlbumsAndSongsReadTransaction) BatchGet(
 	defer it.Stop()
 	foundRows := make(map[AlbumsPrimaryKey]*AlbumsAndSongsRow, len(keys))
 	if err := it.Do(func(row *AlbumsAndSongsRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.AlbumsPrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -997,10 +1092,18 @@ type AlbumsAndSongsRow struct {
 	Songs      []*SongsRow        `spanner:"Songs"`
 }
 
-func (r *AlbumsAndSongsRow) PrimaryKey() AlbumsPrimaryKey {
+func (r *AlbumsAndSongsRow) AlbumsPrimaryKey() AlbumsPrimaryKey {
 	return AlbumsPrimaryKey{
 		SingerId: r.SingerId,
 		AlbumId:  r.AlbumId,
+	}
+}
+
+func (r AlbumsAndSongsRow) SongsPartialKey() SongsPartialKey {
+	return SongsPartialKey{
+		SingerId:     r.SingerId,
+		AlbumId:      r.AlbumId,
+		ValidAlbumId: true,
 	}
 }
 
@@ -1028,6 +1131,37 @@ func (r *AlbumsAndSongsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 		}
 	}
 	return nil
+}
+
+func (r AlbumsAndSongsRow) AlbumsRow() *AlbumsRow {
+	return &AlbumsRow{
+		SingerId:   r.SingerId,
+		AlbumId:    r.AlbumId,
+		AlbumTitle: r.AlbumTitle,
+	}
+}
+
+func (r AlbumsAndSongsRow) Insert() []*spanner.Mutation {
+	n := 1
+	n += len(r.Songs)
+	mutations := make([]*spanner.Mutation, 0, n)
+	mutations = append(mutations, r.AlbumsRow().Insert())
+	for _, interleavedRow := range r.Songs {
+		mutations = append(mutations, interleavedRow.Insert())
+	}
+	return mutations
+}
+
+func (r AlbumsAndSongsRow) Update() []*spanner.Mutation {
+	n := 2 // one delete mutation per interleaved table
+	n += len(r.Songs)
+	mutations := make([]*spanner.Mutation, 0, n)
+	mutations = append(mutations, r.AlbumsRow().Update())
+	mutations = append(mutations, r.SongsPartialKey().Delete())
+	for _, interleavedRow := range r.Songs {
+		mutations = append(mutations, interleavedRow.Insert())
+	}
+	return mutations
 }
 
 type SongsReadTransaction struct {
@@ -1171,6 +1305,10 @@ func (k SongsPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k SongsPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Songs", k.SpannerKey())
+}
+
 func (k SongsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -1254,6 +1392,10 @@ func (k SongsPartialKey) SpannerKey() spanner.Key {
 
 func (k SongsPartialKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
+}
+
+func (k SongsPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Songs", k.SpannerKey())
 }
 
 func (k SongsPartialKey) BoolExpr() spansql.BoolExpr {
@@ -1396,15 +1538,6 @@ func (r *SongsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *SongsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "Songs", columns, values
-}
-
-func (r *SongsRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *SongsRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -1427,6 +1560,37 @@ func (r *SongsRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
 
 func (r *SongsRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
+}
+
+func (r *SongsRow) Mutation() (string, []string, []interface{}) {
+	return "Songs", r.ColumnNames(), []interface{}{
+		r.SingerId,
+		r.AlbumId,
+		r.TrackId,
+		r.SongName,
+	}
+}
+
+func (r *SongsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "SingerId":
+			values = append(values, r.SingerId)
+		case "AlbumId":
+			values = append(values, r.AlbumId)
+		case "TrackId":
+			values = append(values, r.TrackId)
+		case "SongName":
+			values = append(values, r.SongName)
+		default:
+			panic(fmt.Errorf("table Songs does not have column %s", column))
+		}
+	}
+	return "Songs", columns, values
 }
 
 func (r *SongsRow) PrimaryKey() SongsPrimaryKey {

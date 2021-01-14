@@ -44,11 +44,20 @@ func (g PrimaryKeyCodeGenerator) GenerateCode(f *codegen.File) {
 	f.P("func (k ", g.Type(), ") SpannerKeySet() ", spannerPkg, ".KeySet {")
 	f.P("return k.SpannerKey()")
 	f.P("}")
-	g.generateBoolExprFunction(f)
-	g.generateQualifiedBoolExprFunction(f)
+	g.generateDeleteMethod(f)
+	g.generateBoolExprMethod(f)
+	g.generateQualifiedBoolExprMethod(f)
 }
 
-func (g PrimaryKeyCodeGenerator) generateBoolExprFunction(f *codegen.File) {
+func (g PrimaryKeyCodeGenerator) generateDeleteMethod(f *codegen.File) {
+	spannerPkg := f.Import("cloud.google.com/go/spanner")
+	f.P()
+	f.P("func (k ", g.Type(), ") Delete() *", spannerPkg, ".Mutation {")
+	f.P("return ", spannerPkg, ".Delete(", strconv.Quote(string(g.Table.Name)), ", k.SpannerKey())")
+	f.P("}")
+}
+
+func (g PrimaryKeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	k0 := g.Table.PrimaryKey[0]
@@ -79,7 +88,7 @@ func (g PrimaryKeyCodeGenerator) generateBoolExprFunction(f *codegen.File) {
 	f.P("}")
 }
 
-func (g PrimaryKeyCodeGenerator) generateQualifiedBoolExprFunction(f *codegen.File) {
+func (g PrimaryKeyCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File) {
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	k0 := g.Table.PrimaryKey[0]

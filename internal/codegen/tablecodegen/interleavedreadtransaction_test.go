@@ -24,6 +24,9 @@ func TestInterleavedReadTransaction_GenerateCode(t *testing.T) {
 					Table:             table,
 					InterleavedTables: interleavedTables,
 				}.GenerateCode(f)
+				for _, interleavedTable := range interleavedTables {
+					PartialKeyCodeGenerator{Table: interleavedTable}.GenerateCode(f)
+				}
 			}
 			RowCodeGenerator{Table: table}.GenerateCode(f)
 			PrimaryKeyCodeGenerator{Table: table}.GenerateCode(f)

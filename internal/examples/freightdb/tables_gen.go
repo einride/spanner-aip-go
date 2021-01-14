@@ -152,6 +152,10 @@ func (k ShippersPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k ShippersPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("shippers", k.SpannerKey())
+}
+
 func (k ShippersPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -176,6 +180,10 @@ type ShippersPartialKey struct {
 
 func (k ShippersPartialKey) SpannerKey() spanner.Key {
 	return spanner.Key{k.ShipperId}
+}
+
+func (k ShippersPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("shippers", k.SpannerKey())
 }
 
 func (k ShippersPartialKey) BoolExpr() spansql.BoolExpr {
@@ -277,15 +285,6 @@ func (r *ShippersRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *ShippersRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "shippers", columns, values
-}
-
-func (r *ShippersRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *ShippersRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -308,6 +307,37 @@ func (r *ShippersRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation 
 
 func (r *ShippersRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
+}
+
+func (r *ShippersRow) Mutation() (string, []string, []interface{}) {
+	return "shippers", r.ColumnNames(), []interface{}{
+		r.ShipperId,
+		r.CreateTime,
+		r.UpdateTime,
+		r.DeleteTime,
+	}
+}
+
+func (r *ShippersRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "shipper_id":
+			values = append(values, r.ShipperId)
+		case "create_time":
+			values = append(values, r.CreateTime)
+		case "update_time":
+			values = append(values, r.UpdateTime)
+		case "delete_time":
+			values = append(values, r.DeleteTime)
+		default:
+			panic(fmt.Errorf("table shippers does not have column %s", column))
+		}
+	}
+	return "shippers", columns, values
 }
 
 func (r *ShippersRow) PrimaryKey() ShippersPrimaryKey {
@@ -455,6 +485,10 @@ func (k SitesPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k SitesPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("sites", k.SpannerKey())
+}
+
 func (k SitesPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -512,6 +546,10 @@ func (k SitesPartialKey) SpannerKey() spanner.Key {
 
 func (k SitesPartialKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
+}
+
+func (k SitesPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("sites", k.SpannerKey())
 }
 
 func (k SitesPartialKey) BoolExpr() spansql.BoolExpr {
@@ -673,15 +711,6 @@ func (r *SitesRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *SitesRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "sites", columns, values
-}
-
-func (r *SitesRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *SitesRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -704,6 +733,49 @@ func (r *SitesRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
 
 func (r *SitesRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
+}
+
+func (r *SitesRow) Mutation() (string, []string, []interface{}) {
+	return "sites", r.ColumnNames(), []interface{}{
+		r.ShipperId,
+		r.SiteId,
+		r.CreateTime,
+		r.UpdateTime,
+		r.DeleteTime,
+		r.DisplayName,
+		r.Latitude,
+		r.Longitude,
+	}
+}
+
+func (r *SitesRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "shipper_id":
+			values = append(values, r.ShipperId)
+		case "site_id":
+			values = append(values, r.SiteId)
+		case "create_time":
+			values = append(values, r.CreateTime)
+		case "update_time":
+			values = append(values, r.UpdateTime)
+		case "delete_time":
+			values = append(values, r.DeleteTime)
+		case "display_name":
+			values = append(values, r.DisplayName)
+		case "latitude":
+			values = append(values, r.Latitude)
+		case "longitude":
+			values = append(values, r.Longitude)
+		default:
+			panic(fmt.Errorf("table sites does not have column %s", column))
+		}
+	}
+	return "sites", columns, values
 }
 
 func (r *SitesRow) PrimaryKey() SitesPrimaryKey {
@@ -852,6 +924,10 @@ func (k ShipmentsPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k ShipmentsPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("shipments", k.SpannerKey())
+}
+
 func (k ShipmentsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -909,6 +985,10 @@ func (k ShipmentsPartialKey) SpannerKey() spanner.Key {
 
 func (k ShipmentsPartialKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
+}
+
+func (k ShipmentsPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("shipments", k.SpannerKey())
 }
 
 func (k ShipmentsPartialKey) BoolExpr() spansql.BoolExpr {
@@ -1097,15 +1177,6 @@ func (r *ShipmentsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *ShipmentsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "shipments", columns, values
-}
-
-func (r *ShipmentsRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *ShipmentsRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -1128,6 +1199,58 @@ func (r *ShipmentsRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation
 
 func (r *ShipmentsRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
+}
+
+func (r *ShipmentsRow) Mutation() (string, []string, []interface{}) {
+	return "shipments", r.ColumnNames(), []interface{}{
+		r.ShipperId,
+		r.ShipmentId,
+		r.CreateTime,
+		r.UpdateTime,
+		r.DeleteTime,
+		r.OriginSiteId,
+		r.DestinationSiteId,
+		r.PickupEarliestTime,
+		r.PickupLatestTime,
+		r.DeliveryEarliestTime,
+		r.DeliveryLatestTime,
+	}
+}
+
+func (r *ShipmentsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "shipper_id":
+			values = append(values, r.ShipperId)
+		case "shipment_id":
+			values = append(values, r.ShipmentId)
+		case "create_time":
+			values = append(values, r.CreateTime)
+		case "update_time":
+			values = append(values, r.UpdateTime)
+		case "delete_time":
+			values = append(values, r.DeleteTime)
+		case "origin_site_id":
+			values = append(values, r.OriginSiteId)
+		case "destination_site_id":
+			values = append(values, r.DestinationSiteId)
+		case "pickup_earliest_time":
+			values = append(values, r.PickupEarliestTime)
+		case "pickup_latest_time":
+			values = append(values, r.PickupLatestTime)
+		case "delivery_earliest_time":
+			values = append(values, r.DeliveryEarliestTime)
+		case "delivery_latest_time":
+			values = append(values, r.DeliveryLatestTime)
+		default:
+			panic(fmt.Errorf("table shipments does not have column %s", column))
+		}
+	}
+	return "shipments", columns, values
 }
 
 func (r *ShipmentsRow) PrimaryKey() ShipmentsPrimaryKey {
@@ -1247,7 +1370,7 @@ func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 	defer it.Stop()
 	foundRows := make(map[ShipmentsPrimaryKey]*ShipmentsAndLineItemsRow, len(keys))
 	if err := it.Do(func(row *ShipmentsAndLineItemsRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.ShipmentsPrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -1304,10 +1427,18 @@ type ShipmentsAndLineItemsRow struct {
 	LineItems            []*LineItemsRow    `spanner:"line_items"`
 }
 
-func (r *ShipmentsAndLineItemsRow) PrimaryKey() ShipmentsPrimaryKey {
+func (r *ShipmentsAndLineItemsRow) ShipmentsPrimaryKey() ShipmentsPrimaryKey {
 	return ShipmentsPrimaryKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
+	}
+}
+
+func (r ShipmentsAndLineItemsRow) LineItemsPartialKey() LineItemsPartialKey {
+	return LineItemsPartialKey{
+		ShipperId:       r.ShipperId,
+		ShipmentId:      r.ShipmentId,
+		ValidShipmentId: true,
 	}
 }
 
@@ -1367,6 +1498,45 @@ func (r *ShipmentsAndLineItemsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 		}
 	}
 	return nil
+}
+
+func (r ShipmentsAndLineItemsRow) ShipmentsRow() *ShipmentsRow {
+	return &ShipmentsRow{
+		ShipperId:            r.ShipperId,
+		ShipmentId:           r.ShipmentId,
+		CreateTime:           r.CreateTime,
+		UpdateTime:           r.UpdateTime,
+		DeleteTime:           r.DeleteTime,
+		OriginSiteId:         r.OriginSiteId,
+		DestinationSiteId:    r.DestinationSiteId,
+		PickupEarliestTime:   r.PickupEarliestTime,
+		PickupLatestTime:     r.PickupLatestTime,
+		DeliveryEarliestTime: r.DeliveryEarliestTime,
+		DeliveryLatestTime:   r.DeliveryLatestTime,
+	}
+}
+
+func (r ShipmentsAndLineItemsRow) Insert() []*spanner.Mutation {
+	n := 1
+	n += len(r.LineItems)
+	mutations := make([]*spanner.Mutation, 0, n)
+	mutations = append(mutations, r.ShipmentsRow().Insert())
+	for _, interleavedRow := range r.LineItems {
+		mutations = append(mutations, interleavedRow.Insert())
+	}
+	return mutations
+}
+
+func (r ShipmentsAndLineItemsRow) Update() []*spanner.Mutation {
+	n := 2 // one delete mutation per interleaved table
+	n += len(r.LineItems)
+	mutations := make([]*spanner.Mutation, 0, n)
+	mutations = append(mutations, r.ShipmentsRow().Update())
+	mutations = append(mutations, r.LineItemsPartialKey().Delete())
+	for _, interleavedRow := range r.LineItems {
+		mutations = append(mutations, interleavedRow.Insert())
+	}
+	return mutations
 }
 
 type LineItemsReadTransaction struct {
@@ -1510,6 +1680,10 @@ func (k LineItemsPrimaryKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
 }
 
+func (k LineItemsPrimaryKey) Delete() *spanner.Mutation {
+	return spanner.Delete("line_items", k.SpannerKey())
+}
+
 func (k LineItemsPrimaryKey) BoolExpr() spansql.BoolExpr {
 	b := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
@@ -1593,6 +1767,10 @@ func (k LineItemsPartialKey) SpannerKey() spanner.Key {
 
 func (k LineItemsPartialKey) SpannerKeySet() spanner.KeySet {
 	return k.SpannerKey()
+}
+
+func (k LineItemsPartialKey) Delete() *spanner.Mutation {
+	return spanner.Delete("line_items", k.SpannerKey())
 }
 
 func (k LineItemsPartialKey) BoolExpr() spansql.BoolExpr {
@@ -1768,15 +1946,6 @@ func (r *LineItemsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *LineItemsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
-	var values []interface{}
-	return "line_items", columns, values
-}
-
-func (r *LineItemsRow) Mutation() (string, []string, []interface{}) {
-	return r.MutationForColumns(r.ColumnNames())
-}
-
 func (r *LineItemsRow) Insert() *spanner.Mutation {
 	return spanner.Insert(r.Mutation())
 }
@@ -1799,6 +1968,46 @@ func (r *LineItemsRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation
 
 func (r *LineItemsRow) UpdateColumns(columns []string) *spanner.Mutation {
 	return spanner.Update(r.MutationForColumns(columns))
+}
+
+func (r *LineItemsRow) Mutation() (string, []string, []interface{}) {
+	return "line_items", r.ColumnNames(), []interface{}{
+		r.ShipperId,
+		r.ShipmentId,
+		r.LineNumber,
+		r.Title,
+		r.Quantity,
+		r.WeightKg,
+		r.VolumeM3,
+	}
+}
+
+func (r *LineItemsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "shipper_id":
+			values = append(values, r.ShipperId)
+		case "shipment_id":
+			values = append(values, r.ShipmentId)
+		case "line_number":
+			values = append(values, r.LineNumber)
+		case "title":
+			values = append(values, r.Title)
+		case "quantity":
+			values = append(values, r.Quantity)
+		case "weight_kg":
+			values = append(values, r.WeightKg)
+		case "volume_m3":
+			values = append(values, r.VolumeM3)
+		default:
+			panic(fmt.Errorf("table line_items does not have column %s", column))
+		}
+	}
+	return "line_items", columns, values
 }
 
 func (r *LineItemsRow) PrimaryKey() LineItemsPrimaryKey {
