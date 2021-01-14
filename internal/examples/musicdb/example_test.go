@@ -1,79 +1,4 @@
-# AIP Spanner Go
-
-Add-on to the [AIP Go SDK][aip-go] for implementing [Cloud
-Spanner][cloud-spanner] persistance for [resource-oriented
-APIs][google-aip].
-
-**Experimental**: This library is under active development and breaking
-changes to config files, APIs and generated code are expected between
-releases.
-
-[aip-go]: https://github.com/einride/aip-go
-[google-aip]: https://aip.dev
-[cloud-spanner]: https://cloud.google.com/spanner
-
-## Documentation
-
-See [https://aip.dev][google-aip] for the full AIP documentation and the
-[Cloud Spanner documentation][cloud-spanner-docs].
-
-[cloud-spanner-docs]: https://cloud.google.com/spanner/docs
-
-## Usage
-
-### Installing
-
-```bash
-$ go get -u go.einride.tech/aip-spanner
-```
-
-### Code generation
-
-Use a YAML config file to specify the schema to generate code from:
-
-```yaml
-- name: music
-  schema:
-    - "testdata/migrations/music/*.up.sql"
-  package:
-    name: musicdb
-    path: ./internal/examples/musicdb
-```
-
-### Reading data
-
-#### Get
-
-```go
-package main
-
-import (
-	"context"
-
-	"cloud.google.com/go/spanner"
-	"go.einride.tech/aip-spanner/internal/examples/musicdb"
-)
-
-func main() {
-	ctx := context.Background()
-	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
-	if err != nil {
-		panic(err) // TODO: Handle error.
-	}
-	singer, err := musicdb.Singers(client.Single()).Get(ctx, musicdb.SingersPrimaryKey{
-		SingerId: 42,
-	})
-	if err != nil {
-		panic(err)
-	}
-	_ = singer // TODO: Use singer.
-}
-```
-
-#### List
-
-```go
-package main
+package musicdb_test
 
 import (
 	"context"
@@ -83,7 +8,22 @@ import (
 	"go.einride.tech/aip-spanner/internal/examples/musicdb"
 )
 
-func main() {
+func ExampleAlbumsReadTransaction_Get() {
+	ctx := context.Background()
+	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
+	if err != nil {
+		panic(err) // TODO: Handle error.
+	}
+	singer, err := musicdb.Singers(client.Single()).Get(ctx, musicdb.SingersPrimaryKey{
+		SingerId: 42,
+	})
+	if err != nil {
+		panic(err) // TODO: Handle error.
+	}
+	_ = singer // TODO: Use singer.
+}
+
+func ExampleAlbumsReadTransaction_List() {
 	ctx := context.Background()
 	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
 	if err != nil {
@@ -108,4 +48,28 @@ func main() {
 		panic(err) // TODO: Handle error.
 	}
 }
-```
+
+func Example_readOnlyTransaction_MultipleTables() {
+	ctx := context.Background()
+	client, err := spanner.NewClient(ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>")
+	if err != nil {
+		panic(err) // TODO: Handle error.
+	}
+	tx := client.ReadOnlyTransaction()
+	defer tx.Close()
+	singer, err := musicdb.Singers(tx).Get(ctx, musicdb.SingersPrimaryKey{
+		SingerId: 42,
+	})
+	if err != nil {
+		panic(err) // TODO: Handle error.
+	}
+	album, err := musicdb.Albums(tx).Get(ctx, musicdb.AlbumsPrimaryKey{
+		SingerId: 42,
+		AlbumId:  24,
+	})
+	if err != nil {
+		panic(err) // TODO: Handle error.
+	}
+	_ = singer // TODO: Use singer.
+	_ = album  // TODO: Use album.
+}

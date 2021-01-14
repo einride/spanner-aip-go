@@ -18,6 +18,10 @@ type SingersReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func Singers(tx SpannerReadTransaction) SingersReadTransaction {
+	return SingersReadTransaction{Tx: tx}
+}
+
 func (t SingersReadTransaction) Read(
 	ctx context.Context,
 	keySet spanner.KeySet,

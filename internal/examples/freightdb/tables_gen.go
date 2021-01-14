@@ -19,6 +19,10 @@ type ShippersReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func Shippers(tx SpannerReadTransaction) ShippersReadTransaction {
+	return ShippersReadTransaction{Tx: tx}
+}
+
 func (t ShippersReadTransaction) Read(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -314,6 +318,10 @@ func (r *ShippersRow) PrimaryKey() ShippersPrimaryKey {
 
 type SitesReadTransaction struct {
 	Tx SpannerReadTransaction
+}
+
+func Sites(tx SpannerReadTransaction) SitesReadTransaction {
+	return SitesReadTransaction{Tx: tx}
 }
 
 func (t SitesReadTransaction) Read(
@@ -707,6 +715,10 @@ func (r *SitesRow) PrimaryKey() SitesPrimaryKey {
 
 type ShipmentsReadTransaction struct {
 	Tx SpannerReadTransaction
+}
+
+func Shipments(tx SpannerReadTransaction) ShipmentsReadTransaction {
+	return ShipmentsReadTransaction{Tx: tx}
 }
 
 func (t ShipmentsReadTransaction) Read(
@@ -1129,6 +1141,10 @@ type ShipmentsAndLineItemsReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func ShipmentsAndLineItems(tx SpannerReadTransaction) ShipmentsAndLineItemsReadTransaction {
+	return ShipmentsAndLineItemsReadTransaction{Tx: tx}
+}
+
 func (t ShipmentsAndLineItemsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
@@ -1355,6 +1371,10 @@ func (r *ShipmentsAndLineItemsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 
 type LineItemsReadTransaction struct {
 	Tx SpannerReadTransaction
+}
+
+func LineItems(tx SpannerReadTransaction) LineItemsReadTransaction {
+	return LineItemsReadTransaction{Tx: tx}
 }
 
 func (t LineItemsReadTransaction) Read(
