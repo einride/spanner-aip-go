@@ -16,6 +16,10 @@ func (g ReadTransactionCodeGenerator) Type() string {
 	return strcase.UpperCamelCase(string(g.Table.Name)) + "ReadTransaction"
 }
 
+func (g ReadTransactionCodeGenerator) ConstructorMethod() string {
+	return strcase.UpperCamelCase(string(g.Table.Name))
+}
+
 func (g ReadTransactionCodeGenerator) ReadMethod() string {
 	return "Read"
 }
@@ -38,6 +42,7 @@ func (g ReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 	f.P("type ", g.Type(), " struct {")
 	f.P("Tx ", common.SpannerReadTransactionType())
 	f.P("}")
+	g.generateConstructorMethod(f)
 	g.generateReadRowsMethod(f)
 	g.generateGetRowMethod(f)
 	g.generateBatchGetRowsMethod(f)
@@ -164,5 +169,13 @@ func (g ReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *codegen.File
 	f.P("rows = append(rows, row)")
 	f.P("}")
 	f.P("return rows, nil")
+	f.P("}")
+}
+
+func (g ReadTransactionCodeGenerator) generateConstructorMethod(f *codegen.File) {
+	common := CommonCodeGenerator{}
+	f.P()
+	f.P("func ", g.ConstructorMethod(), "(tx ", common.SpannerReadTransactionType(), ") ", g.Type(), " {")
+	f.P("return ", g.Type(), "{Tx: tx}")
 	f.P("}")
 }

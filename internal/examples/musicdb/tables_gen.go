@@ -18,6 +18,10 @@ type SingersReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func Singers(tx SpannerReadTransaction) SingersReadTransaction {
+	return SingersReadTransaction{Tx: tx}
+}
+
 func (t SingersReadTransaction) Read(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -318,6 +322,10 @@ type SingersAndAlbumsReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func SingersAndAlbums(tx SpannerReadTransaction) SingersAndAlbumsReadTransaction {
+	return SingersAndAlbumsReadTransaction{Tx: tx}
+}
+
 func (t SingersAndAlbumsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
@@ -495,6 +503,10 @@ func (r *SingersAndAlbumsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 
 type AlbumsReadTransaction struct {
 	Tx SpannerReadTransaction
+}
+
+func Albums(tx SpannerReadTransaction) AlbumsReadTransaction {
+	return AlbumsReadTransaction{Tx: tx}
 }
 
 func (t AlbumsReadTransaction) Read(
@@ -841,6 +853,10 @@ type AlbumsAndSongsReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func AlbumsAndSongs(tx SpannerReadTransaction) AlbumsAndSongsReadTransaction {
+	return AlbumsAndSongsReadTransaction{Tx: tx}
+}
+
 func (t AlbumsAndSongsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
@@ -1016,6 +1032,10 @@ func (r *AlbumsAndSongsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 
 type SongsReadTransaction struct {
 	Tx SpannerReadTransaction
+}
+
+func Songs(tx SpannerReadTransaction) SongsReadTransaction {
+	return SongsReadTransaction{Tx: tx}
 }
 
 func (t SongsReadTransaction) Read(

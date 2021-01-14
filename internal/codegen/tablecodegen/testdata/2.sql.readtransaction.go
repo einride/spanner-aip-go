@@ -18,6 +18,10 @@ type SingersReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func Singers(tx SpannerReadTransaction) SingersReadTransaction {
+	return SingersReadTransaction{Tx: tx}
+}
+
 func (t SingersReadTransaction) Read(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -276,6 +280,10 @@ func (k SingersPrimaryKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.Boo
 
 type AlbumsReadTransaction struct {
 	Tx SpannerReadTransaction
+}
+
+func Albums(tx SpannerReadTransaction) AlbumsReadTransaction {
+	return AlbumsReadTransaction{Tx: tx}
 }
 
 func (t AlbumsReadTransaction) Read(

@@ -20,6 +20,10 @@ type SingersAndAlbumsReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
+func SingersAndAlbums(tx SpannerReadTransaction) SingersAndAlbumsReadTransaction {
+	return SingersAndAlbumsReadTransaction{Tx: tx}
+}
+
 func (t SingersAndAlbumsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,

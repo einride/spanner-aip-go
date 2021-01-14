@@ -16,6 +16,10 @@ func (g InterleavedReadTransactionCodeGenerator) Type() string {
 	return InterleavedRowCodeGenerator(g).Ident() + "ReadTransaction"
 }
 
+func (g InterleavedReadTransactionCodeGenerator) ConstructorMethod() string {
+	return InterleavedRowCodeGenerator(g).Ident()
+}
+
 func (g InterleavedReadTransactionCodeGenerator) ListMethod() string {
 	return "List"
 }
@@ -34,6 +38,7 @@ func (g InterleavedReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 	f.P("type ", g.Type(), " struct {")
 	f.P("Tx ", common.SpannerReadTransactionType())
 	f.P("}")
+	g.generateConstructorMethod(f)
 	g.generateListRowsMethod(f)
 	g.generateGetRowMethod(f)
 	g.generateBatchGetRowsMethod(f)
@@ -178,5 +183,13 @@ func (g InterleavedReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *c
 	f.P("rows = append(rows, row)")
 	f.P("}")
 	f.P("return rows, nil")
+	f.P("}")
+}
+
+func (g InterleavedReadTransactionCodeGenerator) generateConstructorMethod(f *codegen.File) {
+	common := CommonCodeGenerator{}
+	f.P()
+	f.P("func ", g.ConstructorMethod(), "(tx ", common.SpannerReadTransactionType(), ") ", g.Type(), " {")
+	f.P("return ", g.Type(), "{Tx: tx}")
 	f.P("}")
 }
