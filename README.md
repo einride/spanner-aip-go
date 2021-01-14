@@ -33,12 +33,12 @@ Use a YAML config file to specify the schema to generate code from:
 
 ```yaml
 databases:
-	- name: music
-		schema:
-			- "testdata/migrations/music/*.up.sql"
-		package:
-			name: musicdb
-			path: ./internal/examples/musicdb
+  - name: music
+    schema:
+      - "testdata/migrations/music/*.up.sql"
+    package:
+      name: musicdb
+      path: ./internal/examples/musicdb
 ```
 
 ### Reading data
