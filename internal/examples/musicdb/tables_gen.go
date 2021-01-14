@@ -378,7 +378,7 @@ func (t SingersAndAlbumsReadTransaction) Get(
 	row, err := it.Next()
 	if err != nil {
 		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %s", key)
+			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
 		}
 		return nil, err
 	}
@@ -903,7 +903,7 @@ func (t AlbumsAndSongsReadTransaction) Get(
 	row, err := it.Next()
 	if err != nil {
 		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %s", key)
+			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
 		}
 		return nil, err
 	}
