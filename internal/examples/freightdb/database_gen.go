@@ -60,29 +60,19 @@ func (t ShippersReadTransaction) Get(
 func (t ShippersReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []ShippersKey,
-) ([]*ShippersRow, error) {
+) (map[ShippersKey]*ShippersRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
-	if err := it.Do(func(row *ShippersRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShippersRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*ShippersRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t ShippersReadTransaction) List(
@@ -391,29 +381,19 @@ func (t SitesReadTransaction) Get(
 func (t SitesReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []SitesKey,
-) ([]*SitesRow, error) {
+) (map[SitesKey]*SitesRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[SitesKey]*SitesRow, len(keys))
-	if err := it.Do(func(row *SitesRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SitesRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*SitesRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t SitesReadTransaction) List(
@@ -830,29 +810,19 @@ func (t ShipmentsReadTransaction) Get(
 func (t ShipmentsReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []ShipmentsKey,
-) ([]*ShipmentsRow, error) {
+) (map[ShipmentsKey]*ShipmentsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
-	if err := it.Do(func(row *ShipmentsRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShipmentsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*ShipmentsRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t ShipmentsReadTransaction) List(
@@ -1351,7 +1321,7 @@ func (t ShipmentsAndLineItemsReadTransaction) Get(
 func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []ShipmentsKey,
-) ([]*ShipmentsAndLineItemsRow, error) {
+) (map[ShipmentsKey]*ShipmentsAndLineItemsRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -1363,27 +1333,17 @@ func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 			RHS: key.BoolExpr(),
 		}
 	}
-	it := t.List(ctx, ListQuery{
+	foundRows := make(map[ShipmentsKey]*ShipmentsAndLineItemsRow, len(keys))
+	if err := t.List(ctx, ListQuery{
 		Where: spansql.Paren{Expr: where},
 		Limit: int64(len(keys)),
-	})
-	defer it.Stop()
-	foundRows := make(map[ShipmentsKey]*ShipmentsAndLineItemsRow, len(keys))
-	if err := it.Do(func(row *ShipmentsAndLineItemsRow) error {
+	}).Do(func(row *ShipmentsAndLineItemsRow) error {
 		foundRows[row.ShipmentsKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*ShipmentsAndLineItemsRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 type ShipmentsAndLineItemsRowIterator struct {
@@ -1584,29 +1544,19 @@ func (t LineItemsReadTransaction) Get(
 func (t LineItemsReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []LineItemsKey,
-) ([]*LineItemsRow, error) {
+) (map[LineItemsKey]*LineItemsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
-	if err := it.Do(func(row *LineItemsRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *LineItemsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*LineItemsRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t LineItemsReadTransaction) List(
