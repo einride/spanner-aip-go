@@ -10,8 +10,6 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type SingersReadTransaction struct {
@@ -59,29 +57,19 @@ func (t SingersReadTransaction) Get(
 func (t SingersReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []SingersKey,
-) ([]*SingersRow, error) {
+) (map[SingersKey]*SingersRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[SingersKey]*SingersRow, len(keys))
-	if err := it.Do(func(row *SingersRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SingersRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*SingersRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t SingersReadTransaction) List(

@@ -32,6 +32,39 @@ func TestAlbumsReadTransaction(t *testing.T) {
 		assert.DeepEqual(t, expected, actual)
 	})
 
+	t.Run("insert and batch get", func(t *testing.T) {
+		t.Parallel()
+		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
+		newSinger := func(i int) *musicdb.SingersRow {
+			return &musicdb.SingersRow{
+				SingerId:  int64(i),
+				FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
+				LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
+			}
+		}
+		const n = 10
+		singers := make([]*musicdb.SingersRow, 0, n)
+		for i := 0; i < n; i++ {
+			singer := newSinger(i)
+			_, err := client.Apply(fx.Ctx, []*spanner.Mutation{singer.Insert()})
+			assert.NilError(t, err)
+			singers = append(singers, singer)
+		}
+		expected := map[musicdb.SingersKey]*musicdb.SingersRow{
+			singers[1].PrimaryKey(): singers[1],
+			singers[3].PrimaryKey(): singers[3],
+			singers[5].PrimaryKey(): singers[5],
+		}
+		actual, err := musicdb.Singers(client.Single()).BatchGet(fx.Ctx, []musicdb.SingersKey{
+			singers[1].PrimaryKey(),
+			singers[3].PrimaryKey(),
+			singers[5].PrimaryKey(),
+			{SingerId: n + 1}, // not found
+		})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, expected, actual)
+	})
+
 	t.Run("insert many and list pages", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")

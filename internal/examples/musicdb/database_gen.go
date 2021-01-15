@@ -59,29 +59,19 @@ func (t SingersReadTransaction) Get(
 func (t SingersReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []SingersKey,
-) ([]*SingersRow, error) {
+) (map[SingersKey]*SingersRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[SingersKey]*SingersRow, len(keys))
-	if err := it.Do(func(row *SingersRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SingersRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*SingersRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t SingersReadTransaction) List(
@@ -426,7 +416,7 @@ func (t SingersAndAlbumsReadTransaction) Get(
 func (t SingersAndAlbumsReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []SingersKey,
-) ([]*SingersAndAlbumsRow, error) {
+) (map[SingersKey]*SingersAndAlbumsRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -438,27 +428,17 @@ func (t SingersAndAlbumsReadTransaction) BatchGet(
 			RHS: key.BoolExpr(),
 		}
 	}
-	it := t.List(ctx, ListQuery{
+	foundRows := make(map[SingersKey]*SingersAndAlbumsRow, len(keys))
+	if err := t.List(ctx, ListQuery{
 		Where: spansql.Paren{Expr: where},
 		Limit: int64(len(keys)),
-	})
-	defer it.Stop()
-	foundRows := make(map[SingersKey]*SingersAndAlbumsRow, len(keys))
-	if err := it.Do(func(row *SingersAndAlbumsRow) error {
+	}).Do(func(row *SingersAndAlbumsRow) error {
 		foundRows[row.SingersKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*SingersAndAlbumsRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 type SingersAndAlbumsRowIterator struct {
@@ -614,29 +594,19 @@ func (t AlbumsReadTransaction) Get(
 func (t AlbumsReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []AlbumsKey,
-) ([]*AlbumsRow, error) {
+) (map[AlbumsKey]*AlbumsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[AlbumsKey]*AlbumsRow, len(keys))
-	if err := it.Do(func(row *AlbumsRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *AlbumsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*AlbumsRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t AlbumsReadTransaction) List(
@@ -1024,7 +994,7 @@ func (t AlbumsAndSongsReadTransaction) Get(
 func (t AlbumsAndSongsReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []AlbumsKey,
-) ([]*AlbumsAndSongsRow, error) {
+) (map[AlbumsKey]*AlbumsAndSongsRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -1036,27 +1006,17 @@ func (t AlbumsAndSongsReadTransaction) BatchGet(
 			RHS: key.BoolExpr(),
 		}
 	}
-	it := t.List(ctx, ListQuery{
+	foundRows := make(map[AlbumsKey]*AlbumsAndSongsRow, len(keys))
+	if err := t.List(ctx, ListQuery{
 		Where: spansql.Paren{Expr: where},
 		Limit: int64(len(keys)),
-	})
-	defer it.Stop()
-	foundRows := make(map[AlbumsKey]*AlbumsAndSongsRow, len(keys))
-	if err := it.Do(func(row *AlbumsAndSongsRow) error {
+	}).Do(func(row *AlbumsAndSongsRow) error {
 		foundRows[row.AlbumsKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*AlbumsAndSongsRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 type AlbumsAndSongsRowIterator struct {
@@ -1209,29 +1169,19 @@ func (t SongsReadTransaction) Get(
 func (t SongsReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []SongsKey,
-) ([]*SongsRow, error) {
+) (map[SongsKey]*SongsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(keys))
 	for _, key := range keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	it := t.Read(ctx, spanner.KeySets(spannerKeys...))
-	defer it.Stop()
 	foundRows := make(map[SongsKey]*SongsRow, len(keys))
-	if err := it.Do(func(row *SongsRow) error {
+	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SongsRow) error {
 		foundRows[row.PrimaryKey()] = row
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	rows := make([]*SongsRow, 0, len(keys))
-	for _, key := range keys {
-		row, ok := foundRows[key]
-		if !ok {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		rows = append(rows, row)
-	}
-	return rows, nil
+	return foundRows, nil
 }
 
 func (t SongsReadTransaction) List(
