@@ -1,4 +1,4 @@
-package tablecodegen
+package databasecodegen
 
 import (
 	"go.einride.tech/aip-spanner/internal/codegen"

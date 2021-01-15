@@ -9,8 +9,8 @@ import (
 
 	"cloud.google.com/go/spanner/spansql"
 	"go.einride.tech/aip-spanner/internal/codegen"
+	"go.einride.tech/aip-spanner/internal/codegen/databasecodegen"
 	"go.einride.tech/aip-spanner/internal/codegen/descriptorcodegen"
-	"go.einride.tech/aip-spanner/internal/codegen/tablecodegen"
 	"go.einride.tech/aip-spanner/spanddl"
 	"gopkg.in/yaml.v2"
 )
@@ -94,7 +94,7 @@ func main() {
 				Package:     databaseConfig.Package.Name,
 				GeneratedBy: generatedBy,
 			})
-			tablecodegen.DatabaseCodeGenerator{Database: &db}.GenerateCode(f)
+			databasecodegen.DatabaseCodeGenerator{Database: &db}.GenerateCode(f)
 			content, err := f.Content()
 			if err != nil {
 				log.Panic(err)
