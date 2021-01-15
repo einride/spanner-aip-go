@@ -1,4 +1,4 @@
-package tablecodegen
+package databasecodegen
 
 import (
 	"fmt"
@@ -12,71 +12,44 @@ import (
 	"go.einride.tech/aip-spanner/spanddl"
 )
 
-type KeyPrefixCodeGenerator struct {
+type KeyCodeGenerator struct {
 	Table *spanddl.Table
 }
 
-func (g KeyPrefixCodeGenerator) Type() string {
-	return strcase.UpperCamelCase(string(g.Table.Name)) + "KeyPrefix"
+func (g KeyCodeGenerator) Type() string {
+	return strcase.UpperCamelCase(string(g.Table.Name)) + "Key"
 }
 
-func (g KeyPrefixCodeGenerator) FieldName(keyPart spansql.KeyPart) string {
+func (g KeyCodeGenerator) FieldName(keyPart spansql.KeyPart) string {
 	return strcase.UpperCamelCase(string(keyPart.Column))
 }
 
-func (g KeyPrefixCodeGenerator) GenerateCode(f *codegen.File) {
-	if len(g.Table.PrimaryKey) == 0 {
-		return
-	}
-	f.P()
-	f.P("type ", g.Type(), " struct {")
-	f.P(g.FieldName(g.Table.PrimaryKey[0]), " ", g.columnType(f, g.Table.PrimaryKey[0]))
-	for _, keyPart := range g.Table.PrimaryKey[1:] {
-		f.P(g.FieldName(keyPart), " ", g.columnType(f, keyPart))
-		f.P("Valid", g.FieldName(keyPart), " bool")
-	}
-	f.P("}")
-	g.generateSpannerKeyMethod(f)
-	g.generateDeleteMethod(f)
-	g.generateBoolExprMethod(f)
-	g.generateQualifiedBoolExprMethod(f)
-}
-
-func (g KeyPrefixCodeGenerator) generateSpannerKeyMethod(f *codegen.File) {
+func (g KeyCodeGenerator) GenerateCode(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	f.P()
+	f.P("type ", g.Type(), " struct {")
+	for _, keyPart := range g.Table.PrimaryKey {
+		f.P(g.FieldName(keyPart), " ", g.columnType(f, keyPart))
+	}
+	f.P("}")
+	f.P()
 	f.P("func (k ", g.Type(), ") SpannerKey() ", spannerPkg, ".Key {")
-	if len(g.Table.PrimaryKey) == 1 {
-		f.P("return ", spannerPkg, ".Key{k.", g.FieldName(g.Table.PrimaryKey[0]), "}")
-		f.P("}")
-		return
+	f.P("return ", spannerPkg, ".Key{")
+	for _, keyPart := range g.Table.PrimaryKey {
+		f.P("k.", g.FieldName(keyPart), ",")
 	}
-	f.P("n := 1")
-	for _, keyPart := range g.Table.PrimaryKey[1:] {
-		f.P("if k.Valid", g.FieldName(keyPart), " {")
-		f.P("n++")
-	}
-	for range g.Table.PrimaryKey[1:] {
-		f.P("}")
-	}
-	f.P("result := make(", spannerPkg, ".Key, 0, n)")
-	f.P("result = append(result, k.", g.FieldName(g.Table.PrimaryKey[0]), ")")
-	for _, keyPart := range g.Table.PrimaryKey[1:] {
-		f.P("if k.Valid", g.FieldName(keyPart), " {")
-		f.P("result = append(result, k.", g.FieldName(keyPart), ")")
-	}
-	for range g.Table.PrimaryKey[1:] {
-		f.P("}")
-	}
-	f.P("return result")
+	f.P("}")
 	f.P("}")
 	f.P()
 	f.P("func (k ", g.Type(), ") SpannerKeySet() ", spannerPkg, ".KeySet {")
 	f.P("return k.SpannerKey()")
 	f.P("}")
+	g.generateDeleteMethod(f)
+	g.generateBoolExprMethod(f)
+	g.generateQualifiedBoolExprMethod(f)
 }
 
-func (g KeyPrefixCodeGenerator) generateDeleteMethod(f *codegen.File) {
+func (g KeyCodeGenerator) generateDeleteMethod(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	f.P()
 	f.P("func (k ", g.Type(), ") Delete() *", spannerPkg, ".Mutation {")
@@ -84,7 +57,7 @@ func (g KeyPrefixCodeGenerator) generateDeleteMethod(f *codegen.File) {
 	f.P("}")
 }
 
-func (g KeyPrefixCodeGenerator) generateBoolExprMethod(f *codegen.File) {
+func (g KeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	k0 := g.Table.PrimaryKey[0]
@@ -98,7 +71,6 @@ func (g KeyPrefixCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 	)
 	f.P("})")
 	for _, keyPart := range g.Table.PrimaryKey[1:] {
-		f.P("if k.Valid", g.FieldName(keyPart), " {")
 		f.P("b = ", spansqlPkg, ".LogicalOp{")
 		f.P("Op: ", spansqlPkg, ".And,")
 		f.P("LHS: b,")
@@ -112,28 +84,24 @@ func (g KeyPrefixCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 		f.P("},")
 		f.P("}")
 	}
-	for range g.Table.PrimaryKey[1:] {
-		f.P("}")
-	}
 	f.P("return ", spansqlPkg, ".Paren{Expr: b}")
 	f.P("}")
 }
 
-func (g KeyPrefixCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File) {
+func (g KeyCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File) {
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	k0 := g.Table.PrimaryKey[0]
 	f.P("func (k ", g.Type(), ") QualifiedBoolExpr(prefix ", spansqlPkg, ".PathExp) ", spansqlPkg, ".BoolExpr {")
 	f.P("b := ", spansqlPkg, ".BoolExpr(", spansqlPkg, ".ComparisonOp{")
 	f.P("Op: ", spansqlPkg, ".Eq,")
-	f.P("LHS: append(prefix, ", spansqlPkg, ".ID(", strconv.Quote(string(g.Table.PrimaryKey[0].Column)), ")),")
+	f.P("LHS: append(prefix, ", spansqlPkg, ".ID(", strconv.Quote(string(k0.Column)), ")),")
 	f.P(
 		"RHS: ", g.columnSpanSQLType(f, k0),
 		"(k.", g.FieldName(k0), typescodegen.ValueAccessor(g.keyColumn(k0)), "),",
 	)
 	f.P("})")
 	for _, keyPart := range g.Table.PrimaryKey[1:] {
-		f.P("if k.Valid", g.FieldName(keyPart), " {")
 		f.P("b = ", spansqlPkg, ".LogicalOp{")
 		f.P("Op: ", spansqlPkg, ".And,")
 		f.P("LHS: b,")
@@ -147,14 +115,11 @@ func (g KeyPrefixCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File)
 		f.P("},")
 		f.P("}")
 	}
-	for range g.Table.PrimaryKey[1:] {
-		f.P("}")
-	}
 	f.P("return ", spansqlPkg, ".Paren{Expr: b}")
 	f.P("}")
 }
 
-func (g KeyPrefixCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Column {
+func (g KeyCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Column {
 	column, ok := g.Table.Column(keyPart.Column)
 	if !ok {
 		panic(fmt.Errorf("table %s has no column %s", g.Table.Name, keyPart.Column))
@@ -162,7 +127,7 @@ func (g KeyPrefixCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Colu
 	return column
 }
 
-func (g KeyPrefixCodeGenerator) columnType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
+func (g KeyCodeGenerator) columnType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
 	t := typescodegen.GoType(g.keyColumn(keyPart))
 	if t.PkgPath() != "" {
 		_ = f.Import(t.PkgPath())
@@ -170,7 +135,7 @@ func (g KeyPrefixCodeGenerator) columnType(f *codegen.File, keyPart spansql.KeyP
 	return t
 }
 
-func (g KeyPrefixCodeGenerator) columnSpanSQLType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
+func (g KeyCodeGenerator) columnSpanSQLType(f *codegen.File, keyPart spansql.KeyPart) reflect.Type {
 	t := typescodegen.SpanSQLType(g.keyColumn(keyPart))
 	if t.PkgPath() != "" {
 		_ = f.Import(t.PkgPath())

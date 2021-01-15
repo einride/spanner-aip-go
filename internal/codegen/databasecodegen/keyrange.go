@@ -1,4 +1,4 @@
-package tablecodegen
+package databasecodegen
 
 import (
 	"github.com/stoewer/go-strcase"
