@@ -174,50 +174,6 @@ func (k SingersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-type SingersKeyPrefix struct {
-	SingerId int64
-}
-
-func (k SingersKeyPrefix) SpannerKey() spanner.Key {
-	return spanner.Key{k.SingerId}
-}
-
-func (k SingersKeyPrefix) Delete() *spanner.Mutation {
-	return spanner.Delete("Singers", k.SpannerKey())
-}
-
-func (k SingersKeyPrefix) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("SingerId"),
-		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
-func (k SingersKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("SingerId")),
-		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
-type SingersKeyRange struct {
-	Start SingersKeyPrefix
-	End   SingersKeyPrefix
-	Kind  spanner.KeyRangeKind
-}
-
-func (k SingersKeyRange) SpannerKeySet() spanner.KeySet {
-	return spanner.KeyRange{
-		Start: k.Start.SpannerKey(),
-		End:   k.End.SpannerKey(),
-		Kind:  k.Kind,
-	}
-}
-
 type SingersRow struct {
 	SingerId   int64              `spanner:"SingerId"`
 	FirstName  spanner.NullString `spanner:"FirstName"`
@@ -454,7 +410,7 @@ func (t SingersAndAlbumsReadTransaction) BatchGet(
 		Where: spansql.Paren{Expr: where},
 		Limit: int64(len(keys)),
 	}).Do(func(row *SingersAndAlbumsRow) error {
-		foundRows[row.SingersKey()] = row
+		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -496,14 +452,8 @@ type SingersAndAlbumsRow struct {
 	Albums     []*AlbumsRow       `spanner:"Albums"`
 }
 
-func (r *SingersAndAlbumsRow) SingersKey() SingersKey {
+func (r *SingersAndAlbumsRow) Key() SingersKey {
 	return SingersKey{
-		SingerId: r.SingerId,
-	}
-}
-
-func (r SingersAndAlbumsRow) AlbumsKeyPrefix() AlbumsKeyPrefix {
-	return AlbumsKeyPrefix{
 		SingerId: r.SingerId,
 	}
 }
@@ -563,7 +513,7 @@ func (r SingersAndAlbumsRow) Update() []*spanner.Mutation {
 	n += len(r.Albums)
 	mutations := make([]*spanner.Mutation, 0, n)
 	mutations = append(mutations, r.SingersRow().Update())
-	mutations = append(mutations, r.AlbumsKeyPrefix().Delete())
+	mutations = append(mutations, spanner.Delete("Albums", r.Key().SpannerKey().AsPrefix()))
 	for _, interleavedRow := range r.Albums {
 		mutations = append(mutations, interleavedRow.Insert())
 	}
@@ -747,87 +697,6 @@ func (k AlbumsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 		},
 	}
 	return spansql.Paren{Expr: b}
-}
-
-type AlbumsKeyPrefix struct {
-	SingerId     int64
-	AlbumId      int64
-	ValidAlbumId bool
-}
-
-func (k AlbumsKeyPrefix) SpannerKey() spanner.Key {
-	n := 1
-	if k.ValidAlbumId {
-		n++
-	}
-	result := make(spanner.Key, 0, n)
-	result = append(result, k.SingerId)
-	if k.ValidAlbumId {
-		result = append(result, k.AlbumId)
-	}
-	return result
-}
-
-func (k AlbumsKeyPrefix) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k AlbumsKeyPrefix) Delete() *spanner.Mutation {
-	return spanner.Delete("Albums", k.SpannerKey())
-}
-
-func (k AlbumsKeyPrefix) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("SingerId"),
-		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
-	if k.ValidAlbumId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: spansql.ID("AlbumId"),
-				RHS: spansql.IntegerLiteral(k.AlbumId),
-			},
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k AlbumsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("SingerId")),
-		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
-	if k.ValidAlbumId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: append(prefix, spansql.ID("AlbumId")),
-				RHS: spansql.IntegerLiteral(k.AlbumId),
-			},
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-type AlbumsKeyRange struct {
-	Start AlbumsKeyPrefix
-	End   AlbumsKeyPrefix
-	Kind  spanner.KeyRangeKind
-}
-
-func (k AlbumsKeyRange) SpannerKeySet() spanner.KeySet {
-	return spanner.KeyRange{
-		Start: k.Start.SpannerKey(),
-		End:   k.End.SpannerKey(),
-		Kind:  k.Kind,
-	}
 }
 
 type AlbumsRow struct {

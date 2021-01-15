@@ -173,50 +173,6 @@ func (k ShippersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr 
 	return spansql.Paren{Expr: b}
 }
 
-type ShippersKeyPrefix struct {
-	ShipperId string
-}
-
-func (k ShippersKeyPrefix) SpannerKey() spanner.Key {
-	return spanner.Key{k.ShipperId}
-}
-
-func (k ShippersKeyPrefix) Delete() *spanner.Mutation {
-	return spanner.Delete("shippers", k.SpannerKey())
-}
-
-func (k ShippersKeyPrefix) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
-func (k ShippersKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
-type ShippersKeyRange struct {
-	Start ShippersKeyPrefix
-	End   ShippersKeyPrefix
-	Kind  spanner.KeyRangeKind
-}
-
-func (k ShippersKeyRange) SpannerKeySet() spanner.KeySet {
-	return spanner.KeyRange{
-		Start: k.Start.SpannerKey(),
-		End:   k.End.SpannerKey(),
-		Kind:  k.Kind,
-	}
-}
-
 type ShippersRow struct {
 	ShipperId  string           `spanner:"shipper_id"`
 	CreateTime time.Time        `spanner:"create_time"`
@@ -522,87 +478,6 @@ func (k SitesKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 		},
 	}
 	return spansql.Paren{Expr: b}
-}
-
-type SitesKeyPrefix struct {
-	ShipperId   string
-	SiteId      string
-	ValidSiteId bool
-}
-
-func (k SitesKeyPrefix) SpannerKey() spanner.Key {
-	n := 1
-	if k.ValidSiteId {
-		n++
-	}
-	result := make(spanner.Key, 0, n)
-	result = append(result, k.ShipperId)
-	if k.ValidSiteId {
-		result = append(result, k.SiteId)
-	}
-	return result
-}
-
-func (k SitesKeyPrefix) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k SitesKeyPrefix) Delete() *spanner.Mutation {
-	return spanner.Delete("sites", k.SpannerKey())
-}
-
-func (k SitesKeyPrefix) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	if k.ValidSiteId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: spansql.ID("site_id"),
-				RHS: spansql.StringLiteral(k.SiteId),
-			},
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k SitesKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	if k.ValidSiteId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: append(prefix, spansql.ID("site_id")),
-				RHS: spansql.StringLiteral(k.SiteId),
-			},
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-type SitesKeyRange struct {
-	Start SitesKeyPrefix
-	End   SitesKeyPrefix
-	Kind  spanner.KeyRangeKind
-}
-
-func (k SitesKeyRange) SpannerKeySet() spanner.KeySet {
-	return spanner.KeyRange{
-		Start: k.Start.SpannerKey(),
-		End:   k.End.SpannerKey(),
-		Kind:  k.Kind,
-	}
 }
 
 type SitesRow struct {
@@ -963,87 +838,6 @@ func (k ShipmentsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr
 	return spansql.Paren{Expr: b}
 }
 
-type ShipmentsKeyPrefix struct {
-	ShipperId       string
-	ShipmentId      string
-	ValidShipmentId bool
-}
-
-func (k ShipmentsKeyPrefix) SpannerKey() spanner.Key {
-	n := 1
-	if k.ValidShipmentId {
-		n++
-	}
-	result := make(spanner.Key, 0, n)
-	result = append(result, k.ShipperId)
-	if k.ValidShipmentId {
-		result = append(result, k.ShipmentId)
-	}
-	return result
-}
-
-func (k ShipmentsKeyPrefix) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k ShipmentsKeyPrefix) Delete() *spanner.Mutation {
-	return spanner.Delete("shipments", k.SpannerKey())
-}
-
-func (k ShipmentsKeyPrefix) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	if k.ValidShipmentId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: spansql.ID("shipment_id"),
-				RHS: spansql.StringLiteral(k.ShipmentId),
-			},
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k ShipmentsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	if k.ValidShipmentId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: append(prefix, spansql.ID("shipment_id")),
-				RHS: spansql.StringLiteral(k.ShipmentId),
-			},
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-type ShipmentsKeyRange struct {
-	Start ShipmentsKeyPrefix
-	End   ShipmentsKeyPrefix
-	Kind  spanner.KeyRangeKind
-}
-
-func (k ShipmentsKeyRange) SpannerKeySet() spanner.KeySet {
-	return spanner.KeyRange{
-		Start: k.Start.SpannerKey(),
-		End:   k.End.SpannerKey(),
-		Kind:  k.Kind,
-	}
-}
-
 type ShipmentsRow struct {
 	ShipperId            string             `spanner:"shipper_id"`
 	ShipmentId           string             `spanner:"shipment_id"`
@@ -1379,7 +1173,7 @@ func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 		Where: spansql.Paren{Expr: where},
 		Limit: int64(len(keys)),
 	}).Do(func(row *ShipmentsAndLineItemsRow) error {
-		foundRows[row.ShipmentsKey()] = row
+		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -1428,18 +1222,10 @@ type ShipmentsAndLineItemsRow struct {
 	LineItems            []*LineItemsRow    `spanner:"line_items"`
 }
 
-func (r *ShipmentsAndLineItemsRow) ShipmentsKey() ShipmentsKey {
+func (r *ShipmentsAndLineItemsRow) Key() ShipmentsKey {
 	return ShipmentsKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
-	}
-}
-
-func (r ShipmentsAndLineItemsRow) LineItemsKeyPrefix() LineItemsKeyPrefix {
-	return LineItemsKeyPrefix{
-		ShipperId:       r.ShipperId,
-		ShipmentId:      r.ShipmentId,
-		ValidShipmentId: true,
 	}
 }
 
@@ -1533,7 +1319,7 @@ func (r ShipmentsAndLineItemsRow) Update() []*spanner.Mutation {
 	n += len(r.LineItems)
 	mutations := make([]*spanner.Mutation, 0, n)
 	mutations = append(mutations, r.ShipmentsRow().Update())
-	mutations = append(mutations, r.LineItemsKeyPrefix().Delete())
+	mutations = append(mutations, spanner.Delete("line_items", r.Key().SpannerKey().AsPrefix()))
 	for _, interleavedRow := range r.LineItems {
 		mutations = append(mutations, interleavedRow.Insert())
 	}
@@ -1738,117 +1524,6 @@ func (k LineItemsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr
 		},
 	}
 	return spansql.Paren{Expr: b}
-}
-
-type LineItemsKeyPrefix struct {
-	ShipperId       string
-	ShipmentId      string
-	ValidShipmentId bool
-	LineNumber      int64
-	ValidLineNumber bool
-}
-
-func (k LineItemsKeyPrefix) SpannerKey() spanner.Key {
-	n := 1
-	if k.ValidShipmentId {
-		n++
-		if k.ValidLineNumber {
-			n++
-		}
-	}
-	result := make(spanner.Key, 0, n)
-	result = append(result, k.ShipperId)
-	if k.ValidShipmentId {
-		result = append(result, k.ShipmentId)
-		if k.ValidLineNumber {
-			result = append(result, k.LineNumber)
-		}
-	}
-	return result
-}
-
-func (k LineItemsKeyPrefix) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k LineItemsKeyPrefix) Delete() *spanner.Mutation {
-	return spanner.Delete("line_items", k.SpannerKey())
-}
-
-func (k LineItemsKeyPrefix) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	if k.ValidShipmentId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: spansql.ID("shipment_id"),
-				RHS: spansql.StringLiteral(k.ShipmentId),
-			},
-		}
-		if k.ValidLineNumber {
-			b = spansql.LogicalOp{
-				Op:  spansql.And,
-				LHS: b,
-				RHS: spansql.ComparisonOp{
-					Op:  spansql.Eq,
-					LHS: spansql.ID("line_number"),
-					RHS: spansql.IntegerLiteral(k.LineNumber),
-				},
-			}
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k LineItemsKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	if k.ValidShipmentId {
-		b = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: b,
-			RHS: spansql.ComparisonOp{
-				Op:  spansql.Eq,
-				LHS: append(prefix, spansql.ID("shipment_id")),
-				RHS: spansql.StringLiteral(k.ShipmentId),
-			},
-		}
-		if k.ValidLineNumber {
-			b = spansql.LogicalOp{
-				Op:  spansql.And,
-				LHS: b,
-				RHS: spansql.ComparisonOp{
-					Op:  spansql.Eq,
-					LHS: append(prefix, spansql.ID("line_number")),
-					RHS: spansql.IntegerLiteral(k.LineNumber),
-				},
-			}
-		}
-	}
-	return spansql.Paren{Expr: b}
-}
-
-type LineItemsKeyRange struct {
-	Start LineItemsKeyPrefix
-	End   LineItemsKeyPrefix
-	Kind  spanner.KeyRangeKind
-}
-
-func (k LineItemsKeyRange) SpannerKeySet() spanner.KeySet {
-	return spanner.KeyRange{
-		Start: k.Start.SpannerKey(),
-		End:   k.End.SpannerKey(),
-		Kind:  k.Kind,
-	}
 }
 
 type LineItemsRow struct {
