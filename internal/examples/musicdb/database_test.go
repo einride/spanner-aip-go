@@ -144,7 +144,7 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 		}
 		_, err := client.Apply(fx.Ctx, expected.Insert())
 		assert.NilError(t, err)
-		actual, err := musicdb.SingersAndAlbums(client.Single()).Get(fx.Ctx, expected.SingersKey())
+		actual, err := musicdb.SingersAndAlbums(client.Single()).Get(fx.Ctx, expected.Key())
 		assert.NilError(t, err)
 		assert.DeepEqual(t, expected, actual)
 	})
@@ -194,14 +194,14 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 			singersAndAlbums = append(singersAndAlbums, singerAndAlbums)
 		}
 		expected := map[musicdb.SingersKey]*musicdb.SingersAndAlbumsRow{
-			singersAndAlbums[1].SingersKey(): singersAndAlbums[1],
-			singersAndAlbums[3].SingersKey(): singersAndAlbums[3],
-			singersAndAlbums[5].SingersKey(): singersAndAlbums[5],
+			singersAndAlbums[1].Key(): singersAndAlbums[1],
+			singersAndAlbums[3].Key(): singersAndAlbums[3],
+			singersAndAlbums[5].Key(): singersAndAlbums[5],
 		}
 		actual, err := musicdb.SingersAndAlbums(client.Single()).BatchGet(fx.Ctx, []musicdb.SingersKey{
-			singersAndAlbums[1].SingersKey(),
-			singersAndAlbums[3].SingersKey(),
-			singersAndAlbums[5].SingersKey(),
+			singersAndAlbums[1].Key(),
+			singersAndAlbums[3].Key(),
+			singersAndAlbums[5].Key(),
 			{SingerId: n + 1}, // not found
 		})
 		assert.NilError(t, err)

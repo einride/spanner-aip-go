@@ -183,7 +183,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *c
 	f.P("Where: ", spansqlPkg, ".Paren{Expr: where},")
 	f.P("Limit: int64(len(keys)),")
 	f.P("}).Do(func(row *", interleavedRow.Type(), ") error {")
-	f.P("foundRows[row.", interleavedRow.PrimaryKeyMethod(), "()] = row")
+	f.P("foundRows[row.", interleavedRow.KeyMethod(), "()] = row")
 	f.P("return nil")
 	f.P("}); err != nil {")
 	f.P("return nil, err")

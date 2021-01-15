@@ -170,50 +170,6 @@ func (k SingersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-type SingersKeyPrefix struct {
-	SingerId int64
-}
-
-func (k SingersKeyPrefix) SpannerKey() spanner.Key {
-	return spanner.Key{k.SingerId}
-}
-
-func (k SingersKeyPrefix) Delete() *spanner.Mutation {
-	return spanner.Delete("Singers", k.SpannerKey())
-}
-
-func (k SingersKeyPrefix) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("SingerId"),
-		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
-func (k SingersKeyPrefix) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("SingerId")),
-		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
-type SingersKeyRange struct {
-	Start SingersKeyPrefix
-	End   SingersKeyPrefix
-	Kind  spanner.KeyRangeKind
-}
-
-func (k SingersKeyRange) SpannerKeySet() spanner.KeySet {
-	return spanner.KeyRange{
-		Start: k.Start.SpannerKey(),
-		End:   k.End.SpannerKey(),
-		Kind:  k.Kind,
-	}
-}
-
 type SingersRow struct {
 	SingerId   int64              `spanner:"SingerId"`
 	FirstName  spanner.NullString `spanner:"FirstName"`
