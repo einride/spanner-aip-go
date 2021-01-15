@@ -67,7 +67,7 @@ func (t ShippersReadTransaction) BatchGet(
 	}
 	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
 	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShippersRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -339,7 +339,7 @@ func (r *ShippersRow) MutationForColumns(columns []string) (string, []string, []
 	return "shippers", columns, values
 }
 
-func (r *ShippersRow) PrimaryKey() ShippersKey {
+func (r *ShippersRow) Key() ShippersKey {
 	return ShippersKey{
 		ShipperId: r.ShipperId,
 	}
@@ -397,7 +397,7 @@ func (t SitesReadTransaction) BatchGet(
 	}
 	foundRows := make(map[SitesKey]*SitesRow, len(keys))
 	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SitesRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -777,7 +777,7 @@ func (r *SitesRow) MutationForColumns(columns []string) (string, []string, []int
 	return "sites", columns, values
 }
 
-func (r *SitesRow) PrimaryKey() SitesKey {
+func (r *SitesRow) Key() SitesKey {
 	return SitesKey{
 		ShipperId: r.ShipperId,
 		SiteId:    r.SiteId,
@@ -836,7 +836,7 @@ func (t ShipmentsReadTransaction) BatchGet(
 	}
 	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
 	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShipmentsRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -1252,7 +1252,7 @@ func (r *ShipmentsRow) MutationForColumns(columns []string) (string, []string, [
 	return "shipments", columns, values
 }
 
-func (r *ShipmentsRow) PrimaryKey() ShipmentsKey {
+func (r *ShipmentsRow) Key() ShipmentsKey {
 	return ShipmentsKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
@@ -1592,7 +1592,7 @@ func (t LineItemsReadTransaction) BatchGet(
 	}
 	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
 	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *LineItemsRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -2012,7 +2012,7 @@ func (r *LineItemsRow) MutationForColumns(columns []string) (string, []string, [
 	return "line_items", columns, values
 }
 
-func (r *LineItemsRow) PrimaryKey() LineItemsKey {
+func (r *LineItemsRow) Key() LineItemsKey {
 	return LineItemsKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,

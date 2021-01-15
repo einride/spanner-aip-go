@@ -158,7 +158,7 @@ func (g ReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *codegen.File
 		"if err := t.", g.ReadMethod(), "(ctx, ", spannerPkg, ".KeySets(spannerKeys...))",
 		".Do(func(row *", row.Type(), ") error {",
 	)
-	f.P("foundRows[row.", row.PrimaryKeyMethod(), "()] = row")
+	f.P("foundRows[row.", row.KeyMethod(), "()] = row")
 	f.P("return nil")
 	f.P("}); err != nil {")
 	f.P("return nil, err")

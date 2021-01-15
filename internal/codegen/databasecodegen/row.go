@@ -40,8 +40,8 @@ func (g RowCodeGenerator) UnmarshalSpannerRowMethod() string {
 	return "UnmarshalSpannerRow"
 }
 
-func (g RowCodeGenerator) PrimaryKeyMethod() string {
-	return "PrimaryKey"
+func (g RowCodeGenerator) KeyMethod() string {
+	return "Key"
 }
 
 func (g RowCodeGenerator) Nil() string {
@@ -211,7 +211,7 @@ func (g RowCodeGenerator) generateColumnNamesFunctions(f *codegen.File) {
 func (g RowCodeGenerator) generatePrimaryKeyMethod(f *codegen.File) {
 	primaryKey := KeyCodeGenerator(g)
 	f.P()
-	f.P("func (r *", g.Type(), ") ", g.PrimaryKeyMethod(), "() ", primaryKey.Type(), " {")
+	f.P("func (r *", g.Type(), ") ", g.KeyMethod(), "() ", primaryKey.Type(), " {")
 	f.P("return ", primaryKey.Type(), "{")
 	for _, keyPart := range g.Table.PrimaryKey {
 		f.P(primaryKey.FieldName(keyPart), ": r.", g.ColumnFieldName(g.keyColumn(keyPart)), ",")
