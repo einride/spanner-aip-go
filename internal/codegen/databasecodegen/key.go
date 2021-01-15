@@ -45,6 +45,7 @@ func (g KeyCodeGenerator) GenerateCode(f *codegen.File) {
 	f.P("return k.SpannerKey()")
 	f.P("}")
 	g.generateDeleteMethod(f)
+	g.generateOrderMethod(f)
 	g.generateBoolExprMethod(f)
 	g.generateQualifiedBoolExprMethod(f)
 }
@@ -54,6 +55,18 @@ func (g KeyCodeGenerator) generateDeleteMethod(f *codegen.File) {
 	f.P()
 	f.P("func (k ", g.Type(), ") Delete() *", spannerPkg, ".Mutation {")
 	f.P("return ", spannerPkg, ".Delete(", strconv.Quote(string(g.Table.Name)), ", k.SpannerKey())")
+	f.P("}")
+}
+
+func (g KeyCodeGenerator) generateOrderMethod(f *codegen.File) {
+	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
+	f.P()
+	f.P("func (", g.Type(), ") Order() []", spansqlPkg, ".Order {")
+	f.P("return []", spansqlPkg, ".Order{")
+	for _, keyPart := range g.Table.PrimaryKey {
+		f.P("{Expr: ", spansqlPkg, ".ID(", strconv.Quote(string(keyPart.Column)), "), Desc: ", keyPart.Desc, "},")
+	}
+	f.P("}")
 	f.P("}")
 }
 
