@@ -93,7 +93,7 @@ func (t SingersReadTransaction) List(
 			Offset: spansql.Param("offset"),
 		}.SQL(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -304,7 +304,7 @@ func (r *SingersRow) Key() SingersKey {
 type ListQuery struct {
 	Where  spansql.BoolExpr
 	Order  []spansql.Order
-	Limit  int64
+	Limit  int32
 	Offset int64
 }
 

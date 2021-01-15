@@ -25,7 +25,7 @@ func (g CommonCodeGenerator) generateListQueryStruct(f *codegen.File) {
 	f.P("type ", g.ListQueryType(), " struct {")
 	f.P("Where  ", spansqlPkg, ".BoolExpr")
 	f.P("Order  []", spansqlPkg, ".Order")
-	f.P("Limit  int64")
+	f.P("Limit  int32")
 	f.P("Offset int64")
 	f.P("}")
 }

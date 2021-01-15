@@ -97,7 +97,7 @@ func (t SingersReadTransaction) List(
 			Offset: spansql.Param("offset"),
 		}.SQL(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -362,7 +362,7 @@ func (t SingersAndAlbumsReadTransaction) List(
 	stmt := spanner.Statement{
 		SQL: q.String(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -408,7 +408,7 @@ func (t SingersAndAlbumsReadTransaction) BatchGet(
 	foundRows := make(map[SingersKey]*SingersAndAlbumsRow, len(keys))
 	if err := t.List(ctx, ListQuery{
 		Where: spansql.Paren{Expr: where},
-		Limit: int64(len(keys)),
+		Limit: int32(len(keys)),
 	}).Do(func(row *SingersAndAlbumsRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -601,7 +601,7 @@ func (t AlbumsReadTransaction) List(
 			Offset: spansql.Param("offset"),
 		}.SQL(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -817,7 +817,7 @@ func (r *AlbumsRow) Key() AlbumsKey {
 type ListQuery struct {
 	Where  spansql.BoolExpr
 	Order  []spansql.Order
-	Limit  int64
+	Limit  int32
 	Offset int64
 }
 

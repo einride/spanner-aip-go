@@ -96,7 +96,7 @@ func (t ShippersReadTransaction) List(
 			Offset: spansql.Param("offset"),
 		}.SQL(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -382,7 +382,7 @@ func (t SitesReadTransaction) List(
 			Offset: spansql.Param("offset"),
 		}.SQL(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -740,7 +740,7 @@ func (t ShipmentsReadTransaction) List(
 			Offset: spansql.Param("offset"),
 		}.SQL(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -1125,7 +1125,7 @@ func (t ShipmentsAndLineItemsReadTransaction) List(
 	stmt := spanner.Statement{
 		SQL: q.String(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -1171,7 +1171,7 @@ func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 	foundRows := make(map[ShipmentsKey]*ShipmentsAndLineItemsRow, len(keys))
 	if err := t.List(ctx, ListQuery{
 		Where: spansql.Paren{Expr: where},
-		Limit: int64(len(keys)),
+		Limit: int32(len(keys)),
 	}).Do(func(row *ShipmentsAndLineItemsRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -1407,7 +1407,7 @@ func (t LineItemsReadTransaction) List(
 			Offset: spansql.Param("offset"),
 		}.SQL(),
 		Params: map[string]interface{}{
-			"limit":  query.Limit,
+			"limit":  int64(query.Limit),
 			"offset": query.Offset,
 		},
 	}
@@ -1698,7 +1698,7 @@ func (r *LineItemsRow) Key() LineItemsKey {
 type ListQuery struct {
 	Where  spansql.BoolExpr
 	Order  []spansql.Order
-	Limit  int64
+	Limit  int32
 	Offset int64
 }
 
