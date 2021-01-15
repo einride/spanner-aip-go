@@ -80,6 +80,9 @@ func (t SingersReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *SingersRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = SingersKey{}.Order()
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -145,6 +148,12 @@ func (k SingersKey) SpannerKeySet() spanner.KeySet {
 
 func (k SingersKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
+}
+
+func (SingersKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("SingerId"), Desc: false},
+	}
 }
 
 func (k SingersKey) BoolExpr() spansql.BoolExpr {
@@ -352,6 +361,9 @@ func (t SingersAndAlbumsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *SingersAndAlbumsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = SingersKey{}.Order()
+	}
 	var q strings.Builder
 	_, _ = q.WriteString("SELECT ")
 	_, _ = q.WriteString("SingerId, ")
@@ -366,6 +378,11 @@ func (t SingersAndAlbumsReadTransaction) List(
 	_, _ = q.WriteString("FROM Albums ")
 	_, _ = q.WriteString("WHERE ")
 	_, _ = q.WriteString("SingerId = Singers.SingerId ")
+	_, _ = q.WriteString("ORDER BY ")
+	_, _ = q.WriteString("SingerId")
+	_, _ = q.WriteString(", ")
+	_, _ = q.WriteString("AlbumId")
+	_, _ = q.WriteString(" ")
 	_, _ = q.WriteString(") AS Albums, ")
 	_, _ = q.WriteString("FROM Singers ")
 	if query.Where != nil {
@@ -379,6 +396,8 @@ func (t SingersAndAlbumsReadTransaction) List(
 			_, _ = q.WriteString(order.SQL())
 			if i < len(query.Order)-1 {
 				_, _ = q.WriteString(", ")
+			} else {
+				_, _ = q.WriteString(" ")
 			}
 		}
 	}
@@ -615,6 +634,9 @@ func (t AlbumsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *AlbumsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = AlbumsKey{}.Order()
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -682,6 +704,13 @@ func (k AlbumsKey) SpannerKeySet() spanner.KeySet {
 
 func (k AlbumsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Albums", k.SpannerKey())
+}
+
+func (AlbumsKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("SingerId"), Desc: false},
+		{Expr: spansql.ID("AlbumId"), Desc: false},
+	}
 }
 
 func (k AlbumsKey) BoolExpr() spansql.BoolExpr {

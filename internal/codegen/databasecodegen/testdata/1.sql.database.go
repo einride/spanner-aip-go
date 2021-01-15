@@ -76,6 +76,9 @@ func (t SingersReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *SingersRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = SingersKey{}.Order()
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -141,6 +144,12 @@ func (k SingersKey) SpannerKeySet() spanner.KeySet {
 
 func (k SingersKey) Delete() *spanner.Mutation {
 	return spanner.Delete("Singers", k.SpannerKey())
+}
+
+func (SingersKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("SingerId"), Desc: false},
+	}
 }
 
 func (k SingersKey) BoolExpr() spansql.BoolExpr {

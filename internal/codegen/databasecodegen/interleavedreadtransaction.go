@@ -50,6 +50,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 		offsetParam = "offset"
 	)
 	rowIterator := InterleavedRowIteratorCodeGenerator(g)
+	key := KeyCodeGenerator{Table: g.Table}
 	contextPkg := f.Import("context")
 	stringsPkg := f.Import("strings")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
@@ -58,6 +59,9 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 	f.P("ctx ", contextPkg, ".Context,")
 	f.P("query ListQuery,")
 	f.P(") *", rowIterator.Type(), " {")
+	f.P("if len(query.Order) == 0 {")
+	f.P("query.Order = ", key.Type(), "{}.Order()")
+	f.P("}")
 	f.P("var q ", stringsPkg, ".Builder")
 	f.P(`_, _ = q.WriteString("SELECT ")`)
 	for _, column := range g.Table.Columns {
@@ -77,6 +81,18 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 				f.P(`_, _ = q.WriteString("AND ")`)
 			}
 		}
+		f.P(`_, _ = q.WriteString("ORDER BY ")`)
+		for i, keyPart := range interleavedTable.PrimaryKey {
+			f.P(`_, _ = q.WriteString("`, keyPart.Column, `")`)
+			if keyPart.Desc {
+				f.P(`_, _ = q.WriteString(" DESC")`)
+			}
+			if i < len(interleavedTable.PrimaryKey)-1 {
+				f.P(`_, _ = q.WriteString(", ")`)
+			} else {
+				f.P(`_, _ = q.WriteString(" ")`)
+			}
+		}
 		f.P(`_, _ = q.WriteString(") AS `, interleavedTable.Name, `, ")`)
 	}
 	f.P(`_, _ = q.WriteString("FROM `, g.Table.Name, ` ")`)
@@ -91,6 +107,8 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 	f.P(`_, _ = q.WriteString(order.SQL())`)
 	f.P("if i < len(query.Order) - 1 {")
 	f.P(`_, _ = q.WriteString(", ")`)
+	f.P("} else {")
+	f.P(`_, _ = q.WriteString(" ")`)
 	f.P("}")
 	f.P(`}`)
 	f.P("}")

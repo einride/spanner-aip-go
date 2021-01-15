@@ -79,6 +79,9 @@ func (t ShippersReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *ShippersRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShippersKey{}.Order()
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -144,6 +147,12 @@ func (k ShippersKey) SpannerKeySet() spanner.KeySet {
 
 func (k ShippersKey) Delete() *spanner.Mutation {
 	return spanner.Delete("shippers", k.SpannerKey())
+}
+
+func (ShippersKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+	}
 }
 
 func (k ShippersKey) BoolExpr() spansql.BoolExpr {
@@ -400,6 +409,9 @@ func (t SitesReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *SitesRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = SitesKey{}.Order()
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -467,6 +479,13 @@ func (k SitesKey) SpannerKeySet() spanner.KeySet {
 
 func (k SitesKey) Delete() *spanner.Mutation {
 	return spanner.Delete("sites", k.SpannerKey())
+}
+
+func (SitesKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+		{Expr: spansql.ID("site_id"), Desc: false},
+	}
 }
 
 func (k SitesKey) BoolExpr() spansql.BoolExpr {
@@ -829,6 +848,9 @@ func (t ShipmentsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *ShipmentsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShipmentsKey{}.Order()
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -896,6 +918,13 @@ func (k ShipmentsKey) SpannerKeySet() spanner.KeySet {
 
 func (k ShipmentsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("shipments", k.SpannerKey())
+}
+
+func (ShipmentsKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+		{Expr: spansql.ID("shipment_id"), Desc: false},
+	}
 }
 
 func (k ShipmentsKey) BoolExpr() spansql.BoolExpr {
@@ -1242,6 +1271,9 @@ func (t ShipmentsAndLineItemsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *ShipmentsAndLineItemsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShipmentsKey{}.Order()
+	}
 	var q strings.Builder
 	_, _ = q.WriteString("SELECT ")
 	_, _ = q.WriteString("shipper_id, ")
@@ -1269,6 +1301,13 @@ func (t ShipmentsAndLineItemsReadTransaction) List(
 	_, _ = q.WriteString("shipper_id = shipments.shipper_id ")
 	_, _ = q.WriteString("AND ")
 	_, _ = q.WriteString("shipment_id = shipments.shipment_id ")
+	_, _ = q.WriteString("ORDER BY ")
+	_, _ = q.WriteString("shipper_id")
+	_, _ = q.WriteString(", ")
+	_, _ = q.WriteString("shipment_id")
+	_, _ = q.WriteString(", ")
+	_, _ = q.WriteString("line_number")
+	_, _ = q.WriteString(" ")
 	_, _ = q.WriteString(") AS line_items, ")
 	_, _ = q.WriteString("FROM shipments ")
 	if query.Where != nil {
@@ -1282,6 +1321,8 @@ func (t ShipmentsAndLineItemsReadTransaction) List(
 			_, _ = q.WriteString(order.SQL())
 			if i < len(query.Order)-1 {
 				_, _ = q.WriteString(", ")
+			} else {
+				_, _ = q.WriteString(" ")
 			}
 		}
 	}
@@ -1563,6 +1604,9 @@ func (t LineItemsReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
 ) *LineItemsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = LineItemsKey{}.Order()
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -1632,6 +1676,14 @@ func (k LineItemsKey) SpannerKeySet() spanner.KeySet {
 
 func (k LineItemsKey) Delete() *spanner.Mutation {
 	return spanner.Delete("line_items", k.SpannerKey())
+}
+
+func (LineItemsKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+		{Expr: spansql.ID("shipment_id"), Desc: false},
+		{Expr: spansql.ID("line_number"), Desc: false},
+	}
 }
 
 func (k LineItemsKey) BoolExpr() spansql.BoolExpr {
