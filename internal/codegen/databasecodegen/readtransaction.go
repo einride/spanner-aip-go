@@ -103,7 +103,7 @@ func (g ReadTransactionCodeGenerator) generateListRowsMethod(f *codegen.File) {
 	f.P("Offset: ", spansqlPkg, ".Param(", strconv.Quote(offsetParam), "),")
 	f.P("}.SQL(),")
 	f.P("Params: map[string]interface{}{")
-	f.P(strconv.Quote(limitParam), ": query.Limit,")
+	f.P(strconv.Quote(limitParam), ": int64(query.Limit),")
 	f.P(strconv.Quote(offsetParam), ": query.Offset,")
 	f.P("},")
 	f.P("}")
