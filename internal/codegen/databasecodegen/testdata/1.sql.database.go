@@ -64,7 +64,7 @@ func (t SingersReadTransaction) BatchGet(
 	}
 	foundRows := make(map[SingersKey]*SingersRow, len(keys))
 	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SingersRow) error {
-		foundRows[row.PrimaryKey()] = row
+		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
 		return nil, err
@@ -339,7 +339,7 @@ func (r *SingersRow) MutationForColumns(columns []string) (string, []string, []i
 	return "Singers", columns, values
 }
 
-func (r *SingersRow) PrimaryKey() SingersKey {
+func (r *SingersRow) Key() SingersKey {
 	return SingersKey{
 		SingerId: r.SingerId,
 	}
