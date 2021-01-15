@@ -1,5 +1,16 @@
 # AIP Spanner Go
 
+[![PkgGoDev][pkg-badge]][pkg]
+[![GoReportCard][report-badge]][report]
+[![Codecov][codecov-badge]][codecov]
+
+[pkg-badge]: https://pkg.go.dev/badge/go.einride.tech/aip-spanner
+[pkg]: https://pkg.go.dev/go.einride.tech/aip-spanner
+[report-badge]: https://goreportcard.com/badge/go.einride.tech/aip-spanner
+[report]: https://goreportcard.com/report/go.einride.tech/aip-spanner
+[codecov-badge]: https://codecov.io/gh/einride/aip-spanner-go/branch/master/graph/badge.svg
+[codecov]: https://codecov.io/gh/einride/aip-spanner-go
+
 Add-on to the [AIP Go SDK][aip-go] for implementing [Cloud
 Spanner][cloud-spanner] persistance for [resource-oriented
 APIs][google-aip].
