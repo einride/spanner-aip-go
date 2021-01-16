@@ -1,4 +1,11 @@
 databases:
+  - name: music
+    schema:
+      - "testdata/migrations/music/*.up.sql"
+    package:
+      name: musicdb
+      path: ./internal/examples/musicdb
+
   - name: freight
     schema:
       - "testdata/migrations/freight/*.up.sql"
@@ -6,9 +13,12 @@ databases:
       name: freightdb
       path: ./internal/examples/freightdb
 
-  - name: music
-    schema:
-      - "testdata/migrations/music/*.up.sql"
-    package:
-      name: musicdb
-      path: ./internal/examples/musicdb
+    resources:
+      - message: go.einride.tech/aip/examples/proto/gen/einride/example/freight/v1.Shipper
+        table: shippers
+
+      - message: go.einride.tech/aip/examples/proto/gen/einride/example/freight/v1.Site
+        table: sites
+
+      - message: go.einride.tech/aip/examples/proto/gen/einride/example/freight/v1.Shipment
+        table: shipments

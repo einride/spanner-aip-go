@@ -11,7 +11,7 @@ import (
 	"go.einride.tech/aip-spanner/internal/codegen"
 	"go.einride.tech/aip-spanner/internal/codegen/databasecodegen"
 	"go.einride.tech/aip-spanner/internal/codegen/descriptorcodegen"
-	"go.einride.tech/aip-spanner/spanddl"
+	"go.einride.tech/aip-spanner/internal/config"
 	"gopkg.in/yaml.v2"
 )
 
@@ -33,39 +33,26 @@ func main() {
 			log.Panic(err)
 		}
 	}()
-	var config struct {
-		Databases []struct {
-			Name        string   `yaml:"name"`
-			SchemaGlobs []string `yaml:"schema"`
-			Package     struct {
-				Name string `yaml:"name"`
-				Path string `yaml:"path"`
-			} `yaml:"package"`
-		} `yaml:"databases"`
-	}
-	if err := yaml.NewDecoder(configFile).Decode(&config); err != nil {
+	var codeGenerationConfig config.CodeGenerationConfig
+	if err := yaml.NewDecoder(configFile).Decode(&codeGenerationConfig); err != nil {
 		log.Panic(err)
 	}
-	for _, databaseConfig := range config.Databases {
-		var db spanddl.Database
-		for _, schemaGlob := range databaseConfig.SchemaGlobs {
-			schemaFiles, err := filepath.Glob(schemaGlob)
+	for _, databaseConfig := range codeGenerationConfig.Databases {
+		db, err := databaseConfig.LoadDatabase()
+		if err != nil {
+			log.Panic(err)
+		}
+		for _, resourceConfig := range databaseConfig.Resources {
+			table, ok := db.Table(spansql.ID(resourceConfig.Table))
+			if !ok {
+				log.Panicf("unknown table %s in database %s", resourceConfig.Table, databaseConfig.Name)
+			}
+			messageDescriptor, err := resourceConfig.LoadMessageDescriptor()
 			if err != nil {
 				log.Panic(err)
 			}
-			for _, schemaFile := range schemaFiles {
-				schema, err := ioutil.ReadFile(schemaFile)
-				if err != nil {
-					log.Panic(err)
-				}
-				ddl, err := spansql.ParseDDL(schemaFile, string(schema))
-				if err != nil {
-					log.Panic(err)
-				}
-				if err := db.ApplyDDL(ddl); err != nil {
-					log.Panic(err)
-				}
-			}
+			// TODO: Use table and message descriptor for code generation.
+			_, _ = table, messageDescriptor
 		}
 		if err := os.MkdirAll(databaseConfig.Package.Path, 0o775); err != nil {
 			log.Panic(err)
@@ -77,7 +64,7 @@ func main() {
 			GeneratedBy: generatedBy,
 		})
 		descriptorcodegen.DatabaseDescriptorCodeGenerator{
-			Database: &db,
+			Database: db,
 		}.GenerateCode(f)
 		content, err := f.Content()
 		if err != nil {
@@ -94,7 +81,7 @@ func main() {
 				Package:     databaseConfig.Package.Name,
 				GeneratedBy: generatedBy,
 			})
-			databasecodegen.DatabaseCodeGenerator{Database: &db}.GenerateCode(f)
+			databasecodegen.DatabaseCodeGenerator{Database: db}.GenerateCode(f)
 			content, err := f.Content()
 			if err != nil {
 				log.Panic(err)
