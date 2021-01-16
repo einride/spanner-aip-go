@@ -6,8 +6,7 @@ import (
 )
 
 type InterleavedRowIteratorCodeGenerator struct {
-	Table             *spanddl.Table
-	InterleavedTables []*spanddl.Table
+	Table *spanddl.Table
 }
 
 func (g InterleavedRowIteratorCodeGenerator) Type() string {

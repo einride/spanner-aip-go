@@ -134,6 +134,24 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 						PrimaryKey: []spansql.KeyPart{
 							{Column: "SingerId"},
 						},
+						InterleavedTables: []*Table{
+							{
+								Name: "Albums",
+								Columns: []*Column{
+									{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+									{Name: "AlbumId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+									{Name: "AlbumTitle", Type: spansql.Type{Base: spansql.String, Len: spansql.MaxLen}},
+								},
+								PrimaryKey: []spansql.KeyPart{
+									{Column: "SingerId"},
+									{Column: "AlbumId"},
+								},
+								Interleave: &spansql.Interleave{
+									Parent:   "Singers",
+									OnDelete: spansql.CascadeOnDelete,
+								},
+							},
+						},
 					},
 
 					{

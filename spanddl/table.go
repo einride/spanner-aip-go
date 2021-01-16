@@ -8,10 +8,11 @@ import (
 
 // Table represents a Spanner table.
 type Table struct {
-	Name       spansql.ID
-	Columns    []*Column
-	PrimaryKey []spansql.KeyPart
-	Interleave *spansql.Interleave
+	Name              spansql.ID
+	Columns           []*Column
+	InterleavedTables []*Table
+	PrimaryKey        []spansql.KeyPart
+	Interleave        *spansql.Interleave
 }
 
 func (t *Table) applyAlterTable(stmt *spansql.AlterTable) error {
