@@ -15,21 +15,17 @@ func (g DatabaseCodeGenerator) GenerateCode(f *codegen.File) {
 		RowIteratorCodeGenerator{Table: table}.GenerateCode(f)
 		KeyCodeGenerator{Table: table}.GenerateCode(f)
 		RowCodeGenerator{Table: table}.GenerateCode(f)
-		interleavedTables := g.Database.InterleavedTables(table.Name)
-		if len(interleavedTables) == 0 {
+		if len(table.InterleavedTables) == 0 {
 			continue
 		}
 		InterleavedReadTransactionCodeGenerator{
-			Table:             table,
-			InterleavedTables: interleavedTables,
+			Table: table,
 		}.GenerateCode(f)
 		InterleavedRowIteratorCodeGenerator{
-			Table:             table,
-			InterleavedTables: interleavedTables,
+			Table: table,
 		}.GenerateCode(f)
 		InterleavedRowCodeGenerator{
-			Table:             table,
-			InterleavedTables: interleavedTables,
+			Table: table,
 		}.GenerateCode(f)
 	}
 	CommonCodeGenerator{}.GenerateCode(f)

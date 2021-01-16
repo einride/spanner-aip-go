@@ -24,21 +24,6 @@ func (d *Database) Table(name spansql.ID) (*Table, bool) {
 	return nil, false
 }
 
-// InterleavedTables looks up all interleaved tables (non-recursively) for the provided table name.
-func (d *Database) InterleavedTables(name spansql.ID) []*Table {
-	table, ok := d.Table(name)
-	if !ok {
-		return nil
-	}
-	result := make([]*Table, 0, len(d.Tables))
-	for _, candidateTable := range d.Tables {
-		if candidateTable.Interleave != nil && candidateTable.Interleave.Parent == table.Name {
-			result = append(result, candidateTable)
-		}
-	}
-	return result
-}
-
 // Index looks up an index with the provided name.
 func (d *Database) Index(name spansql.ID) (*Index, bool) {
 	for _, index := range d.Indexes {
@@ -97,6 +82,13 @@ func (d *Database) applyCreateTable(stmt *spansql.CreateTable) (err error) {
 			return err
 		}
 		table.Columns = append(table.Columns, &column)
+	}
+	if table.Interleave != nil {
+		parent, ok := d.Table(table.Interleave.Parent)
+		if !ok {
+			return fmt.Errorf("parent table %s does not exist", table.Interleave.Parent)
+		}
+		parent.InterleavedTables = append(parent.InterleavedTables, table)
 	}
 	d.Tables = append(d.Tables, table)
 	return nil

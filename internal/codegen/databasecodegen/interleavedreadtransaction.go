@@ -8,8 +8,7 @@ import (
 )
 
 type InterleavedReadTransactionCodeGenerator struct {
-	Table             *spanddl.Table
-	InterleavedTables []*spanddl.Table
+	Table *spanddl.Table
 }
 
 func (g InterleavedReadTransactionCodeGenerator) Type() string {
@@ -50,7 +49,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 		offsetParam = "offset"
 	)
 	rowIterator := InterleavedRowIteratorCodeGenerator(g)
-	key := KeyCodeGenerator{Table: g.Table}
+	key := KeyCodeGenerator(g)
 	contextPkg := f.Import("context")
 	stringsPkg := f.Import("strings")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
@@ -67,7 +66,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 	for _, column := range g.Table.Columns {
 		f.P(`_, _ = q.WriteString("`, column.Name, `, ")`)
 	}
-	for _, interleavedTable := range g.InterleavedTables {
+	for _, interleavedTable := range g.Table.InterleavedTables {
 		f.P(`_, _ = q.WriteString("ARRAY( ")`)
 		f.P(`_, _ = q.WriteString("SELECT AS STRUCT ")`)
 		for _, column := range interleavedTable.Columns {
@@ -128,7 +127,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 }
 
 func (g InterleavedReadTransactionCodeGenerator) generateGetRowMethod(f *codegen.File) {
-	primaryKey := KeyCodeGenerator{Table: g.Table}
+	primaryKey := KeyCodeGenerator(g)
 	row := InterleavedRowCodeGenerator(g)
 	common := CommonCodeGenerator{}
 	contextPkg := f.Import("context")
@@ -157,7 +156,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateGetRowMethod(f *codegen
 }
 
 func (g InterleavedReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *codegen.File) {
-	primaryKey := KeyCodeGenerator{Table: g.Table}
+	primaryKey := KeyCodeGenerator(g)
 	interleavedRow := InterleavedRowCodeGenerator(g)
 	common := CommonCodeGenerator{}
 	contextPkg := f.Import("context")
