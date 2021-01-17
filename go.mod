@@ -1,4 +1,4 @@
-module go.einride.tech/aip-spanner
+module go.einride.tech/spanner-aip
 
 go 1.15
 

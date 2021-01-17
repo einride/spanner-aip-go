@@ -1,7 +1,7 @@
 package descriptorcodegen
 
 import (
-	"go.einride.tech/aip-spanner/internal/codegen"
+	"go.einride.tech/spanner-aip/internal/codegen"
 )
 
 type GenericColumnDescriptorCodeGenerator struct{}

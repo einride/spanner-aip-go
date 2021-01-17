@@ -3,9 +3,9 @@ before:
     - go mod download
 
 builds:
-  - id: aip-spanner-go
-    binary: aip-spanner-go
-    main: ./cmd/aip-spanner-go/main.go
+  - id: spanner-aip-go
+    binary: spanner-aip-go
+    main: ./cmd/spanner-aip-go/main.go
     env:
       - CGO_ENABLED=0
     goos:

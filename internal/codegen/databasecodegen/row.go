@@ -7,9 +7,9 @@ import (
 
 	"cloud.google.com/go/spanner/spansql"
 	"github.com/stoewer/go-strcase"
-	"go.einride.tech/aip-spanner/internal/codegen"
-	"go.einride.tech/aip-spanner/internal/codegen/typescodegen"
-	"go.einride.tech/aip-spanner/spanddl"
+	"go.einride.tech/spanner-aip/internal/codegen"
+	"go.einride.tech/spanner-aip/internal/codegen/typescodegen"
+	"go.einride.tech/spanner-aip/spanddl"
 )
 
 type RowCodeGenerator struct {

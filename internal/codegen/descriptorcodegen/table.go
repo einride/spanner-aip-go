@@ -4,8 +4,8 @@ import (
 	"strconv"
 
 	"github.com/stoewer/go-strcase"
-	"go.einride.tech/aip-spanner/internal/codegen"
-	"go.einride.tech/aip-spanner/spanddl"
+	"go.einride.tech/spanner-aip/internal/codegen"
+	"go.einride.tech/spanner-aip/spanddl"
 )
 
 type TableDescriptorCodeGenerator struct {

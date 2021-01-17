@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"go.einride.tech/aip-spanner/internal/protoloader"
+	"go.einride.tech/spanner-aip/internal/protoloader"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 )

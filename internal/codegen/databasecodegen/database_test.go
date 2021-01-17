@@ -3,8 +3,8 @@ package databasecodegen
 import (
 	"testing"
 
-	"go.einride.tech/aip-spanner/internal/codegen"
-	"go.einride.tech/aip-spanner/spanddl"
+	"go.einride.tech/spanner-aip/internal/codegen"
+	"go.einride.tech/spanner-aip/spanddl"
 )
 
 func TestDatabaseCodeGenerator_GenerateCode(t *testing.T) {

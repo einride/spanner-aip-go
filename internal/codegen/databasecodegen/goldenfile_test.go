@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"cloud.google.com/go/spanner/spansql"
-	"go.einride.tech/aip-spanner/internal/codegen"
-	"go.einride.tech/aip-spanner/spanddl"
+	"go.einride.tech/spanner-aip/internal/codegen"
+	"go.einride.tech/spanner-aip/spanddl"
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/golden"
 )

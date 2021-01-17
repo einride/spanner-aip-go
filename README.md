@@ -4,12 +4,12 @@
 [![GoReportCard][report-badge]][report]
 [![Codecov][codecov-badge]][codecov]
 
-[pkg-badge]: https://pkg.go.dev/badge/go.einride.tech/aip-spanner
-[pkg]: https://pkg.go.dev/go.einride.tech/aip-spanner
-[report-badge]: https://goreportcard.com/badge/go.einride.tech/aip-spanner
-[report]: https://goreportcard.com/report/go.einride.tech/aip-spanner
-[codecov-badge]: https://codecov.io/gh/einride/aip-spanner-go/branch/master/graph/badge.svg
-[codecov]: https://codecov.io/gh/einride/aip-spanner-go
+[pkg-badge]: https://pkg.go.dev/badge/go.einride.tech/spanner-aip
+[pkg]: https://pkg.go.dev/go.einride.tech/spanner-aip
+[report-badge]: https://goreportcard.com/badge/go.einride.tech/spanner-aip
+[report]: https://goreportcard.com/report/go.einride.tech/spanner-aip
+[codecov-badge]: https://codecov.io/gh/einride/spanner-aip-go/branch/master/graph/badge.svg
+[codecov]: https://codecov.io/gh/einride/spanner-aip-go
 
 Add-on to the [AIP Go SDK][aip-go] for implementing [Cloud
 Spanner][cloud-spanner] persistance for [resource-oriented
@@ -35,7 +35,7 @@ See [https://aip.dev][google-aip] for the full AIP documentation and the
 ### Installing
 
 ```bash
-$ go get -u go.einride.tech/aip-spanner
+$ go get -u go.einride.tech/spanner-aip
 ```
 
 ### Code generation
@@ -63,7 +63,7 @@ import (
 	"context"
 
 	"cloud.google.com/go/spanner"
-	"go.einride.tech/aip-spanner/internal/examples/musicdb"
+	"go.einride.tech/spanner-aip/internal/examples/musicdb"
 )
 
 func main() {
@@ -94,7 +94,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
-	"go.einride.tech/aip-spanner/internal/examples/musicdb"
+	"go.einride.tech/spanner-aip/internal/examples/musicdb"
 )
 
 func main() {
