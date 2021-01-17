@@ -5,8 +5,8 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
-	"go.einride.tech/aip-spanner/internal/examples/musicdb"
-	"go.einride.tech/aip-spanner/spantest"
+	"go.einride.tech/spanner-aip/internal/examples/musicdb"
+	"go.einride.tech/spanner-aip/spantest"
 	"gotest.tools/v3/assert"
 )
 

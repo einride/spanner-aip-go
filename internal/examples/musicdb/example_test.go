@@ -5,7 +5,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
-	"go.einride.tech/aip-spanner/internal/examples/musicdb"
+	"go.einride.tech/spanner-aip/internal/examples/musicdb"
 )
 
 func ExampleAlbumsReadTransaction_Get() {

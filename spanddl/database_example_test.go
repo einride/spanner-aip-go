@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"cloud.google.com/go/spanner/spansql"
-	"go.einride.tech/aip-spanner/spanddl"
+	"go.einride.tech/spanner-aip/spanddl"
 )
 
 func ExampleDatabase() {

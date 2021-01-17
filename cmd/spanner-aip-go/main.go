@@ -8,21 +8,21 @@ import (
 	"path/filepath"
 
 	"cloud.google.com/go/spanner/spansql"
-	"go.einride.tech/aip-spanner/internal/codegen"
-	"go.einride.tech/aip-spanner/internal/codegen/databasecodegen"
-	"go.einride.tech/aip-spanner/internal/codegen/descriptorcodegen"
-	"go.einride.tech/aip-spanner/internal/config"
+	"go.einride.tech/spanner-aip/internal/codegen"
+	"go.einride.tech/spanner-aip/internal/codegen/databasecodegen"
+	"go.einride.tech/spanner-aip/internal/codegen/descriptorcodegen"
+	"go.einride.tech/spanner-aip/internal/config"
 	"gopkg.in/yaml.v2"
 )
 
-const generatedBy = "aip-spanner-go"
+const generatedBy = "spanner-aip-go"
 
 func main() {
 	log.SetFlags(0)
-	configFilePath := flag.String("config", "aip-spanner-go.yaml", "config file")
+	configFilePath := flag.String("config", "spanner-aip-go.yaml", "config file")
 	flag.Parse()
 	if flag.Arg(0) != "generate" {
-		log.Fatal("usage: aip-spanner-go generate [-config <config>]")
+		log.Fatal("usage: spanner-aip-go generate [-config <config>]")
 	}
 	configFile, err := os.Open(*configFilePath)
 	if err != nil {

@@ -61,7 +61,7 @@ func NewEmulatorDockerFixture(t *testing.T) *EmulatorDockerFixture {
 	assert.NilError(t, err)
 	t.Log("creating instance...")
 	const (
-		projectID  = "aip-spanner-go"
+		projectID  = "spanner-aip-go"
 		instanceID = "emulator"
 	)
 	createInstanceOp, err := instanceAdminClient.CreateInstance(ctx, &instancepb.CreateInstanceRequest{

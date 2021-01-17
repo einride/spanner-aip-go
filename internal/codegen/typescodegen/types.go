@@ -8,7 +8,7 @@ import (
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
-	"go.einride.tech/aip-spanner/spanddl"
+	"go.einride.tech/spanner-aip/spanddl"
 )
 
 func SpanSQLType(column *spanddl.Column) reflect.Type {
