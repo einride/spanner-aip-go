@@ -5,6 +5,7 @@ go 1.15
 require (
 	cloud.google.com/go v0.75.0
 	cloud.google.com/go/spanner v1.12.0
+	github.com/google/go-cmp v0.5.4
 	github.com/stoewer/go-strcase v1.2.0
 	go.einride.tech/aip v0.20.0
 	google.golang.org/api v0.36.0

@@ -2,36 +2,38 @@ package databasecodegen
 
 import (
 	"strconv"
+	"strings"
 
+	"github.com/stoewer/go-strcase"
 	"go.einride.tech/spanner-aip/internal/codegen"
 	"go.einride.tech/spanner-aip/spanddl"
 )
 
-type InterleavedReadTransactionCodeGenerator struct {
+type ParentReadTransactionCodeGenerator struct {
 	Table *spanddl.Table
 }
 
-func (g InterleavedReadTransactionCodeGenerator) Type() string {
-	return InterleavedRowCodeGenerator(g).Ident() + "ReadTransaction"
+func (g ParentReadTransactionCodeGenerator) Type() string {
+	return strcase.UpperCamelCase(string(g.Table.Name)) + "ParentReadTransaction"
 }
 
-func (g InterleavedReadTransactionCodeGenerator) ConstructorMethod() string {
-	return InterleavedRowCodeGenerator(g).Ident()
+func (g ParentReadTransactionCodeGenerator) ConstructorMethod() string {
+	return strcase.UpperCamelCase(string(g.Table.Name)) + "Parent"
 }
 
-func (g InterleavedReadTransactionCodeGenerator) ListMethod() string {
+func (g ParentReadTransactionCodeGenerator) ListMethod() string {
 	return "List"
 }
 
-func (g InterleavedReadTransactionCodeGenerator) GetMethod() string {
+func (g ParentReadTransactionCodeGenerator) GetMethod() string {
 	return "Get"
 }
 
-func (g InterleavedReadTransactionCodeGenerator) BatchGetMethod() string {
+func (g ParentReadTransactionCodeGenerator) BatchGetMethod() string {
 	return "BatchGet"
 }
 
-func (g InterleavedReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
+func (g ParentReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 	common := CommonCodeGenerator{}
 	f.P()
 	f.P("type ", g.Type(), " struct {")
@@ -43,12 +45,12 @@ func (g InterleavedReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateBatchGetRowsMethod(f)
 }
 
-func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codegen.File) {
+func (g ParentReadTransactionCodeGenerator) generateListRowsMethod(f *codegen.File) {
 	const (
 		limitParam  = "limit"
 		offsetParam = "offset"
 	)
-	rowIterator := InterleavedRowIteratorCodeGenerator(g)
+	rowIterator := ParentRowIteratorCodeGenerator(g)
 	key := KeyCodeGenerator(g)
 	contextPkg := f.Import("context")
 	stringsPkg := f.Import("strings")
@@ -62,39 +64,54 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 	f.P("query.Order = ", key.Type(), "{}.Order()")
 	f.P("}")
 	f.P("var q ", stringsPkg, ".Builder")
-	f.P(`_, _ = q.WriteString("SELECT ")`)
+	f.P("_, _ = q.WriteString(`")
+	t := func(level int) string {
+		return strings.Repeat(" ", level*4)
+	}
+	f.P(t(0), "SELECT")
 	for _, column := range g.Table.Columns {
-		f.P(`_, _ = q.WriteString("`, column.Name, `, ")`)
+		f.P(t(1), column.Name, ",")
 	}
-	for _, interleavedTable := range g.Table.InterleavedTables {
-		f.P(`_, _ = q.WriteString("ARRAY( ")`)
-		f.P(`_, _ = q.WriteString("SELECT AS STRUCT ")`)
-		for _, column := range interleavedTable.Columns {
-			f.P(`_, _ = q.WriteString("`, column.Name, `, ")`)
+	var interleave func(level int, parent, child *spanddl.Table)
+	interleave = func(l int, parent, child *spanddl.Table) {
+		f.P(t(l), "ARRAY(")
+		f.P(t(l+1), "SELECT AS STRUCT")
+		for _, column := range child.Columns {
+			f.P(t(l+2), column.Name, ",")
 		}
-		f.P(`_, _ = q.WriteString("FROM `, interleavedTable.Name, ` ")`)
-		f.P(`_, _ = q.WriteString("WHERE ")`)
-		for i, keyPart := range g.Table.PrimaryKey {
-			f.P(`_, _ = q.WriteString("`, keyPart.Column, ` = `, g.Table.Name, `.`, keyPart.Column, ` ")`)
-			if i < len(g.Table.PrimaryKey)-1 {
-				f.P(`_, _ = q.WriteString("AND ")`)
+		for _, grandChild := range child.InterleavedTables {
+			interleave(l+2, child, grandChild)
+		}
+		f.P(t(l+1), "FROM ")
+		f.P(t(l+2), child.Name)
+		f.P(t(l+1), "WHERE ")
+		for i, keyPart := range parent.PrimaryKey {
+			var and string
+			if i < len(parent.PrimaryKey)-1 {
+				and = " AND"
 			}
+			f.P(t(l+2), child.Name, ".", keyPart.Column, " = ", parent.Name, ".", keyPart.Column, and)
 		}
-		f.P(`_, _ = q.WriteString("ORDER BY ")`)
-		for i, keyPart := range interleavedTable.PrimaryKey {
-			f.P(`_, _ = q.WriteString("`, keyPart.Column, `")`)
+		f.P(t(l+1), "ORDER BY ")
+		for i, keyPart := range child.PrimaryKey {
+			var comma string
+			if i < len(child.PrimaryKey)-1 {
+				comma = ","
+			}
+			var desc string
 			if keyPart.Desc {
-				f.P(`_, _ = q.WriteString(" DESC")`)
+				desc = " DESC"
 			}
-			if i < len(interleavedTable.PrimaryKey)-1 {
-				f.P(`_, _ = q.WriteString(", ")`)
-			} else {
-				f.P(`_, _ = q.WriteString(" ")`)
-			}
+			f.P(t(l+2), keyPart.Column, desc, comma)
 		}
-		f.P(`_, _ = q.WriteString(") AS `, interleavedTable.Name, `, ")`)
+		f.P(t(l), ") AS ", child.Name, ",")
 	}
-	f.P(`_, _ = q.WriteString("FROM `, g.Table.Name, ` ")`)
+	for _, child := range g.Table.InterleavedTables {
+		interleave(1, g.Table, child)
+	}
+	f.P(t(0), "FROM")
+	f.P(t(1), g.Table.Name)
+	f.P("`)")
 	f.P("if query.Where != nil {")
 	f.P(`_, _ = q.WriteString("WHERE (")`)
 	f.P(`_, _ = q.WriteString(query.Where.SQL())`)
@@ -126,9 +143,9 @@ func (g InterleavedReadTransactionCodeGenerator) generateListRowsMethod(f *codeg
 	f.P("}")
 }
 
-func (g InterleavedReadTransactionCodeGenerator) generateGetRowMethod(f *codegen.File) {
+func (g ParentReadTransactionCodeGenerator) generateGetRowMethod(f *codegen.File) {
 	primaryKey := KeyCodeGenerator(g)
-	row := InterleavedRowCodeGenerator(g)
+	row := ParentRowCodeGenerator(g)
 	common := CommonCodeGenerator{}
 	contextPkg := f.Import("context")
 	iteratorPkg := f.Import("google.golang.org/api/iterator")
@@ -155,9 +172,9 @@ func (g InterleavedReadTransactionCodeGenerator) generateGetRowMethod(f *codegen
 	f.P("}")
 }
 
-func (g InterleavedReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *codegen.File) {
+func (g ParentReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *codegen.File) {
 	primaryKey := KeyCodeGenerator(g)
-	interleavedRow := InterleavedRowCodeGenerator(g)
+	interleavedRow := ParentRowCodeGenerator(g)
 	common := CommonCodeGenerator{}
 	contextPkg := f.Import("context")
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
@@ -191,7 +208,7 @@ func (g InterleavedReadTransactionCodeGenerator) generateBatchGetRowsMethod(f *c
 	f.P("}")
 }
 
-func (g InterleavedReadTransactionCodeGenerator) generateConstructorMethod(f *codegen.File) {
+func (g ParentReadTransactionCodeGenerator) generateConstructorMethod(f *codegen.File) {
 	common := CommonCodeGenerator{}
 	f.P()
 	f.P("func ", g.ConstructorMethod(), "(tx ", common.SpannerReadTransactionType(), ") ", g.Type(), " {")

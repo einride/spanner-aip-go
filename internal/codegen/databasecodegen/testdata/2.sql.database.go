@@ -305,42 +305,44 @@ func (r *SingersRow) Key() SingersKey {
 	}
 }
 
-type SingersAndAlbumsReadTransaction struct {
+type SingersParentReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
-func SingersAndAlbums(tx SpannerReadTransaction) SingersAndAlbumsReadTransaction {
-	return SingersAndAlbumsReadTransaction{Tx: tx}
+func SingersParent(tx SpannerReadTransaction) SingersParentReadTransaction {
+	return SingersParentReadTransaction{Tx: tx}
 }
 
-func (t SingersAndAlbumsReadTransaction) List(
+func (t SingersParentReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
-) *SingersAndAlbumsRowIterator {
+) *SingersParentRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = SingersKey{}.Order()
 	}
 	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("SingerId, ")
-	_, _ = q.WriteString("FirstName, ")
-	_, _ = q.WriteString("LastName, ")
-	_, _ = q.WriteString("SingerInfo, ")
-	_, _ = q.WriteString("ARRAY( ")
-	_, _ = q.WriteString("SELECT AS STRUCT ")
-	_, _ = q.WriteString("SingerId, ")
-	_, _ = q.WriteString("AlbumId, ")
-	_, _ = q.WriteString("AlbumTitle, ")
-	_, _ = q.WriteString("FROM Albums ")
-	_, _ = q.WriteString("WHERE ")
-	_, _ = q.WriteString("SingerId = Singers.SingerId ")
-	_, _ = q.WriteString("ORDER BY ")
-	_, _ = q.WriteString("SingerId")
-	_, _ = q.WriteString(", ")
-	_, _ = q.WriteString("AlbumId")
-	_, _ = q.WriteString(" ")
-	_, _ = q.WriteString(") AS Albums, ")
-	_, _ = q.WriteString("FROM Singers ")
+	_, _ = q.WriteString(`
+SELECT
+    SingerId,
+    FirstName,
+    LastName,
+    SingerInfo,
+    ARRAY(
+        SELECT AS STRUCT
+            SingerId,
+            AlbumId,
+            AlbumTitle,
+        FROM 
+            Albums
+        WHERE 
+            Albums.SingerId = Singers.SingerId
+        ORDER BY 
+            SingerId,
+            AlbumId
+    ) AS Albums,
+FROM
+    Singers
+`)
 	if query.Where != nil {
 		_, _ = q.WriteString("WHERE (")
 		_, _ = q.WriteString(query.Where.SQL())
@@ -366,15 +368,15 @@ func (t SingersAndAlbumsReadTransaction) List(
 			"offset": query.Offset,
 		},
 	}
-	return &SingersAndAlbumsRowIterator{
+	return &SingersParentRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
 
-func (t SingersAndAlbumsReadTransaction) Get(
+func (t SingersParentReadTransaction) Get(
 	ctx context.Context,
 	key SingersKey,
-) (*SingersAndAlbumsRow, error) {
+) (*SingersParentRow, error) {
 	it := t.List(ctx, ListQuery{
 		Where: key.BoolExpr(),
 		Limit: 1,
@@ -390,10 +392,10 @@ func (t SingersAndAlbumsReadTransaction) Get(
 	return row, nil
 }
 
-func (t SingersAndAlbumsReadTransaction) BatchGet(
+func (t SingersParentReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []SingersKey,
-) (map[SingersKey]*SingersAndAlbumsRow, error) {
+) (map[SingersKey]*SingersParentRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -405,11 +407,11 @@ func (t SingersAndAlbumsReadTransaction) BatchGet(
 			RHS: key.BoolExpr(),
 		}
 	}
-	foundRows := make(map[SingersKey]*SingersAndAlbumsRow, len(keys))
+	foundRows := make(map[SingersKey]*SingersParentRow, len(keys))
 	if err := t.List(ctx, ListQuery{
 		Where: spansql.Paren{Expr: where},
 		Limit: int32(len(keys)),
-	}).Do(func(row *SingersAndAlbumsRow) error {
+	}).Do(func(row *SingersParentRow) error {
 		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
@@ -418,25 +420,25 @@ func (t SingersAndAlbumsReadTransaction) BatchGet(
 	return foundRows, nil
 }
 
-type SingersAndAlbumsRowIterator struct {
+type SingersParentRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *SingersAndAlbumsRowIterator) Next() (*SingersAndAlbumsRow, error) {
+func (i *SingersParentRowIterator) Next() (*SingersParentRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
 	}
-	var row SingersAndAlbumsRow
+	var row SingersParentRow
 	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
 		return nil, err
 	}
 	return &row, nil
 }
 
-func (i *SingersAndAlbumsRowIterator) Do(f func(row *SingersAndAlbumsRow) error) error {
+func (i *SingersParentRowIterator) Do(f func(row *SingersParentRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
-		var row SingersAndAlbumsRow
+		var row SingersParentRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
 			return err
 		}
@@ -444,7 +446,7 @@ func (i *SingersAndAlbumsRowIterator) Do(f func(row *SingersAndAlbumsRow) error)
 	})
 }
 
-type SingersAndAlbumsRow struct {
+type SingersParentRow struct {
 	SingerId   int64              `spanner:"SingerId"`
 	FirstName  spanner.NullString `spanner:"FirstName"`
 	LastName   spanner.NullString `spanner:"LastName"`
@@ -452,13 +454,13 @@ type SingersAndAlbumsRow struct {
 	Albums     []*AlbumsRow       `spanner:"Albums"`
 }
 
-func (r *SingersAndAlbumsRow) Key() SingersKey {
+func (r *SingersParentRow) Key() SingersKey {
 	return SingersKey{
 		SingerId: r.SingerId,
 	}
 }
 
-func (r *SingersAndAlbumsRow) UnmarshalSpannerRow(row *spanner.Row) error {
+func (r *SingersParentRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	for i := 0; i < row.Size(); i++ {
 		switch row.ColumnName(i) {
 		case "SingerId":
@@ -488,7 +490,7 @@ func (r *SingersAndAlbumsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r SingersAndAlbumsRow) SingersRow() *SingersRow {
+func (r SingersParentRow) SingersRow() *SingersRow {
 	return &SingersRow{
 		SingerId:   r.SingerId,
 		FirstName:  r.FirstName,
@@ -497,7 +499,7 @@ func (r SingersAndAlbumsRow) SingersRow() *SingersRow {
 	}
 }
 
-func (r SingersAndAlbumsRow) Insert() []*spanner.Mutation {
+func (r SingersParentRow) Insert() []*spanner.Mutation {
 	n := 1
 	n += len(r.Albums)
 	mutations := make([]*spanner.Mutation, 0, n)
@@ -508,7 +510,7 @@ func (r SingersAndAlbumsRow) Insert() []*spanner.Mutation {
 	return mutations
 }
 
-func (r SingersAndAlbumsRow) Update() []*spanner.Mutation {
+func (r SingersParentRow) Update() []*spanner.Mutation {
 	n := 2 // one delete mutation per interleaved table
 	n += len(r.Albums)
 	mutations := make([]*spanner.Mutation, 0, n)

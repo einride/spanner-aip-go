@@ -5,6 +5,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.einride.tech/spanner-aip/internal/examples/musicdb"
 	"go.einride.tech/spanner-aip/spantest"
 	"gotest.tools/v3/assert"
@@ -101,7 +102,7 @@ func TestAlbumsReadTransaction(t *testing.T) {
 	})
 }
 
-func TestSingersAndAlbumsReadTransaction(t *testing.T) {
+func TestSingersParentReadTransaction(t *testing.T) {
 	t.Parallel()
 	if !spantest.HasDocker() {
 		t.Skip("Need Docker to run Spanner emulator.")
@@ -111,11 +112,11 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 	t.Run("insert and get", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
-		expected := &musicdb.SingersAndAlbumsRow{
+		expected := &musicdb.SingersParentRow{
 			SingerId:  1,
 			FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
 			LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
-			Albums: []*musicdb.AlbumsRow{
+			Albums: []*musicdb.AlbumsParentRow{
 				{
 					SingerId: 1,
 					AlbumId:  1,
@@ -144,20 +145,20 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 		}
 		_, err := client.Apply(fx.Ctx, expected.Insert())
 		assert.NilError(t, err)
-		actual, err := musicdb.SingersAndAlbums(client.Single()).Get(fx.Ctx, expected.Key())
+		actual, err := musicdb.SingersParent(client.Single()).Get(fx.Ctx, expected.Key())
 		assert.NilError(t, err)
-		assert.DeepEqual(t, expected, actual)
+		assert.DeepEqual(t, expected, actual, cmpopts.EquateEmpty())
 	})
 
 	t.Run("insert and batch get", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
-		newSingerAndAlbums := func(i int) *musicdb.SingersAndAlbumsRow {
-			return &musicdb.SingersAndAlbumsRow{
+		newSingerParent := func(i int) *musicdb.SingersParentRow {
+			return &musicdb.SingersParentRow{
 				SingerId:  int64(i),
 				FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
 				LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
-				Albums: []*musicdb.AlbumsRow{
+				Albums: []*musicdb.AlbumsParentRow{
 					{
 						SingerId: int64(i),
 						AlbumId:  1,
@@ -186,25 +187,25 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 			}
 		}
 		const n = 10
-		singersAndAlbums := make([]*musicdb.SingersAndAlbumsRow, 0, n)
+		singerParents := make([]*musicdb.SingersParentRow, 0, n)
 		for i := 0; i < n; i++ {
-			singerAndAlbums := newSingerAndAlbums(i)
-			_, err := client.Apply(fx.Ctx, singerAndAlbums.Insert())
+			singerParent := newSingerParent(i)
+			_, err := client.Apply(fx.Ctx, singerParent.Insert())
 			assert.NilError(t, err)
-			singersAndAlbums = append(singersAndAlbums, singerAndAlbums)
+			singerParents = append(singerParents, singerParent)
 		}
-		expected := map[musicdb.SingersKey]*musicdb.SingersAndAlbumsRow{
-			singersAndAlbums[1].Key(): singersAndAlbums[1],
-			singersAndAlbums[3].Key(): singersAndAlbums[3],
-			singersAndAlbums[5].Key(): singersAndAlbums[5],
+		expected := map[musicdb.SingersKey]*musicdb.SingersParentRow{
+			singerParents[1].Key(): singerParents[1],
+			singerParents[3].Key(): singerParents[3],
+			singerParents[5].Key(): singerParents[5],
 		}
-		actual, err := musicdb.SingersAndAlbums(client.Single()).BatchGet(fx.Ctx, []musicdb.SingersKey{
-			singersAndAlbums[1].Key(),
-			singersAndAlbums[3].Key(),
-			singersAndAlbums[5].Key(),
+		actual, err := musicdb.SingersParent(client.Single()).BatchGet(fx.Ctx, []musicdb.SingersKey{
+			singerParents[1].Key(),
+			singerParents[3].Key(),
+			singerParents[5].Key(),
 			{SingerId: n + 1}, // not found
 		})
 		assert.NilError(t, err)
-		assert.DeepEqual(t, expected, actual)
+		assert.DeepEqual(t, expected, actual, cmpopts.EquateEmpty())
 	})
 }

@@ -3,7 +3,6 @@ package databasecodegen
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"cloud.google.com/go/spanner/spansql"
 	"github.com/stoewer/go-strcase"
@@ -11,37 +10,27 @@ import (
 	"go.einride.tech/spanner-aip/spanddl"
 )
 
-type InterleavedRowCodeGenerator struct {
+type ParentRowCodeGenerator struct {
 	Table *spanddl.Table
 }
 
-func (g InterleavedRowCodeGenerator) Ident() string {
-	var t strings.Builder
-	_, _ = t.WriteString(strcase.UpperCamelCase(string(g.Table.Name)))
-	for _, interleavedTable := range g.Table.InterleavedTables {
-		_, _ = t.WriteString("And")
-		_, _ = t.WriteString(strcase.UpperCamelCase(string(interleavedTable.Name)))
-	}
-	return t.String()
+func (g ParentRowCodeGenerator) Type() string {
+	return strcase.UpperCamelCase(string(g.Table.Name)) + "ParentRow"
 }
 
-func (g InterleavedRowCodeGenerator) UnmarshalSpannerRowMethod() string {
+func (g ParentRowCodeGenerator) UnmarshalSpannerRowMethod() string {
 	return "UnmarshalSpannerRow"
 }
 
-func (g InterleavedRowCodeGenerator) KeyMethod() string {
+func (g ParentRowCodeGenerator) KeyMethod() string {
 	return "Key"
 }
 
-func (g InterleavedRowCodeGenerator) Type() string {
-	return g.Ident() + "Row"
-}
-
-func (g InterleavedRowCodeGenerator) InterleavedRowsField(table *spanddl.Table) string {
+func (g ParentRowCodeGenerator) InterleavedRowsField(table *spanddl.Table) string {
 	return strcase.UpperCamelCase(string(table.Name))
 }
 
-func (g InterleavedRowCodeGenerator) GenerateCode(f *codegen.File) {
+func (g ParentRowCodeGenerator) GenerateCode(f *codegen.File) {
 	row := RowCodeGenerator(g)
 	f.P()
 	f.P("type ", g.Type(), " struct {")
@@ -49,9 +38,12 @@ func (g InterleavedRowCodeGenerator) GenerateCode(f *codegen.File) {
 		row.generateColumn(f, column)
 	}
 	for _, interleavedTable := range g.Table.InterleavedTables {
-		interleavedRow := RowCodeGenerator{Table: interleavedTable}
+		codeGenerator := interface{ Type() string }(RowCodeGenerator{Table: interleavedTable})
+		if len(interleavedTable.InterleavedTables) > 0 {
+			codeGenerator = ParentRowCodeGenerator{Table: interleavedTable}
+		}
 		f.P(
-			g.InterleavedRowsField(interleavedTable), " []*", interleavedRow.Type(),
+			g.InterleavedRowsField(interleavedTable), " []*", codeGenerator.Type(),
 			"`spanner:", strconv.Quote(string(interleavedTable.Name)), "`",
 		)
 	}
@@ -63,7 +55,7 @@ func (g InterleavedRowCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateUpdateMutationMethod(f)
 }
 
-func (g InterleavedRowCodeGenerator) generateInsertMutationMethod(f *codegen.File) {
+func (g ParentRowCodeGenerator) generateInsertMutationMethod(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	row := RowCodeGenerator(g)
 	f.P()
@@ -76,14 +68,18 @@ func (g InterleavedRowCodeGenerator) generateInsertMutationMethod(f *codegen.Fil
 	f.P("mutations = append(mutations, r.", row.Type(), "().Insert())")
 	for _, interleavedTable := range g.Table.InterleavedTables {
 		f.P("for _, interleavedRow := range r.", g.InterleavedRowsField(interleavedTable), " {")
-		f.P("mutations = append(mutations, interleavedRow.Insert())")
+		if len(interleavedTable.InterleavedTables) > 0 {
+			f.P("mutations = append(mutations, interleavedRow.Insert()...)")
+		} else {
+			f.P("mutations = append(mutations, interleavedRow.Insert())")
+		}
 		f.P("}")
 	}
 	f.P("return mutations")
 	f.P("}")
 }
 
-func (g InterleavedRowCodeGenerator) generateUpdateMutationMethod(f *codegen.File) {
+func (g ParentRowCodeGenerator) generateUpdateMutationMethod(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	row := RowCodeGenerator(g)
 	f.P()
@@ -103,14 +99,18 @@ func (g InterleavedRowCodeGenerator) generateUpdateMutationMethod(f *codegen.Fil
 			", r.Key().SpannerKey().AsPrefix()))",
 		)
 		f.P("for _, interleavedRow := range r.", g.InterleavedRowsField(interleavedTable), " {")
-		f.P("mutations = append(mutations, interleavedRow.Insert())")
+		if len(interleavedTable.InterleavedTables) > 0 {
+			f.P("mutations = append(mutations, interleavedRow.Insert()...)")
+		} else {
+			f.P("mutations = append(mutations, interleavedRow.Insert())")
+		}
 		f.P("}")
 	}
 	f.P("return mutations")
 	f.P("}")
 }
 
-func (g InterleavedRowCodeGenerator) generateRowMethod(f *codegen.File) {
+func (g ParentRowCodeGenerator) generateRowMethod(f *codegen.File) {
 	row := RowCodeGenerator(g)
 	f.P()
 	f.P("func (r ", g.Type(), ") ", row.Type(), "() *", row.Type(), " {")
@@ -122,7 +122,7 @@ func (g InterleavedRowCodeGenerator) generateRowMethod(f *codegen.File) {
 	f.P("}")
 }
 
-func (g InterleavedRowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
+func (g ParentRowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
 	row := RowCodeGenerator(g)
 	fmtPkg := f.Import("fmt")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
@@ -153,7 +153,7 @@ func (g InterleavedRowCodeGenerator) generateUnmarshalFunction(f *codegen.File) 
 	f.P("}")
 }
 
-func (g InterleavedRowCodeGenerator) generateKeyMethod(f *codegen.File) {
+func (g ParentRowCodeGenerator) generateKeyMethod(f *codegen.File) {
 	primaryKey := KeyCodeGenerator(g)
 	row := RowCodeGenerator(g)
 	f.P()
@@ -166,7 +166,7 @@ func (g InterleavedRowCodeGenerator) generateKeyMethod(f *codegen.File) {
 	f.P("}")
 }
 
-func (g InterleavedRowCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Column {
+func (g ParentRowCodeGenerator) keyColumn(keyPart spansql.KeyPart) *spanddl.Column {
 	column, ok := g.Table.Column(keyPart.Column)
 	if !ok {
 		panic(fmt.Errorf("table %s has no column %s", g.Table.Name, keyPart.Column))

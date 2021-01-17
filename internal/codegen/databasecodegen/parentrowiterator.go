@@ -1,21 +1,22 @@
 package databasecodegen
 
 import (
+	"github.com/stoewer/go-strcase"
 	"go.einride.tech/spanner-aip/internal/codegen"
 	"go.einride.tech/spanner-aip/spanddl"
 )
 
-type InterleavedRowIteratorCodeGenerator struct {
+type ParentRowIteratorCodeGenerator struct {
 	Table *spanddl.Table
 }
 
-func (g InterleavedRowIteratorCodeGenerator) Type() string {
-	return InterleavedRowCodeGenerator(g).Ident() + "RowIterator"
+func (g ParentRowIteratorCodeGenerator) Type() string {
+	return strcase.UpperCamelCase(string(g.Table.Name)) + "ParentRowIterator"
 }
 
-func (g InterleavedRowIteratorCodeGenerator) GenerateCode(f *codegen.File) {
+func (g ParentRowIteratorCodeGenerator) GenerateCode(f *codegen.File) {
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
-	row := InterleavedRowCodeGenerator(g)
+	row := ParentRowCodeGenerator(g)
 	f.P()
 	f.P("type ", g.Type(), " struct {")
 	f.P("*", spannerPkg, ".RowIterator")

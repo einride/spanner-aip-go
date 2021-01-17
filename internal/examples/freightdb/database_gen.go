@@ -1053,57 +1053,57 @@ func (r *ShipmentsRow) Key() ShipmentsKey {
 	}
 }
 
-type ShipmentsAndLineItemsReadTransaction struct {
+type ShipmentsParentReadTransaction struct {
 	Tx SpannerReadTransaction
 }
 
-func ShipmentsAndLineItems(tx SpannerReadTransaction) ShipmentsAndLineItemsReadTransaction {
-	return ShipmentsAndLineItemsReadTransaction{Tx: tx}
+func ShipmentsParent(tx SpannerReadTransaction) ShipmentsParentReadTransaction {
+	return ShipmentsParentReadTransaction{Tx: tx}
 }
 
-func (t ShipmentsAndLineItemsReadTransaction) List(
+func (t ShipmentsParentReadTransaction) List(
 	ctx context.Context,
 	query ListQuery,
-) *ShipmentsAndLineItemsRowIterator {
+) *ShipmentsParentRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = ShipmentsKey{}.Order()
 	}
 	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("shipment_id, ")
-	_, _ = q.WriteString("create_time, ")
-	_, _ = q.WriteString("update_time, ")
-	_, _ = q.WriteString("delete_time, ")
-	_, _ = q.WriteString("origin_site_id, ")
-	_, _ = q.WriteString("destination_site_id, ")
-	_, _ = q.WriteString("pickup_earliest_time, ")
-	_, _ = q.WriteString("pickup_latest_time, ")
-	_, _ = q.WriteString("delivery_earliest_time, ")
-	_, _ = q.WriteString("delivery_latest_time, ")
-	_, _ = q.WriteString("ARRAY( ")
-	_, _ = q.WriteString("SELECT AS STRUCT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("shipment_id, ")
-	_, _ = q.WriteString("line_number, ")
-	_, _ = q.WriteString("title, ")
-	_, _ = q.WriteString("quantity, ")
-	_, _ = q.WriteString("weight_kg, ")
-	_, _ = q.WriteString("volume_m3, ")
-	_, _ = q.WriteString("FROM line_items ")
-	_, _ = q.WriteString("WHERE ")
-	_, _ = q.WriteString("shipper_id = shipments.shipper_id ")
-	_, _ = q.WriteString("AND ")
-	_, _ = q.WriteString("shipment_id = shipments.shipment_id ")
-	_, _ = q.WriteString("ORDER BY ")
-	_, _ = q.WriteString("shipper_id")
-	_, _ = q.WriteString(", ")
-	_, _ = q.WriteString("shipment_id")
-	_, _ = q.WriteString(", ")
-	_, _ = q.WriteString("line_number")
-	_, _ = q.WriteString(" ")
-	_, _ = q.WriteString(") AS line_items, ")
-	_, _ = q.WriteString("FROM shipments ")
+	_, _ = q.WriteString(`
+SELECT
+    shipper_id,
+    shipment_id,
+    create_time,
+    update_time,
+    delete_time,
+    origin_site_id,
+    destination_site_id,
+    pickup_earliest_time,
+    pickup_latest_time,
+    delivery_earliest_time,
+    delivery_latest_time,
+    ARRAY(
+        SELECT AS STRUCT
+            shipper_id,
+            shipment_id,
+            line_number,
+            title,
+            quantity,
+            weight_kg,
+            volume_m3,
+        FROM 
+            line_items
+        WHERE 
+            line_items.shipper_id = shipments.shipper_id AND
+            line_items.shipment_id = shipments.shipment_id
+        ORDER BY 
+            shipper_id,
+            shipment_id,
+            line_number
+    ) AS line_items,
+FROM
+    shipments
+`)
 	if query.Where != nil {
 		_, _ = q.WriteString("WHERE (")
 		_, _ = q.WriteString(query.Where.SQL())
@@ -1129,15 +1129,15 @@ func (t ShipmentsAndLineItemsReadTransaction) List(
 			"offset": query.Offset,
 		},
 	}
-	return &ShipmentsAndLineItemsRowIterator{
+	return &ShipmentsParentRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
 
-func (t ShipmentsAndLineItemsReadTransaction) Get(
+func (t ShipmentsParentReadTransaction) Get(
 	ctx context.Context,
 	key ShipmentsKey,
-) (*ShipmentsAndLineItemsRow, error) {
+) (*ShipmentsParentRow, error) {
 	it := t.List(ctx, ListQuery{
 		Where: key.BoolExpr(),
 		Limit: 1,
@@ -1153,10 +1153,10 @@ func (t ShipmentsAndLineItemsReadTransaction) Get(
 	return row, nil
 }
 
-func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
+func (t ShipmentsParentReadTransaction) BatchGet(
 	ctx context.Context,
 	keys []ShipmentsKey,
-) (map[ShipmentsKey]*ShipmentsAndLineItemsRow, error) {
+) (map[ShipmentsKey]*ShipmentsParentRow, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -1168,11 +1168,11 @@ func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 			RHS: key.BoolExpr(),
 		}
 	}
-	foundRows := make(map[ShipmentsKey]*ShipmentsAndLineItemsRow, len(keys))
+	foundRows := make(map[ShipmentsKey]*ShipmentsParentRow, len(keys))
 	if err := t.List(ctx, ListQuery{
 		Where: spansql.Paren{Expr: where},
 		Limit: int32(len(keys)),
-	}).Do(func(row *ShipmentsAndLineItemsRow) error {
+	}).Do(func(row *ShipmentsParentRow) error {
 		foundRows[row.Key()] = row
 		return nil
 	}); err != nil {
@@ -1181,25 +1181,25 @@ func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
 	return foundRows, nil
 }
 
-type ShipmentsAndLineItemsRowIterator struct {
+type ShipmentsParentRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *ShipmentsAndLineItemsRowIterator) Next() (*ShipmentsAndLineItemsRow, error) {
+func (i *ShipmentsParentRowIterator) Next() (*ShipmentsParentRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
 	}
-	var row ShipmentsAndLineItemsRow
+	var row ShipmentsParentRow
 	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
 		return nil, err
 	}
 	return &row, nil
 }
 
-func (i *ShipmentsAndLineItemsRowIterator) Do(f func(row *ShipmentsAndLineItemsRow) error) error {
+func (i *ShipmentsParentRowIterator) Do(f func(row *ShipmentsParentRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
-		var row ShipmentsAndLineItemsRow
+		var row ShipmentsParentRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
 			return err
 		}
@@ -1207,7 +1207,7 @@ func (i *ShipmentsAndLineItemsRowIterator) Do(f func(row *ShipmentsAndLineItemsR
 	})
 }
 
-type ShipmentsAndLineItemsRow struct {
+type ShipmentsParentRow struct {
 	ShipperId            string             `spanner:"shipper_id"`
 	ShipmentId           string             `spanner:"shipment_id"`
 	CreateTime           time.Time          `spanner:"create_time"`
@@ -1222,14 +1222,14 @@ type ShipmentsAndLineItemsRow struct {
 	LineItems            []*LineItemsRow    `spanner:"line_items"`
 }
 
-func (r *ShipmentsAndLineItemsRow) Key() ShipmentsKey {
+func (r *ShipmentsParentRow) Key() ShipmentsKey {
 	return ShipmentsKey{
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
 	}
 }
 
-func (r *ShipmentsAndLineItemsRow) UnmarshalSpannerRow(row *spanner.Row) error {
+func (r *ShipmentsParentRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	for i := 0; i < row.Size(); i++ {
 		switch row.ColumnName(i) {
 		case "shipper_id":
@@ -1287,7 +1287,7 @@ func (r *ShipmentsAndLineItemsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r ShipmentsAndLineItemsRow) ShipmentsRow() *ShipmentsRow {
+func (r ShipmentsParentRow) ShipmentsRow() *ShipmentsRow {
 	return &ShipmentsRow{
 		ShipperId:            r.ShipperId,
 		ShipmentId:           r.ShipmentId,
@@ -1303,7 +1303,7 @@ func (r ShipmentsAndLineItemsRow) ShipmentsRow() *ShipmentsRow {
 	}
 }
 
-func (r ShipmentsAndLineItemsRow) Insert() []*spanner.Mutation {
+func (r ShipmentsParentRow) Insert() []*spanner.Mutation {
 	n := 1
 	n += len(r.LineItems)
 	mutations := make([]*spanner.Mutation, 0, n)
@@ -1314,7 +1314,7 @@ func (r ShipmentsAndLineItemsRow) Insert() []*spanner.Mutation {
 	return mutations
 }
 
-func (r ShipmentsAndLineItemsRow) Update() []*spanner.Mutation {
+func (r ShipmentsParentRow) Update() []*spanner.Mutation {
 	n := 2 // one delete mutation per interleaved table
 	n += len(r.LineItems)
 	mutations := make([]*spanner.Mutation, 0, n)

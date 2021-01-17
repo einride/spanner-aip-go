@@ -38,3 +38,9 @@ go-test:
 go-generate:
 	$(info [$@] generating example code...)
 	@go run ./cmd/spanner-aip-go generate
+
+.PHONY: go-test-update-golden
+go-test-update-golden:
+	$(info [$@] updating golden files...)
+	@go test ./internal/codegen/descriptorcodegen -test.update-golden
+	@go test ./internal/codegen/databasecodegen -test.update-golden
