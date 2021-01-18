@@ -1,4 +1,4 @@
-# AIP Spanner Go
+# Spanner AIP Go
 
 [![PkgGoDev][pkg-badge]][pkg]
 [![GoReportCard][report-badge]][report]
