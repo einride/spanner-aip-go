@@ -2,6 +2,7 @@ package databasecodegen
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/stoewer/go-strcase"
 	"go.einride.tech/spanner-aip/internal/codegen"
@@ -18,6 +19,18 @@ func (g ReadTransactionCodeGenerator) Type() string {
 
 func (g ReadTransactionCodeGenerator) ConstructorMethod() string {
 	return "Query"
+}
+
+func (g ReadTransactionCodeGenerator) ListQueryStruct(table *spanddl.Table) string {
+	return g.ListMethod(table) + "Query"
+}
+
+func (g ReadTransactionCodeGenerator) GetQueryStruct(table *spanddl.Table) string {
+	return g.GetMethod(table) + "Query"
+}
+
+func (g ReadTransactionCodeGenerator) BatchGetQueryStruct(table *spanddl.Table) string {
+	return g.BatchGetMethod(table) + "Query"
 }
 
 func (g ReadTransactionCodeGenerator) ReadMethod(table *spanddl.Table) string {
@@ -37,15 +50,15 @@ func (g ReadTransactionCodeGenerator) ListMethod(table *spanddl.Table) string {
 }
 
 func (g ReadTransactionCodeGenerator) ListInterleavedMethod(table *spanddl.Table) string {
-	return g.ListMethod(table) + "Interleaved"
+	return strcase.LowerCamelCase(g.ListMethod(table)) + "Interleaved"
 }
 
 func (g ReadTransactionCodeGenerator) GetInterleavedMethod(table *spanddl.Table) string {
-	return g.GetMethod(table) + "Interleaved"
+	return strcase.LowerCamelCase(g.GetMethod(table)) + "Interleaved"
 }
 
 func (g ReadTransactionCodeGenerator) BatchGetInterleavedMethod(table *spanddl.Table) string {
-	return g.BatchGetMethod(table) + "Interleaved"
+	return strcase.LowerCamelCase(g.BatchGetMethod(table)) + "Interleaved"
 }
 
 func (g ReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
@@ -57,12 +70,17 @@ func (g ReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateConstructorMethod(f)
 	for _, table := range g.Database.Tables {
 		g.generateReadMethod(f, table)
+		g.generateGetQueryStruct(f, table)
 		g.generateGetMethod(f, table)
+		g.generateBatchGetQueryStruct(f, table)
 		g.generateBatchGetMethod(f, table)
+		g.generateListQueryStruct(f, table)
 		g.generateListMethod(f, table)
-		g.generateListInterleavedMethod(f, table)
-		g.generateGetInterleavedMethod(f, table)
-		g.generateBatchGetInterleavedMethod(f, table)
+		if len(table.InterleavedTables) > 0 {
+			g.generateListInterleavedMethod(f, table)
+			g.generateGetInterleavedMethod(f, table)
+			g.generateBatchGetInterleavedMethod(f, table)
+		}
 	}
 }
 
@@ -87,19 +105,38 @@ func (g ReadTransactionCodeGenerator) generateReadMethod(f *codegen.File, table 
 	f.P("}")
 }
 
-func (g ReadTransactionCodeGenerator) generateGetMethod(f *codegen.File, table *spanddl.Table) {
+func (g ReadTransactionCodeGenerator) generateGetQueryStruct(f *codegen.File, table *spanddl.Table) {
 	key := KeyCodeGenerator{Table: table}
+	f.P()
+	f.P("type ", g.GetQueryStruct(table), " struct {")
+	f.P("Key ", key.Type())
+	g.generateInterleavedTablesStructFields(f, table)
+	f.P("}")
+	if len(table.InterleavedTables) > 0 {
+		f.P()
+		f.P("func (q *", g.GetQueryStruct(table), ") hasInterleavedTables() bool {")
+		f.P("return ", hasInterleavedTablesPredicate("q", table))
+		f.P("}")
+	}
+}
+
+func (g ReadTransactionCodeGenerator) generateGetMethod(f *codegen.File, table *spanddl.Table) {
 	row := RowCodeGenerator{Table: table}
 	contextPkg := f.Import("context")
 	f.P()
 	f.P("func (t ", g.Type(), ") ", g.GetMethod(table), "(")
 	f.P("ctx ", contextPkg, ".Context,")
-	f.P("key ", key.Type(), ",")
+	f.P("query ", g.GetQueryStruct(table), ",")
 	f.P(") (*", row.Type(), ", error) {")
+	if len(table.InterleavedTables) > 0 {
+		f.P("if query.hasInterleavedTables() {")
+		f.P("return t.", g.GetInterleavedMethod(table), "(ctx, query)")
+		f.P("}")
+	}
 	f.P("spannerRow, err := t.Tx.ReadRow(")
 	f.P("ctx,")
 	f.P(strconv.Quote(string(table.Name)), ",")
-	f.P("key.SpannerKey(),")
+	f.P("query.Key.SpannerKey(),")
 	f.P(row.Nil(), ".", row.ColumnNamesMethod(), "(),")
 	f.P(")")
 	f.P("if err != nil {")
@@ -113,6 +150,49 @@ func (g ReadTransactionCodeGenerator) generateGetMethod(f *codegen.File, table *
 	f.P("}")
 }
 
+func (g ReadTransactionCodeGenerator) generateGetInterleavedMethod(f *codegen.File, table *spanddl.Table) {
+	row := RowCodeGenerator{Table: table}
+	contextPkg := f.Import("context")
+	iteratorPkg := f.Import("google.golang.org/api/iterator")
+	codesPkg := f.Import("google.golang.org/grpc/codes")
+	statusPkg := f.Import("google.golang.org/grpc/status")
+	f.P()
+	f.P("func (t ", g.Type(), ") ", g.GetInterleavedMethod(table), "(")
+	f.P("ctx ", contextPkg, ".Context,")
+	f.P("query ", g.GetQueryStruct(table), ",")
+	f.P(") (*", row.Type(), ", error) {")
+	f.P("it := t.", g.ListInterleavedMethod(table), "(ctx, ", g.ListQueryStruct(table), "{")
+	f.P("Limit: 1,")
+	f.P("Where: query.Key.BoolExpr(),")
+	g.forwardInterleavedTablesStructFields(f, table, "query")
+	f.P("})")
+	f.P("defer it.Stop()")
+	f.P("row, err := it.Next()")
+	f.P("if err != nil {")
+	f.P("if err == ", iteratorPkg, ".Done {")
+	f.P(`return nil, `, statusPkg, `.Errorf(`, codesPkg, `.NotFound, "not found: %v", query.Key)`)
+	f.P("}")
+	f.P("return nil, err")
+	f.P("}")
+	f.P("return row, nil")
+	f.P("}")
+}
+
+func (g ReadTransactionCodeGenerator) generateBatchGetQueryStruct(f *codegen.File, table *spanddl.Table) {
+	key := KeyCodeGenerator{Table: table}
+	f.P()
+	f.P("type ", g.BatchGetQueryStruct(table), " struct {")
+	f.P("Keys  []", key.Type())
+	g.generateInterleavedTablesStructFields(f, table)
+	f.P("}")
+	if len(table.InterleavedTables) > 0 {
+		f.P()
+		f.P("func (q *", g.BatchGetQueryStruct(table), ") hasInterleavedTables() bool {")
+		f.P("return ", hasInterleavedTablesPredicate("q", table))
+		f.P("}")
+	}
+}
+
 func (g ReadTransactionCodeGenerator) generateBatchGetMethod(f *codegen.File, table *spanddl.Table) {
 	contextPkg := f.Import("context")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
@@ -121,13 +201,18 @@ func (g ReadTransactionCodeGenerator) generateBatchGetMethod(f *codegen.File, ta
 	f.P()
 	f.P("func (t ", g.Type(), ") ", g.BatchGetMethod(table), "(")
 	f.P("ctx ", contextPkg, ".Context,")
-	f.P("keys []", key.Type(), ",")
+	f.P("query ", g.BatchGetQueryStruct(table), ",")
 	f.P(") (map[", key.Type(), "]*", row.Type(), ", error) {")
-	f.P("spannerKeys := make([]", spannerPkg, ".KeySet, 0, len(keys))")
-	f.P("for _, key := range keys {")
+	if len(table.InterleavedTables) > 0 {
+		f.P("if query.hasInterleavedTables() {")
+		f.P("return t.", g.BatchGetInterleavedMethod(table), "(ctx, query)")
+		f.P("}")
+	}
+	f.P("spannerKeys := make([]", spannerPkg, ".KeySet, 0, len(query.Keys))")
+	f.P("for _, key := range query.Keys {")
 	f.P("spannerKeys = append(spannerKeys, key.SpannerKey())")
 	f.P("}")
-	f.P("foundRows := make(map[", key.Type(), "]*", row.Type(), ", len(keys))")
+	f.P("foundRows := make(map[", key.Type(), "]*", row.Type(), ", len(query.Keys))")
 	f.P(
 		"if err := t.", g.ReadMethod(table), "(ctx, ", spannerPkg, ".KeySets(spannerKeys...))",
 		".Do(func(row *", row.Type(), ") error {",
@@ -139,6 +224,24 @@ func (g ReadTransactionCodeGenerator) generateBatchGetMethod(f *codegen.File, ta
 	f.P("}")
 	f.P("return foundRows, nil")
 	f.P("}")
+}
+
+func (g ReadTransactionCodeGenerator) generateListQueryStruct(f *codegen.File, table *spanddl.Table) {
+	f.P()
+	f.P("type ", g.ListQueryStruct(table), " struct {")
+	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
+	f.P("Where  ", spansqlPkg, ".BoolExpr")
+	f.P("Order  []", spansqlPkg, ".Order")
+	f.P("Limit  int32")
+	f.P("Offset int64")
+	g.generateInterleavedTablesStructFields(f, table)
+	f.P("}")
+	if len(table.InterleavedTables) > 0 {
+		f.P()
+		f.P("func (q *", g.ListQueryStruct(table), ") hasInterleavedTables() bool {")
+		f.P("return ", hasInterleavedTablesPredicate("q", table))
+		f.P("}")
+	}
 }
 
 func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table *spanddl.Table) {
@@ -155,8 +258,13 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 	f.P()
 	f.P("func (t ", g.Type(), ") ", g.ListMethod(table), "(")
 	f.P("ctx ", contextPkg, ".Context,")
-	f.P("query ListQuery,")
+	f.P("query ", g.ListQueryStruct(table), ",")
 	f.P(") *", rowIterator.Type(), " {")
+	if len(table.InterleavedTables) > 0 {
+		f.P("if query.hasInterleavedTables() {")
+		f.P("return t.", g.ListInterleavedMethod(table), "(ctx, query)")
+		f.P("}")
+	}
 	f.P("if len(query.Order) == 0 {")
 	f.P("query.Order = ", key.Type(), "{}.Order()")
 	f.P("}")
@@ -197,45 +305,68 @@ func (g ReadTransactionCodeGenerator) generateListInterleavedMethod(f *codegen.F
 	f.P()
 	f.P("func (t ", g.Type(), ") ", g.ListInterleavedMethod(table), "(")
 	f.P("ctx ", contextPkg, ".Context,")
-	f.P("query ListQuery,")
+	f.P("query ", g.ListQueryStruct(table), ",")
 	f.P(") *", rowIterator.Type(), " {")
 	f.P("if len(query.Order) == 0 {")
 	f.P("query.Order = ", key.Type(), "{}.Order()")
 	f.P("}")
 	f.P("var q ", stringsPkg, ".Builder")
-	f.P(`_, _ = q.WriteString("SELECT ")`)
+	f.P("_, _ = q.WriteString(`")
+	t := func(level int) string {
+		return strings.Repeat(" ", level*4)
+	}
+	f.P(t(0), "SELECT")
 	for _, column := range table.Columns {
-		f.P(`_, _ = q.WriteString("`, column.Name, `, ")`)
+		f.P(t(1), column.Name, ",")
 	}
-	for _, interleavedTable := range table.InterleavedTables {
-		f.P(`_, _ = q.WriteString("ARRAY( ")`)
-		f.P(`_, _ = q.WriteString("SELECT AS STRUCT ")`)
-		for _, column := range interleavedTable.Columns {
-			f.P(`_, _ = q.WriteString("`, column.Name, `, ")`)
+	f.P("`)")
+	var interleave func(level int, parent, child *spanddl.Table)
+	interleave = func(l int, parent, child *spanddl.Table) {
+		f.P("if query.", strcase.UpperCamelCase(string(child.Name)), " {")
+		f.P("_, _ = q.WriteString(`")
+		f.P(t(l), "ARRAY(")
+		f.P(t(l+1), "SELECT AS STRUCT")
+		for _, column := range child.Columns {
+			f.P(t(l+2), column.Name, ",")
 		}
-		f.P(`_, _ = q.WriteString("FROM `, interleavedTable.Name, ` ")`)
-		f.P(`_, _ = q.WriteString("WHERE ")`)
-		for i, keyPart := range table.PrimaryKey {
-			f.P(`_, _ = q.WriteString("`, keyPart.Column, ` = `, table.Name, `.`, keyPart.Column, ` ")`)
-			if i < len(table.PrimaryKey)-1 {
-				f.P(`_, _ = q.WriteString("AND ")`)
+		f.P("`)")
+		for _, grandChild := range child.InterleavedTables {
+			interleave(l+2, child, grandChild)
+		}
+		f.P("_, _ = q.WriteString(`")
+		f.P(t(l+1), "FROM ")
+		f.P(t(l+2), child.Name)
+		f.P(t(l+1), "WHERE ")
+		for i, keyPart := range parent.PrimaryKey {
+			var and string
+			if i < len(parent.PrimaryKey)-1 {
+				and = " AND"
 			}
+			f.P(t(l+2), child.Name, ".", keyPart.Column, " = ", parent.Name, ".", keyPart.Column, and)
 		}
-		f.P(`_, _ = q.WriteString("ORDER BY ")`)
-		for i, keyPart := range interleavedTable.PrimaryKey {
-			f.P(`_, _ = q.WriteString("`, keyPart.Column, `")`)
+		f.P(t(l+1), "ORDER BY ")
+		for i, keyPart := range child.PrimaryKey {
+			var comma string
+			if i < len(child.PrimaryKey)-1 {
+				comma = ","
+			}
+			var desc string
 			if keyPart.Desc {
-				f.P(`_, _ = q.WriteString(" DESC")`)
+				desc = " DESC"
 			}
-			if i < len(interleavedTable.PrimaryKey)-1 {
-				f.P(`_, _ = q.WriteString(", ")`)
-			} else {
-				f.P(`_, _ = q.WriteString(" ")`)
-			}
+			f.P(t(l+2), keyPart.Column, desc, comma)
 		}
-		f.P(`_, _ = q.WriteString(") AS `, interleavedTable.Name, `, ")`)
+		f.P(t(l), ") AS ", child.Name, ",")
+		f.P("`)")
+		f.P("}")
 	}
-	f.P(`_, _ = q.WriteString("FROM `, table.Name, ` ")`)
+	for _, child := range table.InterleavedTables {
+		interleave(1, table, child)
+	}
+	f.P("_, _ = q.WriteString(`")
+	f.P(t(0), "FROM")
+	f.P(t(1), table.Name)
+	f.P("`)")
 	f.P("if query.Where != nil {")
 	f.P(`_, _ = q.WriteString("WHERE (")`)
 	f.P(`_, _ = q.WriteString(query.Where.SQL())`)
@@ -267,61 +398,32 @@ func (g ReadTransactionCodeGenerator) generateListInterleavedMethod(f *codegen.F
 	f.P("}")
 }
 
-func (g ReadTransactionCodeGenerator) generateGetInterleavedMethod(f *codegen.File, table *spanddl.Table) {
-	key := KeyCodeGenerator{Table: table}
-	row := RowCodeGenerator{Table: table}
-	common := CommonCodeGenerator{}
-	contextPkg := f.Import("context")
-	iteratorPkg := f.Import("google.golang.org/api/iterator")
-	codesPkg := f.Import("google.golang.org/grpc/codes")
-	statusPkg := f.Import("google.golang.org/grpc/status")
-	f.P()
-	f.P("func (t ", g.Type(), ") ", g.GetInterleavedMethod(table), "(")
-	f.P("ctx ", contextPkg, ".Context,")
-	f.P("key ", key.Type(), ",")
-	f.P(") (*", row.Type(), ", error) {")
-	f.P("it := t.", g.ListInterleavedMethod(table), "(ctx, ", common.ListQueryType(), "{")
-	f.P("Where: key.BoolExpr(),")
-	f.P("Limit: 1,")
-	f.P("})")
-	f.P("defer it.Stop()")
-	f.P("row, err := it.Next()")
-	f.P("if err != nil {")
-	f.P("if err == ", iteratorPkg, ".Done {")
-	f.P(`return nil, `, statusPkg, `.Errorf(`, codesPkg, `.NotFound, "not found: %v", key)`)
-	f.P("}")
-	f.P("return nil, err")
-	f.P("}")
-	f.P("return row, nil")
-	f.P("}")
-}
-
 func (g ReadTransactionCodeGenerator) generateBatchGetInterleavedMethod(f *codegen.File, table *spanddl.Table) {
 	key := KeyCodeGenerator{Table: table}
 	row := RowCodeGenerator{Table: table}
-	common := CommonCodeGenerator{}
 	contextPkg := f.Import("context")
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	f.P("func (t ", g.Type(), ") ", g.BatchGetInterleavedMethod(table), "(")
 	f.P("ctx ", contextPkg, ".Context,")
-	f.P("keys []", key.Type(), ",")
+	f.P("query ", g.BatchGetQueryStruct(table), ",")
 	f.P(") (map[", key.Type(), "]*", row.Type(), ", error) {")
-	f.P("if len(keys) == 0 {")
+	f.P("if len(query.Keys) == 0 {")
 	f.P("return nil, nil")
 	f.P("}")
-	f.P("where := keys[0].BoolExpr()")
-	f.P("for _, key := range keys[1:] {")
+	f.P("where := query.Keys[0].BoolExpr()")
+	f.P("for _, key := range query.Keys[1:] {")
 	f.P("where = ", spansqlPkg, ".LogicalOp{")
 	f.P("Op: ", spansqlPkg, ".Or,")
 	f.P("LHS: where,")
 	f.P("RHS: key.BoolExpr(),")
 	f.P("}")
 	f.P("}")
-	f.P("foundRows := make(map[", key.Type(), "]*", row.Type(), ", len(keys))")
-	f.P("if err := t.", g.ListInterleavedMethod(table), "(ctx, ", common.ListQueryType(), "{")
+	f.P("foundRows := make(map[", key.Type(), "]*", row.Type(), ", len(query.Keys))")
+	f.P("if err := t.", g.ListMethod(table), "(ctx, ", g.ListQueryStruct(table), "{")
 	f.P("Where: ", spansqlPkg, ".Paren{Expr: where},")
-	f.P("Limit: int32(len(keys)),")
+	f.P("Limit: int32(len(query.Keys)),")
+	g.forwardInterleavedTablesStructFields(f, table, "query")
 	f.P("}).Do(func(row *", row.Type(), ") error {")
 	f.P("foundRows[row.", row.KeyMethod(), "()] = row")
 	f.P("return nil")
@@ -338,4 +440,49 @@ func (g ReadTransactionCodeGenerator) generateConstructorMethod(f *codegen.File)
 	f.P("func ", g.ConstructorMethod(), "(tx ", common.SpannerReadTransactionType(), ") ", g.Type(), " {")
 	f.P("return ", g.Type(), "{Tx: tx}")
 	f.P("}")
+}
+
+func hasInterleavedTablesPredicate(field string, table *spanddl.Table) string {
+	var variables []string
+	var addTable func(table *spanddl.Table)
+	addTable = func(table *spanddl.Table) {
+		variables = append(variables, field+"."+strcase.UpperCamelCase(string(table.Name)))
+		for _, interleavedTable := range table.InterleavedTables {
+			addTable(interleavedTable)
+		}
+	}
+	for _, interleavedTable := range table.InterleavedTables {
+		addTable(interleavedTable)
+	}
+	return strings.Join(variables, " || ")
+}
+
+func (g ReadTransactionCodeGenerator) generateInterleavedTablesStructFields(f *codegen.File, table *spanddl.Table) {
+	var pTable func(table *spanddl.Table)
+	pTable = func(table *spanddl.Table) {
+		f.P(strcase.UpperCamelCase(string(table.Name)), " bool")
+		for _, interleavedTable := range table.InterleavedTables {
+			pTable(interleavedTable)
+		}
+	}
+	for _, interleavedTable := range table.InterleavedTables {
+		pTable(interleavedTable)
+	}
+}
+
+func (g ReadTransactionCodeGenerator) forwardInterleavedTablesStructFields(
+	f *codegen.File,
+	table *spanddl.Table,
+	field string,
+) {
+	var pTable func(table *spanddl.Table)
+	pTable = func(table *spanddl.Table) {
+		f.P(strcase.UpperCamelCase(string(table.Name)), ": ", field, ".", strcase.UpperCamelCase(string(table.Name)), ",")
+		for _, interleavedTable := range table.InterleavedTables {
+			pTable(interleavedTable)
+		}
+	}
+	for _, interleavedTable := range table.InterleavedTables {
+		pTable(interleavedTable)
+	}
 }

@@ -7,13 +7,9 @@ package testdata
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
-	"google.golang.org/api/iterator"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type SingersRow struct {
@@ -156,15 +152,6 @@ func (k SingersKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SingersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("SingerId")),
-		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
 type SingersRowIterator struct {
 	*spanner.RowIterator
 }
@@ -213,14 +200,18 @@ func (t ReadTransaction) ReadSingersRows(
 	}
 }
 
+type GetSingersRowQuery struct {
+	Key SingersKey
+}
+
 func (t ReadTransaction) GetSingersRow(
 	ctx context.Context,
-	key SingersKey,
+	query GetSingersRowQuery,
 ) (*SingersRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"Singers",
-		key.SpannerKey(),
+		query.Key.SpannerKey(),
 		((*SingersRow)(nil)).ColumnNames(),
 	)
 	if err != nil {
@@ -233,15 +224,19 @@ func (t ReadTransaction) GetSingersRow(
 	return &row, nil
 }
 
+type BatchGetSingersRowsQuery struct {
+	Keys []SingersKey
+}
+
 func (t ReadTransaction) BatchGetSingersRows(
 	ctx context.Context,
-	keys []SingersKey,
+	query BatchGetSingersRowsQuery,
 ) (map[SingersKey]*SingersRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
+	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	foundRows := make(map[SingersKey]*SingersRow, len(keys))
+	foundRows := make(map[SingersKey]*SingersRow, len(query.Keys))
 	if err := t.ReadSingersRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SingersRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -251,9 +246,16 @@ func (t ReadTransaction) BatchGetSingersRows(
 	return foundRows, nil
 }
 
+type ListSingersRowsQuery struct {
+	Where  spansql.BoolExpr
+	Order  []spansql.Order
+	Limit  int32
+	Offset int64
+}
+
 func (t ReadTransaction) ListSingersRows(
 	ctx context.Context,
-	query ListQuery,
+	query ListSingersRowsQuery,
 ) *SingersRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = SingersKey{}.Order()
@@ -279,104 +281,6 @@ func (t ReadTransaction) ListSingersRows(
 	return &SingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
-}
-
-func (t ReadTransaction) ListSingersRowsInterleaved(
-	ctx context.Context,
-	query ListQuery,
-) *SingersRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = SingersKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("SingerId, ")
-	_, _ = q.WriteString("FirstName, ")
-	_, _ = q.WriteString("LastName, ")
-	_, _ = q.WriteString("SingerInfo, ")
-	_, _ = q.WriteString("FROM Singers ")
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
-	}
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
-	stmt := spanner.Statement{
-		SQL: q.String(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &SingersRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-func (t ReadTransaction) GetSingersRowInterleaved(
-	ctx context.Context,
-	key SingersKey,
-) (*SingersRow, error) {
-	it := t.ListSingersRowsInterleaved(ctx, ListQuery{
-		Where: key.BoolExpr(),
-		Limit: 1,
-	})
-	defer it.Stop()
-	row, err := it.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		return nil, err
-	}
-	return row, nil
-}
-
-func (t ReadTransaction) BatchGetSingersRowsInterleaved(
-	ctx context.Context,
-	keys []SingersKey,
-) (map[SingersKey]*SingersRow, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-	where := keys[0].BoolExpr()
-	for _, key := range keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[SingersKey]*SingersRow, len(keys))
-	if err := t.ListSingersRowsInterleaved(ctx, ListQuery{
-		Where: spansql.Paren{Expr: where},
-		Limit: int32(len(keys)),
-	}).Do(func(row *SingersRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
-type ListQuery struct {
-	Where  spansql.BoolExpr
-	Order  []spansql.Order
-	Limit  int32
-	Offset int64
 }
 
 type SpannerReadTransaction interface {

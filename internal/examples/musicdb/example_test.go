@@ -16,8 +16,8 @@ func ExampleQuery_get() {
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	singer, err := musicdb.Query(client.Single()).GetSingersRow(ctx, musicdb.SingersKey{
-		SingerId: 42,
+	singer, err := musicdb.Query(client.Single()).GetSingersRow(ctx, musicdb.GetSingersRowQuery{
+		Key: musicdb.SingersKey{SingerId: 42},
 	})
 	if err != nil {
 		panic(err) // TODO: Handle error.
@@ -38,7 +38,7 @@ func ExampleQuery_list() {
 	// ORDER BY FirstName DESC
 	// LIMIT 5
 	// OFFSET 10
-	if err := musicdb.Query(client.Single()).ListSingersRows(ctx, musicdb.ListQuery{
+	if err := musicdb.Query(client.Single()).ListSingersRows(ctx, musicdb.ListSingersRowsQuery{
 		Where: spansql.ComparisonOp{
 			Op:  spansql.Eq,
 			LHS: musicdb.Descriptor().Singers().LastName().ColumnID(),
@@ -67,15 +67,14 @@ func ExampleQuery_getMultiple() {
 	}
 	tx := client.ReadOnlyTransaction()
 	defer tx.Close()
-	singer, err := musicdb.Query(tx).GetSingersRow(ctx, musicdb.SingersKey{
-		SingerId: 42,
+	singer, err := musicdb.Query(tx).GetSingersRow(ctx, musicdb.GetSingersRowQuery{
+		Key: musicdb.SingersKey{SingerId: 42},
 	})
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	album, err := musicdb.Query(tx).GetAlbumsRow(ctx, musicdb.AlbumsKey{
-		SingerId: 42,
-		AlbumId:  24,
+	album, err := musicdb.Query(tx).GetAlbumsRow(ctx, musicdb.GetAlbumsRowQuery{
+		Key: musicdb.AlbumsKey{SingerId: 42, AlbumId: 24},
 	})
 	if err != nil {
 		panic(err) // TODO: Handle error.

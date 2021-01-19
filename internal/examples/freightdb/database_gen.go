@@ -648,15 +648,6 @@ func (k ShippersKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k ShippersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
 type SitesKey struct {
 	ShipperId string
 	SiteId    string
@@ -702,24 +693,6 @@ func (k SitesKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-func (k SitesKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("site_id")),
-			RHS: spansql.StringLiteral(k.SiteId),
-		},
-	}
-	return spansql.Paren{Expr: b}
-}
-
 type ShipmentsKey struct {
 	ShipperId  string
 	ShipmentId string
@@ -759,24 +732,6 @@ func (k ShipmentsKey) BoolExpr() spansql.BoolExpr {
 		RHS: spansql.ComparisonOp{
 			Op:  spansql.Eq,
 			LHS: spansql.ID("shipment_id"),
-			RHS: spansql.StringLiteral(k.ShipmentId),
-		},
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k ShipmentsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("shipment_id")),
 			RHS: spansql.StringLiteral(k.ShipmentId),
 		},
 	}
@@ -834,33 +789,6 @@ func (k LineItemsKey) BoolExpr() spansql.BoolExpr {
 		RHS: spansql.ComparisonOp{
 			Op:  spansql.Eq,
 			LHS: spansql.ID("line_number"),
-			RHS: spansql.IntegerLiteral(k.LineNumber),
-		},
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k LineItemsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("shipment_id")),
-			RHS: spansql.StringLiteral(k.ShipmentId),
-		},
-	}
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("line_number")),
 			RHS: spansql.IntegerLiteral(k.LineNumber),
 		},
 	}
@@ -993,14 +921,18 @@ func (t ReadTransaction) ReadShippersRows(
 	}
 }
 
+type GetShippersRowQuery struct {
+	Key ShippersKey
+}
+
 func (t ReadTransaction) GetShippersRow(
 	ctx context.Context,
-	key ShippersKey,
+	query GetShippersRowQuery,
 ) (*ShippersRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"shippers",
-		key.SpannerKey(),
+		query.Key.SpannerKey(),
 		((*ShippersRow)(nil)).ColumnNames(),
 	)
 	if err != nil {
@@ -1013,15 +945,19 @@ func (t ReadTransaction) GetShippersRow(
 	return &row, nil
 }
 
+type BatchGetShippersRowsQuery struct {
+	Keys []ShippersKey
+}
+
 func (t ReadTransaction) BatchGetShippersRows(
 	ctx context.Context,
-	keys []ShippersKey,
+	query BatchGetShippersRowsQuery,
 ) (map[ShippersKey]*ShippersRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
+	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
+	foundRows := make(map[ShippersKey]*ShippersRow, len(query.Keys))
 	if err := t.ReadShippersRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShippersRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -1031,9 +967,16 @@ func (t ReadTransaction) BatchGetShippersRows(
 	return foundRows, nil
 }
 
+type ListShippersRowsQuery struct {
+	Where  spansql.BoolExpr
+	Order  []spansql.Order
+	Limit  int32
+	Offset int64
+}
+
 func (t ReadTransaction) ListShippersRows(
 	ctx context.Context,
-	query ListQuery,
+	query ListShippersRowsQuery,
 ) *ShippersRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
@@ -1061,97 +1004,6 @@ func (t ReadTransaction) ListShippersRows(
 	}
 }
 
-func (t ReadTransaction) ListShippersRowsInterleaved(
-	ctx context.Context,
-	query ListQuery,
-) *ShippersRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = ShippersKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("create_time, ")
-	_, _ = q.WriteString("update_time, ")
-	_, _ = q.WriteString("delete_time, ")
-	_, _ = q.WriteString("FROM shippers ")
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
-	}
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
-	stmt := spanner.Statement{
-		SQL: q.String(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &ShippersRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-func (t ReadTransaction) GetShippersRowInterleaved(
-	ctx context.Context,
-	key ShippersKey,
-) (*ShippersRow, error) {
-	it := t.ListShippersRowsInterleaved(ctx, ListQuery{
-		Where: key.BoolExpr(),
-		Limit: 1,
-	})
-	defer it.Stop()
-	row, err := it.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		return nil, err
-	}
-	return row, nil
-}
-
-func (t ReadTransaction) BatchGetShippersRowsInterleaved(
-	ctx context.Context,
-	keys []ShippersKey,
-) (map[ShippersKey]*ShippersRow, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-	where := keys[0].BoolExpr()
-	for _, key := range keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
-	if err := t.ListShippersRowsInterleaved(ctx, ListQuery{
-		Where: spansql.Paren{Expr: where},
-		Limit: int32(len(keys)),
-	}).Do(func(row *ShippersRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
 func (t ReadTransaction) ReadSitesRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -1166,14 +1018,18 @@ func (t ReadTransaction) ReadSitesRows(
 	}
 }
 
+type GetSitesRowQuery struct {
+	Key SitesKey
+}
+
 func (t ReadTransaction) GetSitesRow(
 	ctx context.Context,
-	key SitesKey,
+	query GetSitesRowQuery,
 ) (*SitesRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"sites",
-		key.SpannerKey(),
+		query.Key.SpannerKey(),
 		((*SitesRow)(nil)).ColumnNames(),
 	)
 	if err != nil {
@@ -1186,15 +1042,19 @@ func (t ReadTransaction) GetSitesRow(
 	return &row, nil
 }
 
+type BatchGetSitesRowsQuery struct {
+	Keys []SitesKey
+}
+
 func (t ReadTransaction) BatchGetSitesRows(
 	ctx context.Context,
-	keys []SitesKey,
+	query BatchGetSitesRowsQuery,
 ) (map[SitesKey]*SitesRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
+	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	foundRows := make(map[SitesKey]*SitesRow, len(keys))
+	foundRows := make(map[SitesKey]*SitesRow, len(query.Keys))
 	if err := t.ReadSitesRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SitesRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -1204,9 +1064,16 @@ func (t ReadTransaction) BatchGetSitesRows(
 	return foundRows, nil
 }
 
+type ListSitesRowsQuery struct {
+	Where  spansql.BoolExpr
+	Order  []spansql.Order
+	Limit  int32
+	Offset int64
+}
+
 func (t ReadTransaction) ListSitesRows(
 	ctx context.Context,
-	query ListQuery,
+	query ListSitesRowsQuery,
 ) *SitesRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = SitesKey{}.Order()
@@ -1234,101 +1101,6 @@ func (t ReadTransaction) ListSitesRows(
 	}
 }
 
-func (t ReadTransaction) ListSitesRowsInterleaved(
-	ctx context.Context,
-	query ListQuery,
-) *SitesRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = SitesKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("site_id, ")
-	_, _ = q.WriteString("create_time, ")
-	_, _ = q.WriteString("update_time, ")
-	_, _ = q.WriteString("delete_time, ")
-	_, _ = q.WriteString("display_name, ")
-	_, _ = q.WriteString("latitude, ")
-	_, _ = q.WriteString("longitude, ")
-	_, _ = q.WriteString("FROM sites ")
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
-	}
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
-	stmt := spanner.Statement{
-		SQL: q.String(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &SitesRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-func (t ReadTransaction) GetSitesRowInterleaved(
-	ctx context.Context,
-	key SitesKey,
-) (*SitesRow, error) {
-	it := t.ListSitesRowsInterleaved(ctx, ListQuery{
-		Where: key.BoolExpr(),
-		Limit: 1,
-	})
-	defer it.Stop()
-	row, err := it.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		return nil, err
-	}
-	return row, nil
-}
-
-func (t ReadTransaction) BatchGetSitesRowsInterleaved(
-	ctx context.Context,
-	keys []SitesKey,
-) (map[SitesKey]*SitesRow, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-	where := keys[0].BoolExpr()
-	for _, key := range keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[SitesKey]*SitesRow, len(keys))
-	if err := t.ListSitesRowsInterleaved(ctx, ListQuery{
-		Where: spansql.Paren{Expr: where},
-		Limit: int32(len(keys)),
-	}).Do(func(row *SitesRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
 func (t ReadTransaction) ReadShipmentsRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -1343,14 +1115,26 @@ func (t ReadTransaction) ReadShipmentsRows(
 	}
 }
 
+type GetShipmentsRowQuery struct {
+	Key       ShipmentsKey
+	LineItems bool
+}
+
+func (q *GetShipmentsRowQuery) hasInterleavedTables() bool {
+	return q.LineItems
+}
+
 func (t ReadTransaction) GetShipmentsRow(
 	ctx context.Context,
-	key ShipmentsKey,
+	query GetShipmentsRowQuery,
 ) (*ShipmentsRow, error) {
+	if query.hasInterleavedTables() {
+		return t.getShipmentsRowInterleaved(ctx, query)
+	}
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"shipments",
-		key.SpannerKey(),
+		query.Key.SpannerKey(),
 		((*ShipmentsRow)(nil)).ColumnNames(),
 	)
 	if err != nil {
@@ -1363,15 +1147,27 @@ func (t ReadTransaction) GetShipmentsRow(
 	return &row, nil
 }
 
+type BatchGetShipmentsRowsQuery struct {
+	Keys      []ShipmentsKey
+	LineItems bool
+}
+
+func (q *BatchGetShipmentsRowsQuery) hasInterleavedTables() bool {
+	return q.LineItems
+}
+
 func (t ReadTransaction) BatchGetShipmentsRows(
 	ctx context.Context,
-	keys []ShipmentsKey,
+	query BatchGetShipmentsRowsQuery,
 ) (map[ShipmentsKey]*ShipmentsRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
+	if query.hasInterleavedTables() {
+		return t.batchGetShipmentsRowsInterleaved(ctx, query)
+	}
+	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
+	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(query.Keys))
 	if err := t.ReadShipmentsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShipmentsRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -1381,10 +1177,25 @@ func (t ReadTransaction) BatchGetShipmentsRows(
 	return foundRows, nil
 }
 
+type ListShipmentsRowsQuery struct {
+	Where     spansql.BoolExpr
+	Order     []spansql.Order
+	Limit     int32
+	Offset    int64
+	LineItems bool
+}
+
+func (q *ListShipmentsRowsQuery) hasInterleavedTables() bool {
+	return q.LineItems
+}
+
 func (t ReadTransaction) ListShipmentsRows(
 	ctx context.Context,
-	query ListQuery,
+	query ListShipmentsRowsQuery,
 ) *ShipmentsRowIterator {
+	if query.hasInterleavedTables() {
+		return t.listShipmentsRowsInterleaved(ctx, query)
+	}
 	if len(query.Order) == 0 {
 		query.Order = ShipmentsKey{}.Order()
 	}
@@ -1411,49 +1222,57 @@ func (t ReadTransaction) ListShipmentsRows(
 	}
 }
 
-func (t ReadTransaction) ListShipmentsRowsInterleaved(
+func (t ReadTransaction) listShipmentsRowsInterleaved(
 	ctx context.Context,
-	query ListQuery,
+	query ListShipmentsRowsQuery,
 ) *ShipmentsRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = ShipmentsKey{}.Order()
 	}
 	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("shipment_id, ")
-	_, _ = q.WriteString("create_time, ")
-	_, _ = q.WriteString("update_time, ")
-	_, _ = q.WriteString("delete_time, ")
-	_, _ = q.WriteString("origin_site_id, ")
-	_, _ = q.WriteString("destination_site_id, ")
-	_, _ = q.WriteString("pickup_earliest_time, ")
-	_, _ = q.WriteString("pickup_latest_time, ")
-	_, _ = q.WriteString("delivery_earliest_time, ")
-	_, _ = q.WriteString("delivery_latest_time, ")
-	_, _ = q.WriteString("ARRAY( ")
-	_, _ = q.WriteString("SELECT AS STRUCT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("shipment_id, ")
-	_, _ = q.WriteString("line_number, ")
-	_, _ = q.WriteString("title, ")
-	_, _ = q.WriteString("quantity, ")
-	_, _ = q.WriteString("weight_kg, ")
-	_, _ = q.WriteString("volume_m3, ")
-	_, _ = q.WriteString("FROM line_items ")
-	_, _ = q.WriteString("WHERE ")
-	_, _ = q.WriteString("shipper_id = shipments.shipper_id ")
-	_, _ = q.WriteString("AND ")
-	_, _ = q.WriteString("shipment_id = shipments.shipment_id ")
-	_, _ = q.WriteString("ORDER BY ")
-	_, _ = q.WriteString("shipper_id")
-	_, _ = q.WriteString(", ")
-	_, _ = q.WriteString("shipment_id")
-	_, _ = q.WriteString(", ")
-	_, _ = q.WriteString("line_number")
-	_, _ = q.WriteString(" ")
-	_, _ = q.WriteString(") AS line_items, ")
-	_, _ = q.WriteString("FROM shipments ")
+	_, _ = q.WriteString(`
+SELECT
+    shipper_id,
+    shipment_id,
+    create_time,
+    update_time,
+    delete_time,
+    origin_site_id,
+    destination_site_id,
+    pickup_earliest_time,
+    pickup_latest_time,
+    delivery_earliest_time,
+    delivery_latest_time,
+`)
+	if query.LineItems {
+		_, _ = q.WriteString(`
+    ARRAY(
+        SELECT AS STRUCT
+            shipper_id,
+            shipment_id,
+            line_number,
+            title,
+            quantity,
+            weight_kg,
+            volume_m3,
+`)
+		_, _ = q.WriteString(`
+        FROM 
+            line_items
+        WHERE 
+            line_items.shipper_id = shipments.shipper_id AND
+            line_items.shipment_id = shipments.shipment_id
+        ORDER BY 
+            shipper_id,
+            shipment_id,
+            line_number
+    ) AS line_items,
+`)
+	}
+	_, _ = q.WriteString(`
+FROM
+    shipments
+`)
 	if query.Where != nil {
 		_, _ = q.WriteString("WHERE (")
 		_, _ = q.WriteString(query.Where.SQL())
@@ -1484,44 +1303,46 @@ func (t ReadTransaction) ListShipmentsRowsInterleaved(
 	}
 }
 
-func (t ReadTransaction) GetShipmentsRowInterleaved(
+func (t ReadTransaction) getShipmentsRowInterleaved(
 	ctx context.Context,
-	key ShipmentsKey,
+	query GetShipmentsRowQuery,
 ) (*ShipmentsRow, error) {
-	it := t.ListShipmentsRowsInterleaved(ctx, ListQuery{
-		Where: key.BoolExpr(),
-		Limit: 1,
+	it := t.listShipmentsRowsInterleaved(ctx, ListShipmentsRowsQuery{
+		Limit:     1,
+		Where:     query.Key.BoolExpr(),
+		LineItems: query.LineItems,
 	})
 	defer it.Stop()
 	row, err := it.Next()
 	if err != nil {
 		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
+			return nil, status.Errorf(codes.NotFound, "not found: %v", query.Key)
 		}
 		return nil, err
 	}
 	return row, nil
 }
 
-func (t ReadTransaction) BatchGetShipmentsRowsInterleaved(
+func (t ReadTransaction) batchGetShipmentsRowsInterleaved(
 	ctx context.Context,
-	keys []ShipmentsKey,
+	query BatchGetShipmentsRowsQuery,
 ) (map[ShipmentsKey]*ShipmentsRow, error) {
-	if len(keys) == 0 {
+	if len(query.Keys) == 0 {
 		return nil, nil
 	}
-	where := keys[0].BoolExpr()
-	for _, key := range keys[1:] {
+	where := query.Keys[0].BoolExpr()
+	for _, key := range query.Keys[1:] {
 		where = spansql.LogicalOp{
 			Op:  spansql.Or,
 			LHS: where,
 			RHS: key.BoolExpr(),
 		}
 	}
-	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
-	if err := t.ListShipmentsRowsInterleaved(ctx, ListQuery{
-		Where: spansql.Paren{Expr: where},
-		Limit: int32(len(keys)),
+	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(query.Keys))
+	if err := t.ListShipmentsRows(ctx, ListShipmentsRowsQuery{
+		Where:     spansql.Paren{Expr: where},
+		Limit:     int32(len(query.Keys)),
+		LineItems: query.LineItems,
 	}).Do(func(row *ShipmentsRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -1545,14 +1366,18 @@ func (t ReadTransaction) ReadLineItemsRows(
 	}
 }
 
+type GetLineItemsRowQuery struct {
+	Key LineItemsKey
+}
+
 func (t ReadTransaction) GetLineItemsRow(
 	ctx context.Context,
-	key LineItemsKey,
+	query GetLineItemsRowQuery,
 ) (*LineItemsRow, error) {
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"line_items",
-		key.SpannerKey(),
+		query.Key.SpannerKey(),
 		((*LineItemsRow)(nil)).ColumnNames(),
 	)
 	if err != nil {
@@ -1565,15 +1390,19 @@ func (t ReadTransaction) GetLineItemsRow(
 	return &row, nil
 }
 
+type BatchGetLineItemsRowsQuery struct {
+	Keys []LineItemsKey
+}
+
 func (t ReadTransaction) BatchGetLineItemsRows(
 	ctx context.Context,
-	keys []LineItemsKey,
+	query BatchGetLineItemsRowsQuery,
 ) (map[LineItemsKey]*LineItemsRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
+	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
 	}
-	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
+	foundRows := make(map[LineItemsKey]*LineItemsRow, len(query.Keys))
 	if err := t.ReadLineItemsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *LineItemsRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -1583,9 +1412,16 @@ func (t ReadTransaction) BatchGetLineItemsRows(
 	return foundRows, nil
 }
 
+type ListLineItemsRowsQuery struct {
+	Where  spansql.BoolExpr
+	Order  []spansql.Order
+	Limit  int32
+	Offset int64
+}
+
 func (t ReadTransaction) ListLineItemsRows(
 	ctx context.Context,
-	query ListQuery,
+	query ListLineItemsRowsQuery,
 ) *LineItemsRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = LineItemsKey{}.Order()
@@ -1611,107 +1447,6 @@ func (t ReadTransaction) ListLineItemsRows(
 	return &LineItemsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
-}
-
-func (t ReadTransaction) ListLineItemsRowsInterleaved(
-	ctx context.Context,
-	query ListQuery,
-) *LineItemsRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = LineItemsKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("shipment_id, ")
-	_, _ = q.WriteString("line_number, ")
-	_, _ = q.WriteString("title, ")
-	_, _ = q.WriteString("quantity, ")
-	_, _ = q.WriteString("weight_kg, ")
-	_, _ = q.WriteString("volume_m3, ")
-	_, _ = q.WriteString("FROM line_items ")
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
-	}
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
-	stmt := spanner.Statement{
-		SQL: q.String(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &LineItemsRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-func (t ReadTransaction) GetLineItemsRowInterleaved(
-	ctx context.Context,
-	key LineItemsKey,
-) (*LineItemsRow, error) {
-	it := t.ListLineItemsRowsInterleaved(ctx, ListQuery{
-		Where: key.BoolExpr(),
-		Limit: 1,
-	})
-	defer it.Stop()
-	row, err := it.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		return nil, err
-	}
-	return row, nil
-}
-
-func (t ReadTransaction) BatchGetLineItemsRowsInterleaved(
-	ctx context.Context,
-	keys []LineItemsKey,
-) (map[LineItemsKey]*LineItemsRow, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-	where := keys[0].BoolExpr()
-	for _, key := range keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
-	if err := t.ListLineItemsRowsInterleaved(ctx, ListQuery{
-		Where: spansql.Paren{Expr: where},
-		Limit: int32(len(keys)),
-	}).Do(func(row *LineItemsRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
-type ListQuery struct {
-	Where  spansql.BoolExpr
-	Order  []spansql.Order
-	Limit  int32
-	Offset int64
 }
 
 type SpannerReadTransaction interface {

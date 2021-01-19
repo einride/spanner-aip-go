@@ -47,7 +47,6 @@ func (g KeyCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateDeleteMethod(f)
 	g.generateOrderMethod(f)
 	g.generateBoolExprMethod(f)
-	g.generateQualifiedBoolExprMethod(f)
 }
 
 func (g KeyCodeGenerator) generateDeleteMethod(f *codegen.File) {
@@ -90,37 +89,6 @@ func (g KeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 		f.P("RHS: ", spansqlPkg, ".ComparisonOp{")
 		f.P("Op: ", spansqlPkg, ".Eq,")
 		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(keyPart.Column)), "),")
-		f.P(
-			"RHS: ", g.columnSpanSQLType(f, keyPart),
-			"(k.", g.FieldName(keyPart), typescodegen.ValueAccessor(g.keyColumn(keyPart)), "),",
-		)
-		f.P("},")
-		f.P("}")
-	}
-	f.P("return ", spansqlPkg, ".Paren{Expr: b}")
-	f.P("}")
-}
-
-func (g KeyCodeGenerator) generateQualifiedBoolExprMethod(f *codegen.File) {
-	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
-	f.P()
-	k0 := g.Table.PrimaryKey[0]
-	f.P("func (k ", g.Type(), ") QualifiedBoolExpr(prefix ", spansqlPkg, ".PathExp) ", spansqlPkg, ".BoolExpr {")
-	f.P("b := ", spansqlPkg, ".BoolExpr(", spansqlPkg, ".ComparisonOp{")
-	f.P("Op: ", spansqlPkg, ".Eq,")
-	f.P("LHS: append(prefix, ", spansqlPkg, ".ID(", strconv.Quote(string(k0.Column)), ")),")
-	f.P(
-		"RHS: ", g.columnSpanSQLType(f, k0),
-		"(k.", g.FieldName(k0), typescodegen.ValueAccessor(g.keyColumn(k0)), "),",
-	)
-	f.P("})")
-	for _, keyPart := range g.Table.PrimaryKey[1:] {
-		f.P("b = ", spansqlPkg, ".LogicalOp{")
-		f.P("Op: ", spansqlPkg, ".And,")
-		f.P("LHS: b,")
-		f.P("RHS: ", spansqlPkg, ".ComparisonOp{")
-		f.P("Op: ", spansqlPkg, ".Eq,")
-		f.P("LHS: append(prefix, ", spansqlPkg, ".ID(", strconv.Quote(string(keyPart.Column)), ")),")
 		f.P(
 			"RHS: ", g.columnSpanSQLType(f, keyPart),
 			"(k.", g.FieldName(keyPart), typescodegen.ValueAccessor(g.keyColumn(keyPart)), "),",
