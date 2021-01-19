@@ -25,9 +25,9 @@ func TestAlbumsReadTransaction(t *testing.T) {
 			FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
 			LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
 		}
-		_, err := client.Apply(fx.Ctx, []*spanner.Mutation{expected.Insert()})
+		_, err := client.Apply(fx.Ctx, []*spanner.Mutation{spanner.Insert(expected.Mutate())})
 		assert.NilError(t, err)
-		actual, err := musicdb.Singers(client.Single()).Get(fx.Ctx, expected.Key())
+		actual, err := musicdb.Query(client.Single()).GetSingersRow(fx.Ctx, expected.Key())
 		assert.NilError(t, err)
 		assert.DeepEqual(t, expected, actual)
 	})
@@ -46,7 +46,7 @@ func TestAlbumsReadTransaction(t *testing.T) {
 		singers := make([]*musicdb.SingersRow, 0, n)
 		for i := 0; i < n; i++ {
 			singer := newSinger(i)
-			_, err := client.Apply(fx.Ctx, []*spanner.Mutation{singer.Insert()})
+			_, err := client.Apply(fx.Ctx, []*spanner.Mutation{spanner.Insert(singer.Mutate())})
 			assert.NilError(t, err)
 			singers = append(singers, singer)
 		}
@@ -55,7 +55,7 @@ func TestAlbumsReadTransaction(t *testing.T) {
 			singers[3].Key(): singers[3],
 			singers[5].Key(): singers[5],
 		}
-		actual, err := musicdb.Singers(client.Single()).BatchGet(fx.Ctx, []musicdb.SingersKey{
+		actual, err := musicdb.Query(client.Single()).BatchGetSingersRows(fx.Ctx, []musicdb.SingersKey{
 			singers[1].Key(),
 			singers[3].Key(),
 			singers[5].Key(),
@@ -79,14 +79,14 @@ func TestAlbumsReadTransaction(t *testing.T) {
 		expected := make([]*musicdb.SingersRow, 0, n)
 		for i := 0; i < n; i++ {
 			singer := newSinger(i)
-			_, err := client.Apply(fx.Ctx, []*spanner.Mutation{singer.Insert()})
+			_, err := client.Apply(fx.Ctx, []*spanner.Mutation{spanner.Insert(singer.Mutate())})
 			assert.NilError(t, err)
 			expected = append(expected, singer)
 		}
 		var actual []*musicdb.SingersRow
 		const pageSize = 10
 		for i := int64(0); i < n/pageSize; i++ {
-			assert.NilError(t, musicdb.Singers(client.Single()).List(fx.Ctx, musicdb.ListQuery{
+			assert.NilError(t, musicdb.Query(client.Single()).ListSingersRows(fx.Ctx, musicdb.ListQuery{
 				Order: []spansql.Order{
 					{Expr: musicdb.Descriptor().Singers().SingerId().ColumnID()},
 				},
@@ -111,7 +111,7 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 	t.Run("insert and get", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
-		expected := &musicdb.SingersAndAlbumsRow{
+		expected := &musicdb.SingersRow{
 			SingerId:  1,
 			FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
 			LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
@@ -142,9 +142,13 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 				},
 			},
 		}
-		_, err := client.Apply(fx.Ctx, expected.Insert())
+		mutations := []*spanner.Mutation{spanner.Insert(expected.Mutate())}
+		for _, album := range expected.Albums {
+			mutations = append(mutations, spanner.Insert(album.Mutate()))
+		}
+		_, err := client.Apply(fx.Ctx, mutations)
 		assert.NilError(t, err)
-		actual, err := musicdb.SingersAndAlbums(client.Single()).Get(fx.Ctx, expected.Key())
+		actual, err := musicdb.Query(client.Single()).GetSingersRowInterleaved(fx.Ctx, expected.Key())
 		assert.NilError(t, err)
 		assert.DeepEqual(t, expected, actual)
 	})
@@ -152,8 +156,8 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 	t.Run("insert and batch get", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
-		newSingerAndAlbums := func(i int) *musicdb.SingersAndAlbumsRow {
-			return &musicdb.SingersAndAlbumsRow{
+		newSingerAndAlbums := func(i int) *musicdb.SingersRow {
+			return &musicdb.SingersRow{
 				SingerId:  int64(i),
 				FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
 				LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
@@ -186,19 +190,23 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 			}
 		}
 		const n = 10
-		singersAndAlbums := make([]*musicdb.SingersAndAlbumsRow, 0, n)
+		singersAndAlbums := make([]*musicdb.SingersRow, 0, n)
 		for i := 0; i < n; i++ {
 			singerAndAlbums := newSingerAndAlbums(i)
-			_, err := client.Apply(fx.Ctx, singerAndAlbums.Insert())
+			mutations := []*spanner.Mutation{spanner.Insert(singerAndAlbums.Mutate())}
+			for _, album := range singerAndAlbums.Albums {
+				mutations = append(mutations, spanner.Insert(album.Mutate()))
+			}
+			_, err := client.Apply(fx.Ctx, mutations)
 			assert.NilError(t, err)
 			singersAndAlbums = append(singersAndAlbums, singerAndAlbums)
 		}
-		expected := map[musicdb.SingersKey]*musicdb.SingersAndAlbumsRow{
+		expected := map[musicdb.SingersKey]*musicdb.SingersRow{
 			singersAndAlbums[1].Key(): singersAndAlbums[1],
 			singersAndAlbums[3].Key(): singersAndAlbums[3],
 			singersAndAlbums[5].Key(): singersAndAlbums[5],
 		}
-		actual, err := musicdb.SingersAndAlbums(client.Single()).BatchGet(fx.Ctx, []musicdb.SingersKey{
+		actual, err := musicdb.Query(client.Single()).BatchGetSingersRowsInterleaved(fx.Ctx, []musicdb.SingersKey{
 			singersAndAlbums[1].Key(),
 			singersAndAlbums[3].Key(),
 			singersAndAlbums[5].Key(),

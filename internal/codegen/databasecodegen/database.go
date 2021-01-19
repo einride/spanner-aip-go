@@ -11,22 +11,14 @@ type DatabaseCodeGenerator struct {
 
 func (g DatabaseCodeGenerator) GenerateCode(f *codegen.File) {
 	for _, table := range g.Database.Tables {
-		ReadTransactionCodeGenerator{Table: table}.GenerateCode(f)
-		RowIteratorCodeGenerator{Table: table}.GenerateCode(f)
-		KeyCodeGenerator{Table: table}.GenerateCode(f)
 		RowCodeGenerator{Table: table}.GenerateCode(f)
-		if len(table.InterleavedTables) == 0 {
-			continue
-		}
-		InterleavedReadTransactionCodeGenerator{
-			Table: table,
-		}.GenerateCode(f)
-		InterleavedRowIteratorCodeGenerator{
-			Table: table,
-		}.GenerateCode(f)
-		InterleavedRowCodeGenerator{
-			Table: table,
-		}.GenerateCode(f)
 	}
+	for _, table := range g.Database.Tables {
+		KeyCodeGenerator{Table: table}.GenerateCode(f)
+	}
+	for _, table := range g.Database.Tables {
+		RowIteratorCodeGenerator{Table: table}.GenerateCode(f)
+	}
+	ReadTransactionCodeGenerator(g).GenerateCode(f)
 	CommonCodeGenerator{}.GenerateCode(f)
 }

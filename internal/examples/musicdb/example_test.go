@@ -8,7 +8,7 @@ import (
 	"go.einride.tech/spanner-aip/internal/examples/musicdb"
 )
 
-func ExampleAlbumsReadTransaction_Get() {
+func ExampleQuery_get() {
 	ctx := context.Background()
 	client, err := spanner.NewClient(
 		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
@@ -16,7 +16,7 @@ func ExampleAlbumsReadTransaction_Get() {
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	singer, err := musicdb.Singers(client.Single()).Get(ctx, musicdb.SingersKey{
+	singer, err := musicdb.Query(client.Single()).GetSingersRow(ctx, musicdb.SingersKey{
 		SingerId: 42,
 	})
 	if err != nil {
@@ -25,7 +25,7 @@ func ExampleAlbumsReadTransaction_Get() {
 	_ = singer // TODO: Use singer.
 }
 
-func ExampleAlbumsReadTransaction_List() {
+func ExampleQuery_list() {
 	ctx := context.Background()
 	client, err := spanner.NewClient(
 		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
@@ -38,7 +38,7 @@ func ExampleAlbumsReadTransaction_List() {
 	// ORDER BY FirstName DESC
 	// LIMIT 5
 	// OFFSET 10
-	if err := musicdb.Singers(client.Single()).List(ctx, musicdb.ListQuery{
+	if err := musicdb.Query(client.Single()).ListSingersRows(ctx, musicdb.ListQuery{
 		Where: spansql.ComparisonOp{
 			Op:  spansql.Eq,
 			LHS: musicdb.Descriptor().Singers().LastName().ColumnID(),
@@ -57,7 +57,7 @@ func ExampleAlbumsReadTransaction_List() {
 	}
 }
 
-func Example_readOnlyTransaction_MultipleTables() {
+func ExampleQuery_getMultiple() {
 	ctx := context.Background()
 	client, err := spanner.NewClient(
 		ctx, "projects/<PROJECT>/instances/<INSTANCE>/databases/<DATABASE>",
@@ -67,13 +67,13 @@ func Example_readOnlyTransaction_MultipleTables() {
 	}
 	tx := client.ReadOnlyTransaction()
 	defer tx.Close()
-	singer, err := musicdb.Singers(tx).Get(ctx, musicdb.SingersKey{
+	singer, err := musicdb.Query(tx).GetSingersRow(ctx, musicdb.SingersKey{
 		SingerId: 42,
 	})
 	if err != nil {
 		panic(err) // TODO: Handle error.
 	}
-	album, err := musicdb.Albums(tx).Get(ctx, musicdb.AlbumsKey{
+	album, err := musicdb.Query(tx).GetAlbumsRow(ctx, musicdb.AlbumsKey{
 		SingerId: 42,
 		AlbumId:  24,
 	})

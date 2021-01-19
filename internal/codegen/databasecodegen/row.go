@@ -54,11 +54,17 @@ func (g RowCodeGenerator) GenerateCode(f *codegen.File) {
 	for _, column := range g.Table.Columns {
 		g.generateColumn(f, column)
 	}
+	for _, interleavedTable := range g.Table.InterleavedTables {
+		interleavedRow := RowCodeGenerator{Table: interleavedTable}
+		f.P(
+			g.InterleavedRowsField(interleavedTable), " []*", interleavedRow.Type(),
+			"`spanner:", strconv.Quote(string(interleavedTable.Name)), "`",
+		)
+	}
 	f.P("}")
 	g.generateColumnNamesFunctions(f)
 	g.generateValidateFunction(f)
 	g.generateUnmarshalFunction(f)
-	g.generateMutationFunctions(f)
 	g.generateMutationFunction(f)
 	g.generateMutationForColumnsFunction(f)
 	g.generatePrimaryKeyMethod(f)
@@ -98,6 +104,10 @@ func (g RowCodeGenerator) generateValidateFunction(f *codegen.File) {
 	f.P("}")
 }
 
+func (g RowCodeGenerator) InterleavedRowsField(table *spanddl.Table) string {
+	return strcase.UpperCamelCase(string(table.Name))
+}
+
 func (g RowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
 	fmtPkg := f.Import("fmt")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
@@ -111,6 +121,15 @@ func (g RowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
 		f.P(`return `, fmtPkg, `.Errorf("unmarshal `, g.Table.Name, ` row: `, column.Name, ` column: %w", err)`)
 		f.P("}")
 	}
+	for _, interleavedTable := range g.Table.InterleavedTables {
+		f.P("case ", strconv.Quote(string(interleavedTable.Name)), ":")
+		f.P("if err := row.Column(i, &r.", g.InterleavedRowsField(interleavedTable), "); err != nil {")
+		f.P(
+			`return `, fmtPkg, `.Errorf("unmarshal `, g.Table.Name, ` interleaved row: `,
+			interleavedTable.Name, ` column: %w", err)`,
+		)
+		f.P("}")
+	}
 	f.P("default:")
 	f.P(`return fmt.Errorf("unmarshal `, g.Table.Name, ` row: unhandled column: %s", row.ColumnName(i))`)
 	f.P("}")
@@ -119,37 +138,9 @@ func (g RowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
 	f.P("}")
 }
 
-func (g RowCodeGenerator) generateMutationFunctions(f *codegen.File) {
-	spannerPkg := f.Import("cloud.google.com/go/spanner")
-	f.P()
-	f.P("func (r *", g.Type(), ") Insert() *", spannerPkg, ".Mutation {")
-	f.P("return ", spannerPkg, ".Insert(r.Mutation())")
-	f.P("}")
-	f.P()
-	f.P("func (r *", g.Type(), ") InsertOrUpdate() *", spannerPkg, ".Mutation {")
-	f.P("return ", spannerPkg, ".InsertOrUpdate(r.Mutation())")
-	f.P("}")
-	f.P()
-	f.P("func (r *", g.Type(), ") Update() *", spannerPkg, ".Mutation {")
-	f.P("return ", spannerPkg, ".Update(r.Mutation())")
-	f.P("}")
-	f.P()
-	f.P("func (r *", g.Type(), ") InsertColumns(columns []string) *", spannerPkg, ".Mutation {")
-	f.P("return ", spannerPkg, ".Insert(r.MutationForColumns(columns))")
-	f.P("}")
-	f.P()
-	f.P("func (r *", g.Type(), ") InsertOrUpdateColumns(columns []string) *", spannerPkg, ".Mutation {")
-	f.P("return ", spannerPkg, ".InsertOrUpdate(r.MutationForColumns(columns))")
-	f.P("}")
-	f.P()
-	f.P("func (r *", g.Type(), ") UpdateColumns(columns []string) *", spannerPkg, ".Mutation {")
-	f.P("return ", spannerPkg, ".Update(r.MutationForColumns(columns))")
-	f.P("}")
-}
-
 func (g RowCodeGenerator) generateMutationFunction(f *codegen.File) {
 	f.P()
-	f.P("func (r *", g.Type(), ") Mutation() (string, []string, []interface{}) {")
+	f.P("func (r *", g.Type(), ") Mutate() (string, []string, []interface{}) {")
 	f.P("return ", strconv.Quote(string(g.Table.Name)), ", r.", g.ColumnNamesMethod(), "(), []interface{}{")
 	for _, column := range g.Table.Columns {
 		f.P("r.", g.ColumnFieldName(column), ",")
@@ -161,7 +152,7 @@ func (g RowCodeGenerator) generateMutationFunction(f *codegen.File) {
 func (g RowCodeGenerator) generateMutationForColumnsFunction(f *codegen.File) {
 	fmtPkg := f.Import("fmt")
 	f.P()
-	f.P("func (r *", g.Type(), ") MutationForColumns(columns []string) (string, []string, []interface{}) {")
+	f.P("func (r *", g.Type(), ") MutateColumns(columns []string) (string, []string, []interface{}) {")
 	f.P("if len(columns) == 0 {")
 	f.P("columns = r.", g.ColumnNamesMethod(), "()")
 	f.P("}")
