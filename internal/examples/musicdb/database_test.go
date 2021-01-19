@@ -10,7 +10,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func TestAlbumsReadTransaction(t *testing.T) {
+func TestReadTransaction(t *testing.T) {
 	t.Parallel()
 	if !spantest.HasDocker() {
 		t.Skip("Need Docker to run Spanner emulator.")
@@ -27,7 +27,11 @@ func TestAlbumsReadTransaction(t *testing.T) {
 		}
 		_, err := client.Apply(fx.Ctx, []*spanner.Mutation{spanner.Insert(expected.Mutate())})
 		assert.NilError(t, err)
-		actual, err := musicdb.Query(client.Single()).GetSingersRow(fx.Ctx, expected.Key())
+		tx := client.Single()
+		defer tx.Close()
+		actual, err := musicdb.Query(tx).GetSingersRow(fx.Ctx, musicdb.GetSingersRowQuery{
+			Key: expected.Key(),
+		})
 		assert.NilError(t, err)
 		assert.DeepEqual(t, expected, actual)
 	})
@@ -55,11 +59,15 @@ func TestAlbumsReadTransaction(t *testing.T) {
 			singers[3].Key(): singers[3],
 			singers[5].Key(): singers[5],
 		}
-		actual, err := musicdb.Query(client.Single()).BatchGetSingersRows(fx.Ctx, []musicdb.SingersKey{
-			singers[1].Key(),
-			singers[3].Key(),
-			singers[5].Key(),
-			{SingerId: n + 1}, // not found
+		tx := client.Single()
+		defer tx.Close()
+		actual, err := musicdb.Query(tx).BatchGetSingersRows(fx.Ctx, musicdb.BatchGetSingersRowsQuery{
+			Keys: []musicdb.SingersKey{
+				singers[1].Key(),
+				singers[3].Key(),
+				singers[5].Key(),
+				{SingerId: n + 1}, // not found
+			},
 		})
 		assert.NilError(t, err)
 		assert.DeepEqual(t, expected, actual)
@@ -85,8 +93,10 @@ func TestAlbumsReadTransaction(t *testing.T) {
 		}
 		var actual []*musicdb.SingersRow
 		const pageSize = 10
+		tx := client.ReadOnlyTransaction()
+		defer tx.Close()
 		for i := int64(0); i < n/pageSize; i++ {
-			assert.NilError(t, musicdb.Query(client.Single()).ListSingersRows(fx.Ctx, musicdb.ListQuery{
+			assert.NilError(t, musicdb.Query(tx).ListSingersRows(fx.Ctx, musicdb.ListSingersRowsQuery{
 				Order: []spansql.Order{
 					{Expr: musicdb.Descriptor().Singers().SingerId().ColumnID()},
 				},
@@ -101,7 +111,7 @@ func TestAlbumsReadTransaction(t *testing.T) {
 	})
 }
 
-func TestSingersAndAlbumsReadTransaction(t *testing.T) {
+func TestReadTransaction_interleaved(t *testing.T) {
 	t.Parallel()
 	if !spantest.HasDocker() {
 		t.Skip("Need Docker to run Spanner emulator.")
@@ -148,7 +158,11 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 		}
 		_, err := client.Apply(fx.Ctx, mutations)
 		assert.NilError(t, err)
-		actual, err := musicdb.Query(client.Single()).GetSingersRowInterleaved(fx.Ctx, expected.Key())
+		tx := client.Single()
+		actual, err := musicdb.Query(tx).GetSingersRow(fx.Ctx, musicdb.GetSingersRowQuery{
+			Key:    expected.Key(),
+			Albums: true,
+		})
 		assert.NilError(t, err)
 		assert.DeepEqual(t, expected, actual)
 	})
@@ -206,11 +220,15 @@ func TestSingersAndAlbumsReadTransaction(t *testing.T) {
 			singersAndAlbums[3].Key(): singersAndAlbums[3],
 			singersAndAlbums[5].Key(): singersAndAlbums[5],
 		}
-		actual, err := musicdb.Query(client.Single()).BatchGetSingersRowsInterleaved(fx.Ctx, []musicdb.SingersKey{
-			singersAndAlbums[1].Key(),
-			singersAndAlbums[3].Key(),
-			singersAndAlbums[5].Key(),
-			{SingerId: n + 1}, // not found
+		tx := client.Single()
+		actual, err := musicdb.Query(tx).BatchGetSingersRows(fx.Ctx, musicdb.BatchGetSingersRowsQuery{
+			Keys: []musicdb.SingersKey{
+				singersAndAlbums[1].Key(),
+				singersAndAlbums[3].Key(),
+				singersAndAlbums[5].Key(),
+				{SingerId: n + 1}, // not found
+			},
+			Albums: true,
 		})
 		assert.NilError(t, err)
 		assert.DeepEqual(t, expected, actual)
