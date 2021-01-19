@@ -15,164 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type ShippersReadTransaction struct {
-	Tx SpannerReadTransaction
-}
-
-func Shippers(tx SpannerReadTransaction) ShippersReadTransaction {
-	return ShippersReadTransaction{Tx: tx}
-}
-
-func (t ShippersReadTransaction) Read(
-	ctx context.Context,
-	keySet spanner.KeySet,
-) *ShippersRowIterator {
-	return &ShippersRowIterator{
-		RowIterator: t.Tx.Read(
-			ctx,
-			"shippers",
-			keySet,
-			((*ShippersRow)(nil)).ColumnNames(),
-		),
-	}
-}
-
-func (t ShippersReadTransaction) Get(
-	ctx context.Context,
-	key ShippersKey,
-) (*ShippersRow, error) {
-	spannerRow, err := t.Tx.ReadRow(
-		ctx,
-		"shippers",
-		key.SpannerKey(),
-		((*ShippersRow)(nil)).ColumnNames(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	var row ShippersRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (t ShippersReadTransaction) BatchGet(
-	ctx context.Context,
-	keys []ShippersKey,
-) (map[ShippersKey]*ShippersRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
-		spannerKeys = append(spannerKeys, key.SpannerKey())
-	}
-	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
-	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShippersRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
-func (t ShippersReadTransaction) List(
-	ctx context.Context,
-	query ListQuery,
-) *ShippersRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = ShippersKey{}.Order()
-	}
-	stmt := spanner.Statement{
-		SQL: spansql.Query{
-			Select: spansql.Select{
-				List: ((*ShippersRow)(nil)).ColumnExprs(),
-				From: []spansql.SelectFrom{
-					spansql.SelectFromTable{Table: "shippers"},
-				},
-				Where: query.Where,
-			},
-			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
-		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &ShippersRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-type ShippersRowIterator struct {
-	*spanner.RowIterator
-}
-
-func (i *ShippersRowIterator) Next() (*ShippersRow, error) {
-	spannerRow, err := i.RowIterator.Next()
-	if err != nil {
-		return nil, err
-	}
-	var row ShippersRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (i *ShippersRowIterator) Do(f func(row *ShippersRow) error) error {
-	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
-		var row ShippersRow
-		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-			return err
-		}
-		return f(&row)
-	})
-}
-
-type ShippersKey struct {
-	ShipperId string
-}
-
-func (k ShippersKey) SpannerKey() spanner.Key {
-	return spanner.Key{
-		k.ShipperId,
-	}
-}
-
-func (k ShippersKey) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k ShippersKey) Delete() *spanner.Mutation {
-	return spanner.Delete("shippers", k.SpannerKey())
-}
-
-func (ShippersKey) Order() []spansql.Order {
-	return []spansql.Order{
-		{Expr: spansql.ID("shipper_id"), Desc: false},
-	}
-}
-
-func (k ShippersKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
-func (k ShippersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	return spansql.Paren{Expr: b}
-}
-
 type ShippersRow struct {
 	ShipperId  string           `spanner:"shipper_id"`
 	CreateTime time.Time        `spanner:"create_time"`
@@ -240,31 +82,7 @@ func (r *ShippersRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *ShippersRow) Insert() *spanner.Mutation {
-	return spanner.Insert(r.Mutation())
-}
-
-func (r *ShippersRow) InsertOrUpdate() *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.Mutation())
-}
-
-func (r *ShippersRow) Update() *spanner.Mutation {
-	return spanner.Update(r.Mutation())
-}
-
-func (r *ShippersRow) InsertColumns(columns []string) *spanner.Mutation {
-	return spanner.Insert(r.MutationForColumns(columns))
-}
-
-func (r *ShippersRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.MutationForColumns(columns))
-}
-
-func (r *ShippersRow) UpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.Update(r.MutationForColumns(columns))
-}
-
-func (r *ShippersRow) Mutation() (string, []string, []interface{}) {
+func (r *ShippersRow) Mutate() (string, []string, []interface{}) {
 	return "shippers", r.ColumnNames(), []interface{}{
 		r.ShipperId,
 		r.CreateTime,
@@ -273,7 +91,7 @@ func (r *ShippersRow) Mutation() (string, []string, []interface{}) {
 	}
 }
 
-func (r *ShippersRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+func (r *ShippersRow) MutateColumns(columns []string) (string, []string, []interface{}) {
 	if len(columns) == 0 {
 		columns = r.ColumnNames()
 	}
@@ -299,185 +117,6 @@ func (r *ShippersRow) Key() ShippersKey {
 	return ShippersKey{
 		ShipperId: r.ShipperId,
 	}
-}
-
-type SitesReadTransaction struct {
-	Tx SpannerReadTransaction
-}
-
-func Sites(tx SpannerReadTransaction) SitesReadTransaction {
-	return SitesReadTransaction{Tx: tx}
-}
-
-func (t SitesReadTransaction) Read(
-	ctx context.Context,
-	keySet spanner.KeySet,
-) *SitesRowIterator {
-	return &SitesRowIterator{
-		RowIterator: t.Tx.Read(
-			ctx,
-			"sites",
-			keySet,
-			((*SitesRow)(nil)).ColumnNames(),
-		),
-	}
-}
-
-func (t SitesReadTransaction) Get(
-	ctx context.Context,
-	key SitesKey,
-) (*SitesRow, error) {
-	spannerRow, err := t.Tx.ReadRow(
-		ctx,
-		"sites",
-		key.SpannerKey(),
-		((*SitesRow)(nil)).ColumnNames(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	var row SitesRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (t SitesReadTransaction) BatchGet(
-	ctx context.Context,
-	keys []SitesKey,
-) (map[SitesKey]*SitesRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
-		spannerKeys = append(spannerKeys, key.SpannerKey())
-	}
-	foundRows := make(map[SitesKey]*SitesRow, len(keys))
-	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SitesRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
-func (t SitesReadTransaction) List(
-	ctx context.Context,
-	query ListQuery,
-) *SitesRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = SitesKey{}.Order()
-	}
-	stmt := spanner.Statement{
-		SQL: spansql.Query{
-			Select: spansql.Select{
-				List: ((*SitesRow)(nil)).ColumnExprs(),
-				From: []spansql.SelectFrom{
-					spansql.SelectFromTable{Table: "sites"},
-				},
-				Where: query.Where,
-			},
-			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
-		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &SitesRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-type SitesRowIterator struct {
-	*spanner.RowIterator
-}
-
-func (i *SitesRowIterator) Next() (*SitesRow, error) {
-	spannerRow, err := i.RowIterator.Next()
-	if err != nil {
-		return nil, err
-	}
-	var row SitesRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (i *SitesRowIterator) Do(f func(row *SitesRow) error) error {
-	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
-		var row SitesRow
-		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-			return err
-		}
-		return f(&row)
-	})
-}
-
-type SitesKey struct {
-	ShipperId string
-	SiteId    string
-}
-
-func (k SitesKey) SpannerKey() spanner.Key {
-	return spanner.Key{
-		k.ShipperId,
-		k.SiteId,
-	}
-}
-
-func (k SitesKey) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k SitesKey) Delete() *spanner.Mutation {
-	return spanner.Delete("sites", k.SpannerKey())
-}
-
-func (SitesKey) Order() []spansql.Order {
-	return []spansql.Order{
-		{Expr: spansql.ID("shipper_id"), Desc: false},
-		{Expr: spansql.ID("site_id"), Desc: false},
-	}
-}
-
-func (k SitesKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("site_id"),
-			RHS: spansql.StringLiteral(k.SiteId),
-		},
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k SitesKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("site_id")),
-			RHS: spansql.StringLiteral(k.SiteId),
-		},
-	}
-	return spansql.Paren{Expr: b}
 }
 
 type SitesRow struct {
@@ -585,31 +224,7 @@ func (r *SitesRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *SitesRow) Insert() *spanner.Mutation {
-	return spanner.Insert(r.Mutation())
-}
-
-func (r *SitesRow) InsertOrUpdate() *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.Mutation())
-}
-
-func (r *SitesRow) Update() *spanner.Mutation {
-	return spanner.Update(r.Mutation())
-}
-
-func (r *SitesRow) InsertColumns(columns []string) *spanner.Mutation {
-	return spanner.Insert(r.MutationForColumns(columns))
-}
-
-func (r *SitesRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.MutationForColumns(columns))
-}
-
-func (r *SitesRow) UpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.Update(r.MutationForColumns(columns))
-}
-
-func (r *SitesRow) Mutation() (string, []string, []interface{}) {
+func (r *SitesRow) Mutate() (string, []string, []interface{}) {
 	return "sites", r.ColumnNames(), []interface{}{
 		r.ShipperId,
 		r.SiteId,
@@ -622,7 +237,7 @@ func (r *SitesRow) Mutation() (string, []string, []interface{}) {
 	}
 }
 
-func (r *SitesRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+func (r *SitesRow) MutateColumns(columns []string) (string, []string, []interface{}) {
 	if len(columns) == 0 {
 		columns = r.ColumnNames()
 	}
@@ -659,185 +274,6 @@ func (r *SitesRow) Key() SitesKey {
 	}
 }
 
-type ShipmentsReadTransaction struct {
-	Tx SpannerReadTransaction
-}
-
-func Shipments(tx SpannerReadTransaction) ShipmentsReadTransaction {
-	return ShipmentsReadTransaction{Tx: tx}
-}
-
-func (t ShipmentsReadTransaction) Read(
-	ctx context.Context,
-	keySet spanner.KeySet,
-) *ShipmentsRowIterator {
-	return &ShipmentsRowIterator{
-		RowIterator: t.Tx.Read(
-			ctx,
-			"shipments",
-			keySet,
-			((*ShipmentsRow)(nil)).ColumnNames(),
-		),
-	}
-}
-
-func (t ShipmentsReadTransaction) Get(
-	ctx context.Context,
-	key ShipmentsKey,
-) (*ShipmentsRow, error) {
-	spannerRow, err := t.Tx.ReadRow(
-		ctx,
-		"shipments",
-		key.SpannerKey(),
-		((*ShipmentsRow)(nil)).ColumnNames(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	var row ShipmentsRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (t ShipmentsReadTransaction) BatchGet(
-	ctx context.Context,
-	keys []ShipmentsKey,
-) (map[ShipmentsKey]*ShipmentsRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
-		spannerKeys = append(spannerKeys, key.SpannerKey())
-	}
-	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
-	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShipmentsRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
-func (t ShipmentsReadTransaction) List(
-	ctx context.Context,
-	query ListQuery,
-) *ShipmentsRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = ShipmentsKey{}.Order()
-	}
-	stmt := spanner.Statement{
-		SQL: spansql.Query{
-			Select: spansql.Select{
-				List: ((*ShipmentsRow)(nil)).ColumnExprs(),
-				From: []spansql.SelectFrom{
-					spansql.SelectFromTable{Table: "shipments"},
-				},
-				Where: query.Where,
-			},
-			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
-		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &ShipmentsRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-type ShipmentsRowIterator struct {
-	*spanner.RowIterator
-}
-
-func (i *ShipmentsRowIterator) Next() (*ShipmentsRow, error) {
-	spannerRow, err := i.RowIterator.Next()
-	if err != nil {
-		return nil, err
-	}
-	var row ShipmentsRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (i *ShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) error {
-	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
-		var row ShipmentsRow
-		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-			return err
-		}
-		return f(&row)
-	})
-}
-
-type ShipmentsKey struct {
-	ShipperId  string
-	ShipmentId string
-}
-
-func (k ShipmentsKey) SpannerKey() spanner.Key {
-	return spanner.Key{
-		k.ShipperId,
-		k.ShipmentId,
-	}
-}
-
-func (k ShipmentsKey) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k ShipmentsKey) Delete() *spanner.Mutation {
-	return spanner.Delete("shipments", k.SpannerKey())
-}
-
-func (ShipmentsKey) Order() []spansql.Order {
-	return []spansql.Order{
-		{Expr: spansql.ID("shipper_id"), Desc: false},
-		{Expr: spansql.ID("shipment_id"), Desc: false},
-	}
-}
-
-func (k ShipmentsKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("shipment_id"),
-			RHS: spansql.StringLiteral(k.ShipmentId),
-		},
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k ShipmentsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("shipment_id")),
-			RHS: spansql.StringLiteral(k.ShipmentId),
-		},
-	}
-	return spansql.Paren{Expr: b}
-}
-
 type ShipmentsRow struct {
 	ShipperId            string             `spanner:"shipper_id"`
 	ShipmentId           string             `spanner:"shipment_id"`
@@ -850,6 +286,7 @@ type ShipmentsRow struct {
 	PickupLatestTime     spanner.NullTime   `spanner:"pickup_latest_time"`
 	DeliveryEarliestTime spanner.NullTime   `spanner:"delivery_earliest_time"`
 	DeliveryLatestTime   spanner.NullTime   `spanner:"delivery_latest_time"`
+	LineItems            []*LineItemsRow    `spanner:"line_items"`
 }
 
 func (*ShipmentsRow) ColumnNames() []string {
@@ -963,6 +400,10 @@ func (r *ShipmentsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 			if err := row.Column(i, &r.DeliveryLatestTime); err != nil {
 				return fmt.Errorf("unmarshal shipments row: delivery_latest_time column: %w", err)
 			}
+		case "line_items":
+			if err := row.Column(i, &r.LineItems); err != nil {
+				return fmt.Errorf("unmarshal shipments interleaved row: line_items column: %w", err)
+			}
 		default:
 			return fmt.Errorf("unmarshal shipments row: unhandled column: %s", row.ColumnName(i))
 		}
@@ -970,31 +411,7 @@ func (r *ShipmentsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *ShipmentsRow) Insert() *spanner.Mutation {
-	return spanner.Insert(r.Mutation())
-}
-
-func (r *ShipmentsRow) InsertOrUpdate() *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.Mutation())
-}
-
-func (r *ShipmentsRow) Update() *spanner.Mutation {
-	return spanner.Update(r.Mutation())
-}
-
-func (r *ShipmentsRow) InsertColumns(columns []string) *spanner.Mutation {
-	return spanner.Insert(r.MutationForColumns(columns))
-}
-
-func (r *ShipmentsRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.MutationForColumns(columns))
-}
-
-func (r *ShipmentsRow) UpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.Update(r.MutationForColumns(columns))
-}
-
-func (r *ShipmentsRow) Mutation() (string, []string, []interface{}) {
+func (r *ShipmentsRow) Mutate() (string, []string, []interface{}) {
 	return "shipments", r.ColumnNames(), []interface{}{
 		r.ShipperId,
 		r.ShipmentId,
@@ -1010,7 +427,7 @@ func (r *ShipmentsRow) Mutation() (string, []string, []interface{}) {
 	}
 }
 
-func (r *ShipmentsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+func (r *ShipmentsRow) MutateColumns(columns []string) (string, []string, []interface{}) {
 	if len(columns) == 0 {
 		columns = r.ColumnNames()
 	}
@@ -1051,479 +468,6 @@ func (r *ShipmentsRow) Key() ShipmentsKey {
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
 	}
-}
-
-type ShipmentsAndLineItemsReadTransaction struct {
-	Tx SpannerReadTransaction
-}
-
-func ShipmentsAndLineItems(tx SpannerReadTransaction) ShipmentsAndLineItemsReadTransaction {
-	return ShipmentsAndLineItemsReadTransaction{Tx: tx}
-}
-
-func (t ShipmentsAndLineItemsReadTransaction) List(
-	ctx context.Context,
-	query ListQuery,
-) *ShipmentsAndLineItemsRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = ShipmentsKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString("SELECT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("shipment_id, ")
-	_, _ = q.WriteString("create_time, ")
-	_, _ = q.WriteString("update_time, ")
-	_, _ = q.WriteString("delete_time, ")
-	_, _ = q.WriteString("origin_site_id, ")
-	_, _ = q.WriteString("destination_site_id, ")
-	_, _ = q.WriteString("pickup_earliest_time, ")
-	_, _ = q.WriteString("pickup_latest_time, ")
-	_, _ = q.WriteString("delivery_earliest_time, ")
-	_, _ = q.WriteString("delivery_latest_time, ")
-	_, _ = q.WriteString("ARRAY( ")
-	_, _ = q.WriteString("SELECT AS STRUCT ")
-	_, _ = q.WriteString("shipper_id, ")
-	_, _ = q.WriteString("shipment_id, ")
-	_, _ = q.WriteString("line_number, ")
-	_, _ = q.WriteString("title, ")
-	_, _ = q.WriteString("quantity, ")
-	_, _ = q.WriteString("weight_kg, ")
-	_, _ = q.WriteString("volume_m3, ")
-	_, _ = q.WriteString("FROM line_items ")
-	_, _ = q.WriteString("WHERE ")
-	_, _ = q.WriteString("shipper_id = shipments.shipper_id ")
-	_, _ = q.WriteString("AND ")
-	_, _ = q.WriteString("shipment_id = shipments.shipment_id ")
-	_, _ = q.WriteString("ORDER BY ")
-	_, _ = q.WriteString("shipper_id")
-	_, _ = q.WriteString(", ")
-	_, _ = q.WriteString("shipment_id")
-	_, _ = q.WriteString(", ")
-	_, _ = q.WriteString("line_number")
-	_, _ = q.WriteString(" ")
-	_, _ = q.WriteString(") AS line_items, ")
-	_, _ = q.WriteString("FROM shipments ")
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
-	}
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
-	stmt := spanner.Statement{
-		SQL: q.String(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &ShipmentsAndLineItemsRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-func (t ShipmentsAndLineItemsReadTransaction) Get(
-	ctx context.Context,
-	key ShipmentsKey,
-) (*ShipmentsAndLineItemsRow, error) {
-	it := t.List(ctx, ListQuery{
-		Where: key.BoolExpr(),
-		Limit: 1,
-	})
-	defer it.Stop()
-	row, err := it.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
-		}
-		return nil, err
-	}
-	return row, nil
-}
-
-func (t ShipmentsAndLineItemsReadTransaction) BatchGet(
-	ctx context.Context,
-	keys []ShipmentsKey,
-) (map[ShipmentsKey]*ShipmentsAndLineItemsRow, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-	where := keys[0].BoolExpr()
-	for _, key := range keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[ShipmentsKey]*ShipmentsAndLineItemsRow, len(keys))
-	if err := t.List(ctx, ListQuery{
-		Where: spansql.Paren{Expr: where},
-		Limit: int32(len(keys)),
-	}).Do(func(row *ShipmentsAndLineItemsRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
-type ShipmentsAndLineItemsRowIterator struct {
-	*spanner.RowIterator
-}
-
-func (i *ShipmentsAndLineItemsRowIterator) Next() (*ShipmentsAndLineItemsRow, error) {
-	spannerRow, err := i.RowIterator.Next()
-	if err != nil {
-		return nil, err
-	}
-	var row ShipmentsAndLineItemsRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (i *ShipmentsAndLineItemsRowIterator) Do(f func(row *ShipmentsAndLineItemsRow) error) error {
-	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
-		var row ShipmentsAndLineItemsRow
-		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-			return err
-		}
-		return f(&row)
-	})
-}
-
-type ShipmentsAndLineItemsRow struct {
-	ShipperId            string             `spanner:"shipper_id"`
-	ShipmentId           string             `spanner:"shipment_id"`
-	CreateTime           time.Time          `spanner:"create_time"`
-	UpdateTime           time.Time          `spanner:"update_time"`
-	DeleteTime           spanner.NullTime   `spanner:"delete_time"`
-	OriginSiteId         spanner.NullString `spanner:"origin_site_id"`
-	DestinationSiteId    spanner.NullString `spanner:"destination_site_id"`
-	PickupEarliestTime   spanner.NullTime   `spanner:"pickup_earliest_time"`
-	PickupLatestTime     spanner.NullTime   `spanner:"pickup_latest_time"`
-	DeliveryEarliestTime spanner.NullTime   `spanner:"delivery_earliest_time"`
-	DeliveryLatestTime   spanner.NullTime   `spanner:"delivery_latest_time"`
-	LineItems            []*LineItemsRow    `spanner:"line_items"`
-}
-
-func (r *ShipmentsAndLineItemsRow) Key() ShipmentsKey {
-	return ShipmentsKey{
-		ShipperId:  r.ShipperId,
-		ShipmentId: r.ShipmentId,
-	}
-}
-
-func (r *ShipmentsAndLineItemsRow) UnmarshalSpannerRow(row *spanner.Row) error {
-	for i := 0; i < row.Size(); i++ {
-		switch row.ColumnName(i) {
-		case "shipper_id":
-			if err := row.Column(i, &r.ShipperId); err != nil {
-				return fmt.Errorf("unmarshal shipments row: shipper_id column: %w", err)
-			}
-		case "shipment_id":
-			if err := row.Column(i, &r.ShipmentId); err != nil {
-				return fmt.Errorf("unmarshal shipments row: shipment_id column: %w", err)
-			}
-		case "create_time":
-			if err := row.Column(i, &r.CreateTime); err != nil {
-				return fmt.Errorf("unmarshal shipments row: create_time column: %w", err)
-			}
-		case "update_time":
-			if err := row.Column(i, &r.UpdateTime); err != nil {
-				return fmt.Errorf("unmarshal shipments row: update_time column: %w", err)
-			}
-		case "delete_time":
-			if err := row.Column(i, &r.DeleteTime); err != nil {
-				return fmt.Errorf("unmarshal shipments row: delete_time column: %w", err)
-			}
-		case "origin_site_id":
-			if err := row.Column(i, &r.OriginSiteId); err != nil {
-				return fmt.Errorf("unmarshal shipments row: origin_site_id column: %w", err)
-			}
-		case "destination_site_id":
-			if err := row.Column(i, &r.DestinationSiteId); err != nil {
-				return fmt.Errorf("unmarshal shipments row: destination_site_id column: %w", err)
-			}
-		case "pickup_earliest_time":
-			if err := row.Column(i, &r.PickupEarliestTime); err != nil {
-				return fmt.Errorf("unmarshal shipments row: pickup_earliest_time column: %w", err)
-			}
-		case "pickup_latest_time":
-			if err := row.Column(i, &r.PickupLatestTime); err != nil {
-				return fmt.Errorf("unmarshal shipments row: pickup_latest_time column: %w", err)
-			}
-		case "delivery_earliest_time":
-			if err := row.Column(i, &r.DeliveryEarliestTime); err != nil {
-				return fmt.Errorf("unmarshal shipments row: delivery_earliest_time column: %w", err)
-			}
-		case "delivery_latest_time":
-			if err := row.Column(i, &r.DeliveryLatestTime); err != nil {
-				return fmt.Errorf("unmarshal shipments row: delivery_latest_time column: %w", err)
-			}
-		case "line_items":
-			if err := row.Column(i, &r.LineItems); err != nil {
-				return fmt.Errorf("unmarshal shipments interleaved row: line_items column: %w", err)
-			}
-		default:
-			return fmt.Errorf("unmarshal shipments row: unhandled column: %s", row.ColumnName(i))
-		}
-	}
-	return nil
-}
-
-func (r ShipmentsAndLineItemsRow) ShipmentsRow() *ShipmentsRow {
-	return &ShipmentsRow{
-		ShipperId:            r.ShipperId,
-		ShipmentId:           r.ShipmentId,
-		CreateTime:           r.CreateTime,
-		UpdateTime:           r.UpdateTime,
-		DeleteTime:           r.DeleteTime,
-		OriginSiteId:         r.OriginSiteId,
-		DestinationSiteId:    r.DestinationSiteId,
-		PickupEarliestTime:   r.PickupEarliestTime,
-		PickupLatestTime:     r.PickupLatestTime,
-		DeliveryEarliestTime: r.DeliveryEarliestTime,
-		DeliveryLatestTime:   r.DeliveryLatestTime,
-	}
-}
-
-func (r ShipmentsAndLineItemsRow) Insert() []*spanner.Mutation {
-	n := 1
-	n += len(r.LineItems)
-	mutations := make([]*spanner.Mutation, 0, n)
-	mutations = append(mutations, r.ShipmentsRow().Insert())
-	for _, interleavedRow := range r.LineItems {
-		mutations = append(mutations, interleavedRow.Insert())
-	}
-	return mutations
-}
-
-func (r ShipmentsAndLineItemsRow) Update() []*spanner.Mutation {
-	n := 2 // one delete mutation per interleaved table
-	n += len(r.LineItems)
-	mutations := make([]*spanner.Mutation, 0, n)
-	mutations = append(mutations, r.ShipmentsRow().Update())
-	mutations = append(mutations, spanner.Delete("line_items", r.Key().SpannerKey().AsPrefix()))
-	for _, interleavedRow := range r.LineItems {
-		mutations = append(mutations, interleavedRow.Insert())
-	}
-	return mutations
-}
-
-type LineItemsReadTransaction struct {
-	Tx SpannerReadTransaction
-}
-
-func LineItems(tx SpannerReadTransaction) LineItemsReadTransaction {
-	return LineItemsReadTransaction{Tx: tx}
-}
-
-func (t LineItemsReadTransaction) Read(
-	ctx context.Context,
-	keySet spanner.KeySet,
-) *LineItemsRowIterator {
-	return &LineItemsRowIterator{
-		RowIterator: t.Tx.Read(
-			ctx,
-			"line_items",
-			keySet,
-			((*LineItemsRow)(nil)).ColumnNames(),
-		),
-	}
-}
-
-func (t LineItemsReadTransaction) Get(
-	ctx context.Context,
-	key LineItemsKey,
-) (*LineItemsRow, error) {
-	spannerRow, err := t.Tx.ReadRow(
-		ctx,
-		"line_items",
-		key.SpannerKey(),
-		((*LineItemsRow)(nil)).ColumnNames(),
-	)
-	if err != nil {
-		return nil, err
-	}
-	var row LineItemsRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (t LineItemsReadTransaction) BatchGet(
-	ctx context.Context,
-	keys []LineItemsKey,
-) (map[LineItemsKey]*LineItemsRow, error) {
-	spannerKeys := make([]spanner.KeySet, 0, len(keys))
-	for _, key := range keys {
-		spannerKeys = append(spannerKeys, key.SpannerKey())
-	}
-	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
-	if err := t.Read(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *LineItemsRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
-func (t LineItemsReadTransaction) List(
-	ctx context.Context,
-	query ListQuery,
-) *LineItemsRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = LineItemsKey{}.Order()
-	}
-	stmt := spanner.Statement{
-		SQL: spansql.Query{
-			Select: spansql.Select{
-				List: ((*LineItemsRow)(nil)).ColumnExprs(),
-				From: []spansql.SelectFrom{
-					spansql.SelectFromTable{Table: "line_items"},
-				},
-				Where: query.Where,
-			},
-			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
-		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
-	}
-	return &LineItemsRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
-}
-
-type LineItemsRowIterator struct {
-	*spanner.RowIterator
-}
-
-func (i *LineItemsRowIterator) Next() (*LineItemsRow, error) {
-	spannerRow, err := i.RowIterator.Next()
-	if err != nil {
-		return nil, err
-	}
-	var row LineItemsRow
-	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
-func (i *LineItemsRowIterator) Do(f func(row *LineItemsRow) error) error {
-	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
-		var row LineItemsRow
-		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
-			return err
-		}
-		return f(&row)
-	})
-}
-
-type LineItemsKey struct {
-	ShipperId  string
-	ShipmentId string
-	LineNumber int64
-}
-
-func (k LineItemsKey) SpannerKey() spanner.Key {
-	return spanner.Key{
-		k.ShipperId,
-		k.ShipmentId,
-		k.LineNumber,
-	}
-}
-
-func (k LineItemsKey) SpannerKeySet() spanner.KeySet {
-	return k.SpannerKey()
-}
-
-func (k LineItemsKey) Delete() *spanner.Mutation {
-	return spanner.Delete("line_items", k.SpannerKey())
-}
-
-func (LineItemsKey) Order() []spansql.Order {
-	return []spansql.Order{
-		{Expr: spansql.ID("shipper_id"), Desc: false},
-		{Expr: spansql.ID("shipment_id"), Desc: false},
-		{Expr: spansql.ID("line_number"), Desc: false},
-	}
-}
-
-func (k LineItemsKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: spansql.ID("shipper_id"),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("shipment_id"),
-			RHS: spansql.StringLiteral(k.ShipmentId),
-		},
-	}
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("line_number"),
-			RHS: spansql.IntegerLiteral(k.LineNumber),
-		},
-	}
-	return spansql.Paren{Expr: b}
-}
-
-func (k LineItemsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
-		Op:  spansql.Eq,
-		LHS: append(prefix, spansql.ID("shipper_id")),
-		RHS: spansql.StringLiteral(k.ShipperId),
-	})
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("shipment_id")),
-			RHS: spansql.StringLiteral(k.ShipmentId),
-		},
-	}
-	b = spansql.LogicalOp{
-		Op:  spansql.And,
-		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: append(prefix, spansql.ID("line_number")),
-			RHS: spansql.IntegerLiteral(k.LineNumber),
-		},
-	}
-	return spansql.Paren{Expr: b}
 }
 
 type LineItemsRow struct {
@@ -1623,31 +567,7 @@ func (r *LineItemsRow) UnmarshalSpannerRow(row *spanner.Row) error {
 	return nil
 }
 
-func (r *LineItemsRow) Insert() *spanner.Mutation {
-	return spanner.Insert(r.Mutation())
-}
-
-func (r *LineItemsRow) InsertOrUpdate() *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.Mutation())
-}
-
-func (r *LineItemsRow) Update() *spanner.Mutation {
-	return spanner.Update(r.Mutation())
-}
-
-func (r *LineItemsRow) InsertColumns(columns []string) *spanner.Mutation {
-	return spanner.Insert(r.MutationForColumns(columns))
-}
-
-func (r *LineItemsRow) InsertOrUpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.InsertOrUpdate(r.MutationForColumns(columns))
-}
-
-func (r *LineItemsRow) UpdateColumns(columns []string) *spanner.Mutation {
-	return spanner.Update(r.MutationForColumns(columns))
-}
-
-func (r *LineItemsRow) Mutation() (string, []string, []interface{}) {
+func (r *LineItemsRow) Mutate() (string, []string, []interface{}) {
 	return "line_items", r.ColumnNames(), []interface{}{
 		r.ShipperId,
 		r.ShipmentId,
@@ -1659,7 +579,7 @@ func (r *LineItemsRow) Mutation() (string, []string, []interface{}) {
 	}
 }
 
-func (r *LineItemsRow) MutationForColumns(columns []string) (string, []string, []interface{}) {
+func (r *LineItemsRow) MutateColumns(columns []string) (string, []string, []interface{}) {
 	if len(columns) == 0 {
 		columns = r.ColumnNames()
 	}
@@ -1693,6 +613,1098 @@ func (r *LineItemsRow) Key() LineItemsKey {
 		ShipmentId: r.ShipmentId,
 		LineNumber: r.LineNumber,
 	}
+}
+
+type ShippersKey struct {
+	ShipperId string
+}
+
+func (k ShippersKey) SpannerKey() spanner.Key {
+	return spanner.Key{
+		k.ShipperId,
+	}
+}
+
+func (k ShippersKey) SpannerKeySet() spanner.KeySet {
+	return k.SpannerKey()
+}
+
+func (k ShippersKey) Delete() *spanner.Mutation {
+	return spanner.Delete("shippers", k.SpannerKey())
+}
+
+func (ShippersKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+	}
+}
+
+func (k ShippersKey) BoolExpr() spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("shipper_id"),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	return spansql.Paren{Expr: b}
+}
+
+func (k ShippersKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: append(prefix, spansql.ID("shipper_id")),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	return spansql.Paren{Expr: b}
+}
+
+type SitesKey struct {
+	ShipperId string
+	SiteId    string
+}
+
+func (k SitesKey) SpannerKey() spanner.Key {
+	return spanner.Key{
+		k.ShipperId,
+		k.SiteId,
+	}
+}
+
+func (k SitesKey) SpannerKeySet() spanner.KeySet {
+	return k.SpannerKey()
+}
+
+func (k SitesKey) Delete() *spanner.Mutation {
+	return spanner.Delete("sites", k.SpannerKey())
+}
+
+func (SitesKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+		{Expr: spansql.ID("site_id"), Desc: false},
+	}
+}
+
+func (k SitesKey) BoolExpr() spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("shipper_id"),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: spansql.ID("site_id"),
+			RHS: spansql.StringLiteral(k.SiteId),
+		},
+	}
+	return spansql.Paren{Expr: b}
+}
+
+func (k SitesKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: append(prefix, spansql.ID("shipper_id")),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: append(prefix, spansql.ID("site_id")),
+			RHS: spansql.StringLiteral(k.SiteId),
+		},
+	}
+	return spansql.Paren{Expr: b}
+}
+
+type ShipmentsKey struct {
+	ShipperId  string
+	ShipmentId string
+}
+
+func (k ShipmentsKey) SpannerKey() spanner.Key {
+	return spanner.Key{
+		k.ShipperId,
+		k.ShipmentId,
+	}
+}
+
+func (k ShipmentsKey) SpannerKeySet() spanner.KeySet {
+	return k.SpannerKey()
+}
+
+func (k ShipmentsKey) Delete() *spanner.Mutation {
+	return spanner.Delete("shipments", k.SpannerKey())
+}
+
+func (ShipmentsKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+		{Expr: spansql.ID("shipment_id"), Desc: false},
+	}
+}
+
+func (k ShipmentsKey) BoolExpr() spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("shipper_id"),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: spansql.ID("shipment_id"),
+			RHS: spansql.StringLiteral(k.ShipmentId),
+		},
+	}
+	return spansql.Paren{Expr: b}
+}
+
+func (k ShipmentsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: append(prefix, spansql.ID("shipper_id")),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: append(prefix, spansql.ID("shipment_id")),
+			RHS: spansql.StringLiteral(k.ShipmentId),
+		},
+	}
+	return spansql.Paren{Expr: b}
+}
+
+type LineItemsKey struct {
+	ShipperId  string
+	ShipmentId string
+	LineNumber int64
+}
+
+func (k LineItemsKey) SpannerKey() spanner.Key {
+	return spanner.Key{
+		k.ShipperId,
+		k.ShipmentId,
+		k.LineNumber,
+	}
+}
+
+func (k LineItemsKey) SpannerKeySet() spanner.KeySet {
+	return k.SpannerKey()
+}
+
+func (k LineItemsKey) Delete() *spanner.Mutation {
+	return spanner.Delete("line_items", k.SpannerKey())
+}
+
+func (LineItemsKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("shipper_id"), Desc: false},
+		{Expr: spansql.ID("shipment_id"), Desc: false},
+		{Expr: spansql.ID("line_number"), Desc: false},
+	}
+}
+
+func (k LineItemsKey) BoolExpr() spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("shipper_id"),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: spansql.ID("shipment_id"),
+			RHS: spansql.StringLiteral(k.ShipmentId),
+		},
+	}
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: spansql.ID("line_number"),
+			RHS: spansql.IntegerLiteral(k.LineNumber),
+		},
+	}
+	return spansql.Paren{Expr: b}
+}
+
+func (k LineItemsKey) QualifiedBoolExpr(prefix spansql.PathExp) spansql.BoolExpr {
+	b := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: append(prefix, spansql.ID("shipper_id")),
+		RHS: spansql.StringLiteral(k.ShipperId),
+	})
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: append(prefix, spansql.ID("shipment_id")),
+			RHS: spansql.StringLiteral(k.ShipmentId),
+		},
+	}
+	b = spansql.LogicalOp{
+		Op:  spansql.And,
+		LHS: b,
+		RHS: spansql.ComparisonOp{
+			Op:  spansql.Eq,
+			LHS: append(prefix, spansql.ID("line_number")),
+			RHS: spansql.IntegerLiteral(k.LineNumber),
+		},
+	}
+	return spansql.Paren{Expr: b}
+}
+
+type ShippersRowIterator struct {
+	*spanner.RowIterator
+}
+
+func (i *ShippersRowIterator) Next() (*ShippersRow, error) {
+	spannerRow, err := i.RowIterator.Next()
+	if err != nil {
+		return nil, err
+	}
+	var row ShippersRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (i *ShippersRowIterator) Do(f func(row *ShippersRow) error) error {
+	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
+		var row ShippersRow
+		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+			return err
+		}
+		return f(&row)
+	})
+}
+
+type SitesRowIterator struct {
+	*spanner.RowIterator
+}
+
+func (i *SitesRowIterator) Next() (*SitesRow, error) {
+	spannerRow, err := i.RowIterator.Next()
+	if err != nil {
+		return nil, err
+	}
+	var row SitesRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (i *SitesRowIterator) Do(f func(row *SitesRow) error) error {
+	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
+		var row SitesRow
+		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+			return err
+		}
+		return f(&row)
+	})
+}
+
+type ShipmentsRowIterator struct {
+	*spanner.RowIterator
+}
+
+func (i *ShipmentsRowIterator) Next() (*ShipmentsRow, error) {
+	spannerRow, err := i.RowIterator.Next()
+	if err != nil {
+		return nil, err
+	}
+	var row ShipmentsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (i *ShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) error {
+	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
+		var row ShipmentsRow
+		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+			return err
+		}
+		return f(&row)
+	})
+}
+
+type LineItemsRowIterator struct {
+	*spanner.RowIterator
+}
+
+func (i *LineItemsRowIterator) Next() (*LineItemsRow, error) {
+	spannerRow, err := i.RowIterator.Next()
+	if err != nil {
+		return nil, err
+	}
+	var row LineItemsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (i *LineItemsRowIterator) Do(f func(row *LineItemsRow) error) error {
+	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
+		var row LineItemsRow
+		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+			return err
+		}
+		return f(&row)
+	})
+}
+
+type ReadTransaction struct {
+	Tx SpannerReadTransaction
+}
+
+func Query(tx SpannerReadTransaction) ReadTransaction {
+	return ReadTransaction{Tx: tx}
+}
+
+func (t ReadTransaction) ReadShippersRows(
+	ctx context.Context,
+	keySet spanner.KeySet,
+) *ShippersRowIterator {
+	return &ShippersRowIterator{
+		RowIterator: t.Tx.Read(
+			ctx,
+			"shippers",
+			keySet,
+			((*ShippersRow)(nil)).ColumnNames(),
+		),
+	}
+}
+
+func (t ReadTransaction) GetShippersRow(
+	ctx context.Context,
+	key ShippersKey,
+) (*ShippersRow, error) {
+	spannerRow, err := t.Tx.ReadRow(
+		ctx,
+		"shippers",
+		key.SpannerKey(),
+		((*ShippersRow)(nil)).ColumnNames(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	var row ShippersRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (t ReadTransaction) BatchGetShippersRows(
+	ctx context.Context,
+	keys []ShippersKey,
+) (map[ShippersKey]*ShippersRow, error) {
+	spannerKeys := make([]spanner.KeySet, 0, len(keys))
+	for _, key := range keys {
+		spannerKeys = append(spannerKeys, key.SpannerKey())
+	}
+	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
+	if err := t.ReadShippersRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShippersRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+func (t ReadTransaction) ListShippersRows(
+	ctx context.Context,
+	query ListQuery,
+) *ShippersRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShippersKey{}.Order()
+	}
+	stmt := spanner.Statement{
+		SQL: spansql.Query{
+			Select: spansql.Select{
+				List: ((*ShippersRow)(nil)).ColumnExprs(),
+				From: []spansql.SelectFrom{
+					spansql.SelectFromTable{Table: "shippers"},
+				},
+				Where: query.Where,
+			},
+			Order:  query.Order,
+			Limit:  spansql.Param("limit"),
+			Offset: spansql.Param("offset"),
+		}.SQL(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &ShippersRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) ListShippersRowsInterleaved(
+	ctx context.Context,
+	query ListQuery,
+) *ShippersRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShippersKey{}.Order()
+	}
+	var q strings.Builder
+	_, _ = q.WriteString("SELECT ")
+	_, _ = q.WriteString("shipper_id, ")
+	_, _ = q.WriteString("create_time, ")
+	_, _ = q.WriteString("update_time, ")
+	_, _ = q.WriteString("delete_time, ")
+	_, _ = q.WriteString("FROM shippers ")
+	if query.Where != nil {
+		_, _ = q.WriteString("WHERE (")
+		_, _ = q.WriteString(query.Where.SQL())
+		_, _ = q.WriteString(") ")
+	}
+	if len(query.Order) > 0 {
+		_, _ = q.WriteString("ORDER BY ")
+		for i, order := range query.Order {
+			_, _ = q.WriteString(order.SQL())
+			if i < len(query.Order)-1 {
+				_, _ = q.WriteString(", ")
+			} else {
+				_, _ = q.WriteString(" ")
+			}
+		}
+	}
+	_, _ = q.WriteString("LIMIT @limit ")
+	_, _ = q.WriteString("OFFSET @offset ")
+	stmt := spanner.Statement{
+		SQL: q.String(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &ShippersRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) GetShippersRowInterleaved(
+	ctx context.Context,
+	key ShippersKey,
+) (*ShippersRow, error) {
+	it := t.ListShippersRowsInterleaved(ctx, ListQuery{
+		Where: key.BoolExpr(),
+		Limit: 1,
+	})
+	defer it.Stop()
+	row, err := it.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func (t ReadTransaction) BatchGetShippersRowsInterleaved(
+	ctx context.Context,
+	keys []ShippersKey,
+) (map[ShippersKey]*ShippersRow, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	where := keys[0].BoolExpr()
+	for _, key := range keys[1:] {
+		where = spansql.LogicalOp{
+			Op:  spansql.Or,
+			LHS: where,
+			RHS: key.BoolExpr(),
+		}
+	}
+	foundRows := make(map[ShippersKey]*ShippersRow, len(keys))
+	if err := t.ListShippersRowsInterleaved(ctx, ListQuery{
+		Where: spansql.Paren{Expr: where},
+		Limit: int32(len(keys)),
+	}).Do(func(row *ShippersRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+func (t ReadTransaction) ReadSitesRows(
+	ctx context.Context,
+	keySet spanner.KeySet,
+) *SitesRowIterator {
+	return &SitesRowIterator{
+		RowIterator: t.Tx.Read(
+			ctx,
+			"sites",
+			keySet,
+			((*SitesRow)(nil)).ColumnNames(),
+		),
+	}
+}
+
+func (t ReadTransaction) GetSitesRow(
+	ctx context.Context,
+	key SitesKey,
+) (*SitesRow, error) {
+	spannerRow, err := t.Tx.ReadRow(
+		ctx,
+		"sites",
+		key.SpannerKey(),
+		((*SitesRow)(nil)).ColumnNames(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	var row SitesRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (t ReadTransaction) BatchGetSitesRows(
+	ctx context.Context,
+	keys []SitesKey,
+) (map[SitesKey]*SitesRow, error) {
+	spannerKeys := make([]spanner.KeySet, 0, len(keys))
+	for _, key := range keys {
+		spannerKeys = append(spannerKeys, key.SpannerKey())
+	}
+	foundRows := make(map[SitesKey]*SitesRow, len(keys))
+	if err := t.ReadSitesRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SitesRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+func (t ReadTransaction) ListSitesRows(
+	ctx context.Context,
+	query ListQuery,
+) *SitesRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = SitesKey{}.Order()
+	}
+	stmt := spanner.Statement{
+		SQL: spansql.Query{
+			Select: spansql.Select{
+				List: ((*SitesRow)(nil)).ColumnExprs(),
+				From: []spansql.SelectFrom{
+					spansql.SelectFromTable{Table: "sites"},
+				},
+				Where: query.Where,
+			},
+			Order:  query.Order,
+			Limit:  spansql.Param("limit"),
+			Offset: spansql.Param("offset"),
+		}.SQL(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &SitesRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) ListSitesRowsInterleaved(
+	ctx context.Context,
+	query ListQuery,
+) *SitesRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = SitesKey{}.Order()
+	}
+	var q strings.Builder
+	_, _ = q.WriteString("SELECT ")
+	_, _ = q.WriteString("shipper_id, ")
+	_, _ = q.WriteString("site_id, ")
+	_, _ = q.WriteString("create_time, ")
+	_, _ = q.WriteString("update_time, ")
+	_, _ = q.WriteString("delete_time, ")
+	_, _ = q.WriteString("display_name, ")
+	_, _ = q.WriteString("latitude, ")
+	_, _ = q.WriteString("longitude, ")
+	_, _ = q.WriteString("FROM sites ")
+	if query.Where != nil {
+		_, _ = q.WriteString("WHERE (")
+		_, _ = q.WriteString(query.Where.SQL())
+		_, _ = q.WriteString(") ")
+	}
+	if len(query.Order) > 0 {
+		_, _ = q.WriteString("ORDER BY ")
+		for i, order := range query.Order {
+			_, _ = q.WriteString(order.SQL())
+			if i < len(query.Order)-1 {
+				_, _ = q.WriteString(", ")
+			} else {
+				_, _ = q.WriteString(" ")
+			}
+		}
+	}
+	_, _ = q.WriteString("LIMIT @limit ")
+	_, _ = q.WriteString("OFFSET @offset ")
+	stmt := spanner.Statement{
+		SQL: q.String(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &SitesRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) GetSitesRowInterleaved(
+	ctx context.Context,
+	key SitesKey,
+) (*SitesRow, error) {
+	it := t.ListSitesRowsInterleaved(ctx, ListQuery{
+		Where: key.BoolExpr(),
+		Limit: 1,
+	})
+	defer it.Stop()
+	row, err := it.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func (t ReadTransaction) BatchGetSitesRowsInterleaved(
+	ctx context.Context,
+	keys []SitesKey,
+) (map[SitesKey]*SitesRow, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	where := keys[0].BoolExpr()
+	for _, key := range keys[1:] {
+		where = spansql.LogicalOp{
+			Op:  spansql.Or,
+			LHS: where,
+			RHS: key.BoolExpr(),
+		}
+	}
+	foundRows := make(map[SitesKey]*SitesRow, len(keys))
+	if err := t.ListSitesRowsInterleaved(ctx, ListQuery{
+		Where: spansql.Paren{Expr: where},
+		Limit: int32(len(keys)),
+	}).Do(func(row *SitesRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+func (t ReadTransaction) ReadShipmentsRows(
+	ctx context.Context,
+	keySet spanner.KeySet,
+) *ShipmentsRowIterator {
+	return &ShipmentsRowIterator{
+		RowIterator: t.Tx.Read(
+			ctx,
+			"shipments",
+			keySet,
+			((*ShipmentsRow)(nil)).ColumnNames(),
+		),
+	}
+}
+
+func (t ReadTransaction) GetShipmentsRow(
+	ctx context.Context,
+	key ShipmentsKey,
+) (*ShipmentsRow, error) {
+	spannerRow, err := t.Tx.ReadRow(
+		ctx,
+		"shipments",
+		key.SpannerKey(),
+		((*ShipmentsRow)(nil)).ColumnNames(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	var row ShipmentsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (t ReadTransaction) BatchGetShipmentsRows(
+	ctx context.Context,
+	keys []ShipmentsKey,
+) (map[ShipmentsKey]*ShipmentsRow, error) {
+	spannerKeys := make([]spanner.KeySet, 0, len(keys))
+	for _, key := range keys {
+		spannerKeys = append(spannerKeys, key.SpannerKey())
+	}
+	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
+	if err := t.ReadShipmentsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShipmentsRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+func (t ReadTransaction) ListShipmentsRows(
+	ctx context.Context,
+	query ListQuery,
+) *ShipmentsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShipmentsKey{}.Order()
+	}
+	stmt := spanner.Statement{
+		SQL: spansql.Query{
+			Select: spansql.Select{
+				List: ((*ShipmentsRow)(nil)).ColumnExprs(),
+				From: []spansql.SelectFrom{
+					spansql.SelectFromTable{Table: "shipments"},
+				},
+				Where: query.Where,
+			},
+			Order:  query.Order,
+			Limit:  spansql.Param("limit"),
+			Offset: spansql.Param("offset"),
+		}.SQL(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &ShipmentsRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) ListShipmentsRowsInterleaved(
+	ctx context.Context,
+	query ListQuery,
+) *ShipmentsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShipmentsKey{}.Order()
+	}
+	var q strings.Builder
+	_, _ = q.WriteString("SELECT ")
+	_, _ = q.WriteString("shipper_id, ")
+	_, _ = q.WriteString("shipment_id, ")
+	_, _ = q.WriteString("create_time, ")
+	_, _ = q.WriteString("update_time, ")
+	_, _ = q.WriteString("delete_time, ")
+	_, _ = q.WriteString("origin_site_id, ")
+	_, _ = q.WriteString("destination_site_id, ")
+	_, _ = q.WriteString("pickup_earliest_time, ")
+	_, _ = q.WriteString("pickup_latest_time, ")
+	_, _ = q.WriteString("delivery_earliest_time, ")
+	_, _ = q.WriteString("delivery_latest_time, ")
+	_, _ = q.WriteString("ARRAY( ")
+	_, _ = q.WriteString("SELECT AS STRUCT ")
+	_, _ = q.WriteString("shipper_id, ")
+	_, _ = q.WriteString("shipment_id, ")
+	_, _ = q.WriteString("line_number, ")
+	_, _ = q.WriteString("title, ")
+	_, _ = q.WriteString("quantity, ")
+	_, _ = q.WriteString("weight_kg, ")
+	_, _ = q.WriteString("volume_m3, ")
+	_, _ = q.WriteString("FROM line_items ")
+	_, _ = q.WriteString("WHERE ")
+	_, _ = q.WriteString("shipper_id = shipments.shipper_id ")
+	_, _ = q.WriteString("AND ")
+	_, _ = q.WriteString("shipment_id = shipments.shipment_id ")
+	_, _ = q.WriteString("ORDER BY ")
+	_, _ = q.WriteString("shipper_id")
+	_, _ = q.WriteString(", ")
+	_, _ = q.WriteString("shipment_id")
+	_, _ = q.WriteString(", ")
+	_, _ = q.WriteString("line_number")
+	_, _ = q.WriteString(" ")
+	_, _ = q.WriteString(") AS line_items, ")
+	_, _ = q.WriteString("FROM shipments ")
+	if query.Where != nil {
+		_, _ = q.WriteString("WHERE (")
+		_, _ = q.WriteString(query.Where.SQL())
+		_, _ = q.WriteString(") ")
+	}
+	if len(query.Order) > 0 {
+		_, _ = q.WriteString("ORDER BY ")
+		for i, order := range query.Order {
+			_, _ = q.WriteString(order.SQL())
+			if i < len(query.Order)-1 {
+				_, _ = q.WriteString(", ")
+			} else {
+				_, _ = q.WriteString(" ")
+			}
+		}
+	}
+	_, _ = q.WriteString("LIMIT @limit ")
+	_, _ = q.WriteString("OFFSET @offset ")
+	stmt := spanner.Statement{
+		SQL: q.String(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &ShipmentsRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) GetShipmentsRowInterleaved(
+	ctx context.Context,
+	key ShipmentsKey,
+) (*ShipmentsRow, error) {
+	it := t.ListShipmentsRowsInterleaved(ctx, ListQuery{
+		Where: key.BoolExpr(),
+		Limit: 1,
+	})
+	defer it.Stop()
+	row, err := it.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func (t ReadTransaction) BatchGetShipmentsRowsInterleaved(
+	ctx context.Context,
+	keys []ShipmentsKey,
+) (map[ShipmentsKey]*ShipmentsRow, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	where := keys[0].BoolExpr()
+	for _, key := range keys[1:] {
+		where = spansql.LogicalOp{
+			Op:  spansql.Or,
+			LHS: where,
+			RHS: key.BoolExpr(),
+		}
+	}
+	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(keys))
+	if err := t.ListShipmentsRowsInterleaved(ctx, ListQuery{
+		Where: spansql.Paren{Expr: where},
+		Limit: int32(len(keys)),
+	}).Do(func(row *ShipmentsRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+func (t ReadTransaction) ReadLineItemsRows(
+	ctx context.Context,
+	keySet spanner.KeySet,
+) *LineItemsRowIterator {
+	return &LineItemsRowIterator{
+		RowIterator: t.Tx.Read(
+			ctx,
+			"line_items",
+			keySet,
+			((*LineItemsRow)(nil)).ColumnNames(),
+		),
+	}
+}
+
+func (t ReadTransaction) GetLineItemsRow(
+	ctx context.Context,
+	key LineItemsKey,
+) (*LineItemsRow, error) {
+	spannerRow, err := t.Tx.ReadRow(
+		ctx,
+		"line_items",
+		key.SpannerKey(),
+		((*LineItemsRow)(nil)).ColumnNames(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	var row LineItemsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (t ReadTransaction) BatchGetLineItemsRows(
+	ctx context.Context,
+	keys []LineItemsKey,
+) (map[LineItemsKey]*LineItemsRow, error) {
+	spannerKeys := make([]spanner.KeySet, 0, len(keys))
+	for _, key := range keys {
+		spannerKeys = append(spannerKeys, key.SpannerKey())
+	}
+	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
+	if err := t.ReadLineItemsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *LineItemsRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+func (t ReadTransaction) ListLineItemsRows(
+	ctx context.Context,
+	query ListQuery,
+) *LineItemsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = LineItemsKey{}.Order()
+	}
+	stmt := spanner.Statement{
+		SQL: spansql.Query{
+			Select: spansql.Select{
+				List: ((*LineItemsRow)(nil)).ColumnExprs(),
+				From: []spansql.SelectFrom{
+					spansql.SelectFromTable{Table: "line_items"},
+				},
+				Where: query.Where,
+			},
+			Order:  query.Order,
+			Limit:  spansql.Param("limit"),
+			Offset: spansql.Param("offset"),
+		}.SQL(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &LineItemsRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) ListLineItemsRowsInterleaved(
+	ctx context.Context,
+	query ListQuery,
+) *LineItemsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = LineItemsKey{}.Order()
+	}
+	var q strings.Builder
+	_, _ = q.WriteString("SELECT ")
+	_, _ = q.WriteString("shipper_id, ")
+	_, _ = q.WriteString("shipment_id, ")
+	_, _ = q.WriteString("line_number, ")
+	_, _ = q.WriteString("title, ")
+	_, _ = q.WriteString("quantity, ")
+	_, _ = q.WriteString("weight_kg, ")
+	_, _ = q.WriteString("volume_m3, ")
+	_, _ = q.WriteString("FROM line_items ")
+	if query.Where != nil {
+		_, _ = q.WriteString("WHERE (")
+		_, _ = q.WriteString(query.Where.SQL())
+		_, _ = q.WriteString(") ")
+	}
+	if len(query.Order) > 0 {
+		_, _ = q.WriteString("ORDER BY ")
+		for i, order := range query.Order {
+			_, _ = q.WriteString(order.SQL())
+			if i < len(query.Order)-1 {
+				_, _ = q.WriteString(", ")
+			} else {
+				_, _ = q.WriteString(" ")
+			}
+		}
+	}
+	_, _ = q.WriteString("LIMIT @limit ")
+	_, _ = q.WriteString("OFFSET @offset ")
+	stmt := spanner.Statement{
+		SQL: q.String(),
+		Params: map[string]interface{}{
+			"limit":  int64(query.Limit),
+			"offset": query.Offset,
+		},
+	}
+	return &LineItemsRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) GetLineItemsRowInterleaved(
+	ctx context.Context,
+	key LineItemsKey,
+) (*LineItemsRow, error) {
+	it := t.ListLineItemsRowsInterleaved(ctx, ListQuery{
+		Where: key.BoolExpr(),
+		Limit: 1,
+	})
+	defer it.Stop()
+	row, err := it.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, status.Errorf(codes.NotFound, "not found: %v", key)
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func (t ReadTransaction) BatchGetLineItemsRowsInterleaved(
+	ctx context.Context,
+	keys []LineItemsKey,
+) (map[LineItemsKey]*LineItemsRow, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	where := keys[0].BoolExpr()
+	for _, key := range keys[1:] {
+		where = spansql.LogicalOp{
+			Op:  spansql.Or,
+			LHS: where,
+			RHS: key.BoolExpr(),
+		}
+	}
+	foundRows := make(map[LineItemsKey]*LineItemsRow, len(keys))
+	if err := t.ListLineItemsRowsInterleaved(ctx, ListQuery{
+		Where: spansql.Paren{Expr: where},
+		Limit: int32(len(keys)),
+	}).Do(func(row *LineItemsRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
 }
 
 type ListQuery struct {
