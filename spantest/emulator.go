@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -44,14 +46,22 @@ func NewEmulatorDockerFixture(t *testing.T) *EmulatorDockerFixture {
 		ctx, cancel = context.WithDeadline(ctx, deadline)
 		t.Cleanup(cancel)
 	}
-	dockerPull(t, "gcr.io/cloud-spanner-emulator/emulator:latest")
-	containerID := dockerRunDetached(t, "--publish-all", "gcr.io/cloud-spanner-emulator/emulator:latest")
+	const cloudSpannerEmulatorImage = "gcr.io/cloud-spanner-emulator/emulator:latest"
+	dockerPull(t, cloudSpannerEmulatorImage)
+	var containerID string
+	if isRunningOnCloudBuild(t) {
+		containerID = dockerRunDetached(t, "--network", "cloudbuild", "--publish-all", cloudSpannerEmulatorImage)
+	} else {
+		containerID = dockerRunDetached(t, "--publish-all", cloudSpannerEmulatorImage)
+	}
 	t.Cleanup(func() {
+		t.Log(dockerLogs(t, containerID))
 		dockerKill(t, containerID)
 		dockerRm(t, containerID)
 	})
 	emulatorHost := inspectPortAddress(t, containerID, "9010/tcp")
 	t.Log("emulator host:", emulatorHost)
+	awaitReachable(t, emulatorHost, 1*time.Second, 10*time.Second)
 	conn, err := grpc.Dial(emulatorHost, grpc.WithInsecure())
 	assert.NilError(t, err)
 	t.Cleanup(func() {
@@ -158,21 +168,34 @@ func inspectPortAddress(t *testing.T, containerID string, containerPort string) 
 				HostIP   string
 				HostPort string
 			}
-		}
-	}
-	stdout := execCommand(t, "docker", "inspect", containerID)
-	assert.NilError(t, json.NewDecoder(strings.NewReader(stdout)).Decode(&containers))
-	for _, container := range containers {
-		for port, hostPorts := range container.NetworkSettings.Ports {
-			if port == containerPort {
-				for _, hostPort := range hostPorts {
-					return fmt.Sprintf("%s:%s", hostPort.HostIP, hostPort.HostPort)
-				}
+			Networks map[string]struct {
+				Gateway string
 			}
 		}
 	}
-	t.Fatalf("failed to inspect container %s for port %s", containerID, containerPort)
-	return ""
+	stdout := execCommand(t, "docker", "inspect", containerID)
+	t.Log(stdout)
+	assert.NilError(t, json.NewDecoder(strings.NewReader(stdout)).Decode(&containers))
+	var host string
+	var port string
+	for _, container := range containers {
+		for portID, hostPorts := range container.NetworkSettings.Ports {
+			if portID == containerPort {
+				for _, hostPort := range hostPorts {
+					host, port = hostPort.HostIP, hostPort.HostPort
+				}
+			}
+		}
+		for networkID, network := range container.NetworkSettings.Networks {
+			if networkID == "cloudbuild" {
+				host = network.Gateway
+			}
+		}
+	}
+	if host == "" || port == "" {
+		t.Fatalf("failed to inspect container %s for port %s", containerID, containerPort)
+	}
+	return fmt.Sprintf("%s:%s", host, port)
 }
 
 func execCommand(t *testing.T, name string, args ...string) string {
@@ -182,7 +205,7 @@ func execCommand(t *testing.T, name string, args ...string) string {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	assert.NilError(t, cmd.Run(), stderr.String())
-	return stdout.String()
+	return strings.TrimSpace(stdout.String())
 }
 
 func dockerRunDetached(t *testing.T, args ...string) string {
@@ -192,4 +215,40 @@ func dockerRunDetached(t *testing.T, args ...string) string {
 	assert.Assert(t, containerID != "")
 	t.Log("id:", containerID)
 	return containerID
+}
+
+func awaitReachable(t *testing.T, addr string, wait, maxWait time.Duration) {
+	deadline := time.Now().Add(maxWait)
+	for time.Now().Before(deadline) {
+		if c, err := net.Dial("tcp", addr); err == nil {
+			_ = c.Close()
+			return
+		}
+		t.Logf("failed to reach %s, sleeping for %v", addr, wait)
+		time.Sleep(wait)
+	}
+	t.Fatalf("%v unreachable for %v", addr, maxWait)
+}
+
+func dockerLogs(t *testing.T, containerID string) string {
+	t.Helper()
+	t.Log("exec:", "docker", "logs", containerID)
+	cmd := exec.Command("docker", "logs", containerID)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	assert.NilError(t, cmd.Run(), stderr.String())
+	return strings.TrimSpace(stderr.String())
+}
+
+func isRunningOnCloudBuild(t *testing.T) bool {
+	t.Helper()
+	t.Log("exec:", "docker", "network", "inspect", "cloudbuild")
+	cmd := exec.Command("docker", "network", "inspect", "cloudbuild")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	result := cmd.Run() == nil
+	if result {
+		t.Log(stdout.String())
+	}
+	return result
 }
