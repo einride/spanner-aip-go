@@ -23,19 +23,19 @@ var descriptor = databaseDescriptor{
 		},
 		firstName: columnDescriptor{
 			columnID:             "FirstName",
-			columnType:           spansql.Type{Array: false, Base: 3, Len: 1024},
+			columnType:           spansql.Type{Array: false, Base: 4, Len: 1024},
 			notNull:              false,
 			allowCommitTimestamp: false,
 		},
 		lastName: columnDescriptor{
 			columnID:             "LastName",
-			columnType:           spansql.Type{Array: false, Base: 3, Len: 1024},
+			columnType:           spansql.Type{Array: false, Base: 4, Len: 1024},
 			notNull:              false,
 			allowCommitTimestamp: false,
 		},
 		singerInfo: columnDescriptor{
 			columnID:             "SingerInfo",
-			columnType:           spansql.Type{Array: false, Base: 4, Len: 9223372036854775807},
+			columnType:           spansql.Type{Array: false, Base: 5, Len: 9223372036854775807},
 			notNull:              false,
 			allowCommitTimestamp: false,
 		},
@@ -56,7 +56,7 @@ var descriptor = databaseDescriptor{
 		},
 		albumTitle: columnDescriptor{
 			columnID:             "AlbumTitle",
-			columnType:           spansql.Type{Array: false, Base: 3, Len: 9223372036854775807},
+			columnType:           spansql.Type{Array: false, Base: 4, Len: 9223372036854775807},
 			notNull:              false,
 			allowCommitTimestamp: false,
 		},

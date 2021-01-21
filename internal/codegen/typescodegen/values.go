@@ -26,6 +26,8 @@ func ValueAccessor(column *spanddl.Column) string {
 		return ".Date"
 	case spansql.Timestamp:
 		return ".Time"
+	case spansql.Numeric:
+		panic(fmt.Errorf("TODO: support NUMERIC"))
 	default:
 		panic(fmt.Errorf("unhandled type: %v", column.Type.Base))
 	}
