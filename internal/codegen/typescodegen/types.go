@@ -25,6 +25,8 @@ func SpanSQLType(column *spanddl.Column) reflect.Type {
 		return reflect.TypeOf(spansql.BytesLiteral([]byte(nil)))
 	case spansql.Date, spansql.Timestamp:
 		panic("https://github.com/googleapis/google-cloud-go/issues/3548")
+	case spansql.Numeric:
+		panic("TODO: implement support for NUMERIC")
 	default:
 		panic(fmt.Sprintf("unhandled base type: %v", column.Type.Base))
 	}
@@ -93,6 +95,8 @@ func GoType(column *spanddl.Column) reflect.Type {
 		default:
 			return reflect.TypeOf(spanner.NullTime{})
 		}
+	case spansql.Numeric:
+		panic("TODO: implement support for NUMERIC")
 	default:
 		panic(fmt.Sprintf("unhandled base type: %v", column.Type.Base))
 	}
