@@ -23,8 +23,10 @@ func SpanSQLType(column *spanddl.Column) reflect.Type {
 		return reflect.TypeOf(spansql.StringLiteral(""))
 	case spansql.Bytes:
 		return reflect.TypeOf(spansql.BytesLiteral([]byte(nil)))
-	case spansql.Date, spansql.Timestamp:
-		panic("https://github.com/googleapis/google-cloud-go/issues/3548")
+	case spansql.Date:
+		return reflect.TypeOf(spansql.DateLiteral{})
+	case spansql.Timestamp:
+		return reflect.TypeOf(spansql.TimestampLiteral{})
 	case spansql.Numeric:
 		panic("TODO: implement support for NUMERIC")
 	default:
