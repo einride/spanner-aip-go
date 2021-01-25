@@ -240,6 +240,7 @@ type ShippersTableDescriptor interface {
 	TableID() spansql.ID
 	ColumnNames() []string
 	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
 	ShipperId() ColumnDescriptor
 	CreateTime() ColumnDescriptor
 	UpdateTime() ColumnDescriptor
@@ -310,6 +311,7 @@ type SitesTableDescriptor interface {
 	TableID() spansql.ID
 	ColumnNames() []string
 	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
 	ShipperId() ColumnDescriptor
 	SiteId() ColumnDescriptor
 	CreateTime() ColumnDescriptor
@@ -416,6 +418,7 @@ type ShipmentsTableDescriptor interface {
 	TableID() spansql.ID
 	ColumnNames() []string
 	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
 	ShipperId() ColumnDescriptor
 	ShipmentId() ColumnDescriptor
 	CreateTime() ColumnDescriptor
@@ -549,6 +552,7 @@ type LineItemsTableDescriptor interface {
 	TableID() spansql.ID
 	ColumnNames() []string
 	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
 	ShipperId() ColumnDescriptor
 	ShipmentId() ColumnDescriptor
 	LineNumber() ColumnDescriptor
