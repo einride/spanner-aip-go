@@ -86,6 +86,7 @@ type SingersTableDescriptor interface {
 	TableID() spansql.ID
 	ColumnNames() []string
 	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
 	SingerId() ColumnDescriptor
 	FirstName() ColumnDescriptor
 	LastName() ColumnDescriptor
@@ -156,6 +157,7 @@ type AlbumsTableDescriptor interface {
 	TableID() spansql.ID
 	ColumnNames() []string
 	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
 	SingerId() ColumnDescriptor
 	AlbumId() ColumnDescriptor
 	AlbumTitle() ColumnDescriptor

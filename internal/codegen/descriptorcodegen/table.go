@@ -58,6 +58,7 @@ func (g TableDescriptorCodeGenerator) generateInterface(f *codegen.File) {
 	f.P(g.TableIDMethod(), "() ", spansqlPkg, ".ID")
 	f.P(g.ColumnNamesMethod(), "() []string")
 	f.P(g.ColumnIDsMethod(), "() []", spansqlPkg, ".ID")
+	f.P(g.ColumnExprsMethod(), "() []", spansqlPkg, ".Expr")
 	for _, column := range g.Table.Columns {
 		f.P(g.ColumnDescriptorMethod(column), "() ", genericColumnDescriptor.InterfaceType())
 	}
