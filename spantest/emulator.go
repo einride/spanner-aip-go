@@ -40,6 +40,9 @@ type EmulatorDockerFixture struct {
 // NewEmulatorDockerFixture creates a test fixture for a containerized Spanner emulator.
 func NewEmulatorDockerFixture(t *testing.T) *EmulatorDockerFixture {
 	t.Helper()
+	if !HasDocker() {
+		t.Fatal("No Docker client available for running the Spanner emulator container.")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	if deadline, ok := t.Deadline(); ok {

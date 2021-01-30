@@ -12,11 +12,7 @@ import (
 
 func TestReadTransaction(t *testing.T) {
 	t.Parallel()
-	if !spantest.HasDocker() {
-		t.Skip("Need Docker to run Spanner emulator.")
-	}
 	fx := spantest.NewEmulatorDockerFixture(t)
-
 	t.Run("insert and get", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")

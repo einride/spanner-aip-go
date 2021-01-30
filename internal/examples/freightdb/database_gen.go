@@ -968,11 +968,12 @@ func (t ReadTransaction) BatchGetShippersRows(
 }
 
 type ListShippersRowsQuery struct {
-	Where  spansql.BoolExpr
-	Order  []spansql.Order
-	Limit  int32
-	Offset int64
-	Params map[string]interface{}
+	Where       spansql.BoolExpr
+	Order       []spansql.Order
+	Limit       int32
+	Offset      int64
+	Params      map[string]interface{}
+	ShowDeleted bool
 }
 
 func (t ReadTransaction) ListShippersRows(
@@ -991,6 +992,19 @@ func (t ReadTransaction) ListShippersRows(
 			panic(fmt.Errorf("invalid param: %s", param))
 		}
 		params[param] = value
+	}
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
+	if !query.ShowDeleted {
+		query.Where = spansql.LogicalOp{
+			Op:  spansql.And,
+			LHS: spansql.Paren{Expr: query.Where},
+			RHS: spansql.IsOp{
+				LHS: spansql.ID("delete_time"),
+				RHS: spansql.Null,
+			},
+		}
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
@@ -1073,11 +1087,12 @@ func (t ReadTransaction) BatchGetSitesRows(
 }
 
 type ListSitesRowsQuery struct {
-	Where  spansql.BoolExpr
-	Order  []spansql.Order
-	Limit  int32
-	Offset int64
-	Params map[string]interface{}
+	Where       spansql.BoolExpr
+	Order       []spansql.Order
+	Limit       int32
+	Offset      int64
+	Params      map[string]interface{}
+	ShowDeleted bool
 }
 
 func (t ReadTransaction) ListSitesRows(
@@ -1096,6 +1111,19 @@ func (t ReadTransaction) ListSitesRows(
 			panic(fmt.Errorf("invalid param: %s", param))
 		}
 		params[param] = value
+	}
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
+	if !query.ShowDeleted {
+		query.Where = spansql.LogicalOp{
+			Op:  spansql.And,
+			LHS: spansql.Paren{Expr: query.Where},
+			RHS: spansql.IsOp{
+				LHS: spansql.ID("delete_time"),
+				RHS: spansql.Null,
+			},
+		}
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
@@ -1194,12 +1222,13 @@ func (t ReadTransaction) BatchGetShipmentsRows(
 }
 
 type ListShipmentsRowsQuery struct {
-	Where     spansql.BoolExpr
-	Order     []spansql.Order
-	Limit     int32
-	Offset    int64
-	Params    map[string]interface{}
-	LineItems bool
+	Where       spansql.BoolExpr
+	Order       []spansql.Order
+	Limit       int32
+	Offset      int64
+	Params      map[string]interface{}
+	ShowDeleted bool
+	LineItems   bool
 }
 
 func (q *ListShipmentsRowsQuery) hasInterleavedTables() bool {
@@ -1225,6 +1254,19 @@ func (t ReadTransaction) ListShipmentsRows(
 			panic(fmt.Errorf("invalid param: %s", param))
 		}
 		params[param] = value
+	}
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
+	if !query.ShowDeleted {
+		query.Where = spansql.LogicalOp{
+			Op:  spansql.And,
+			LHS: spansql.Paren{Expr: query.Where},
+			RHS: spansql.IsOp{
+				LHS: spansql.ID("delete_time"),
+				RHS: spansql.Null,
+			},
+		}
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
@@ -1460,6 +1502,9 @@ func (t ReadTransaction) ListLineItemsRows(
 			panic(fmt.Errorf("invalid param: %s", param))
 		}
 		params[param] = value
+	}
+	if query.Where == nil {
+		query.Where = spansql.True
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
