@@ -972,6 +972,7 @@ type ListShippersRowsQuery struct {
 	Order  []spansql.Order
 	Limit  int32
 	Offset int64
+	Params map[string]interface{}
 }
 
 func (t ReadTransaction) ListShippersRows(
@@ -980,6 +981,16 @@ func (t ReadTransaction) ListShippersRows(
 ) *ShippersRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
+	}
+	params := map[string]interface{}{
+		"__limit":  int64(query.Limit),
+		"__offset": query.Offset,
+	}
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
@@ -991,13 +1002,10 @@ func (t ReadTransaction) ListShippersRows(
 				Where: query.Where,
 			},
 			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
 		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
+		Params: params,
 	}
 	return &ShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
@@ -1069,6 +1077,7 @@ type ListSitesRowsQuery struct {
 	Order  []spansql.Order
 	Limit  int32
 	Offset int64
+	Params map[string]interface{}
 }
 
 func (t ReadTransaction) ListSitesRows(
@@ -1077,6 +1086,16 @@ func (t ReadTransaction) ListSitesRows(
 ) *SitesRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = SitesKey{}.Order()
+	}
+	params := map[string]interface{}{
+		"__limit":  int64(query.Limit),
+		"__offset": query.Offset,
+	}
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
@@ -1088,13 +1107,10 @@ func (t ReadTransaction) ListSitesRows(
 				Where: query.Where,
 			},
 			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
 		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
+		Params: params,
 	}
 	return &SitesRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
@@ -1182,6 +1198,7 @@ type ListShipmentsRowsQuery struct {
 	Order     []spansql.Order
 	Limit     int32
 	Offset    int64
+	Params    map[string]interface{}
 	LineItems bool
 }
 
@@ -1199,6 +1216,16 @@ func (t ReadTransaction) ListShipmentsRows(
 	if len(query.Order) == 0 {
 		query.Order = ShipmentsKey{}.Order()
 	}
+	params := map[string]interface{}{
+		"__limit":  int64(query.Limit),
+		"__offset": query.Offset,
+	}
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -1209,13 +1236,10 @@ func (t ReadTransaction) ListShipmentsRows(
 				Where: query.Where,
 			},
 			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
 		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
+		Params: params,
 	}
 	return &ShipmentsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
@@ -1417,6 +1441,7 @@ type ListLineItemsRowsQuery struct {
 	Order  []spansql.Order
 	Limit  int32
 	Offset int64
+	Params map[string]interface{}
 }
 
 func (t ReadTransaction) ListLineItemsRows(
@@ -1425,6 +1450,16 @@ func (t ReadTransaction) ListLineItemsRows(
 ) *LineItemsRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = LineItemsKey{}.Order()
+	}
+	params := map[string]interface{}{
+		"__limit":  int64(query.Limit),
+		"__offset": query.Offset,
+	}
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
@@ -1436,13 +1471,10 @@ func (t ReadTransaction) ListLineItemsRows(
 				Where: query.Where,
 			},
 			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
 		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
+		Params: params,
 	}
 	return &LineItemsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),

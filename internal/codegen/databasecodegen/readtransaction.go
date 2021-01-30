@@ -234,6 +234,7 @@ func (g ReadTransactionCodeGenerator) generateListQueryStruct(f *codegen.File, t
 	f.P("Order  []", spansqlPkg, ".Order")
 	f.P("Limit  int32")
 	f.P("Offset int64")
+	f.P("Params map[string]interface{}")
 	g.generateInterleavedTablesStructFields(f, table)
 	f.P("}")
 	if len(table.InterleavedTables) > 0 {
@@ -246,13 +247,14 @@ func (g ReadTransactionCodeGenerator) generateListQueryStruct(f *codegen.File, t
 
 func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table *spanddl.Table) {
 	const (
-		limitParam  = "limit"
-		offsetParam = "offset"
+		limitParam  = "__limit"
+		offsetParam = "__offset"
 	)
 	rowIterator := RowIteratorCodeGenerator{Table: table}
 	row := RowCodeGenerator{Table: table}
 	key := KeyCodeGenerator{Table: table}
 	contextPkg := f.Import("context")
+	fmtPkg := f.Import("fmt")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
@@ -268,6 +270,16 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 	f.P("if len(query.Order) == 0 {")
 	f.P("query.Order = ", key.Type(), "{}.Order()")
 	f.P("}")
+	f.P("params := map[string]interface{}{")
+	f.P(strconv.Quote(limitParam), ": int64(query.Limit),")
+	f.P(strconv.Quote(offsetParam), ": query.Offset,")
+	f.P("}")
+	f.P("for param, value := range query.Params {")
+	f.P("if _, ok := params[param]; ok {")
+	f.P("panic(", fmtPkg, `.Errorf("invalid param: %s", param))`)
+	f.P("}")
+	f.P("params[param] = value")
+	f.P("}")
 	f.P("stmt := ", spannerPkg, ".Statement{")
 	f.P("SQL: ", spansqlPkg, ".Query{")
 	f.P("Select: ", spansqlPkg, ".Select{")
@@ -281,10 +293,7 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 	f.P("Limit:  ", spansqlPkg, ".Param(", strconv.Quote(limitParam), "),")
 	f.P("Offset: ", spansqlPkg, ".Param(", strconv.Quote(offsetParam), "),")
 	f.P("}.SQL(),")
-	f.P("Params: map[string]interface{}{")
-	f.P(strconv.Quote(limitParam), ": int64(query.Limit),")
-	f.P(strconv.Quote(offsetParam), ": query.Offset,")
-	f.P("},")
+	f.P("Params: params,")
 	f.P("}")
 	f.P("return &", rowIterator.Type(), "{")
 	f.P("RowIterator: t.Tx.Query(ctx, stmt),")
