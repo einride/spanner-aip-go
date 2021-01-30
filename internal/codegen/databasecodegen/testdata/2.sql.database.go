@@ -438,6 +438,7 @@ type ListSingersRowsQuery struct {
 	Order  []spansql.Order
 	Limit  int32
 	Offset int64
+	Params map[string]interface{}
 	Albums bool
 }
 
@@ -455,6 +456,16 @@ func (t ReadTransaction) ListSingersRows(
 	if len(query.Order) == 0 {
 		query.Order = SingersKey{}.Order()
 	}
+	params := map[string]interface{}{
+		"__limit":  int64(query.Limit),
+		"__offset": query.Offset,
+	}
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -465,13 +476,10 @@ func (t ReadTransaction) ListSingersRows(
 				Where: query.Where,
 			},
 			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
 		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
+		Params: params,
 	}
 	return &SingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
@@ -660,6 +668,7 @@ type ListAlbumsRowsQuery struct {
 	Order  []spansql.Order
 	Limit  int32
 	Offset int64
+	Params map[string]interface{}
 }
 
 func (t ReadTransaction) ListAlbumsRows(
@@ -668,6 +677,16 @@ func (t ReadTransaction) ListAlbumsRows(
 ) *AlbumsRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = AlbumsKey{}.Order()
+	}
+	params := map[string]interface{}{
+		"__limit":  int64(query.Limit),
+		"__offset": query.Offset,
+	}
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
@@ -679,13 +698,10 @@ func (t ReadTransaction) ListAlbumsRows(
 				Where: query.Where,
 			},
 			Order:  query.Order,
-			Limit:  spansql.Param("limit"),
-			Offset: spansql.Param("offset"),
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
 		}.SQL(),
-		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
-		},
+		Params: params,
 	}
 	return &AlbumsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
