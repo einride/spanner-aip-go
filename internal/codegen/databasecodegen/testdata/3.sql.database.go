@@ -660,6 +660,9 @@ func (t ReadTransaction) ListSingersRows(
 		}
 		params[param] = value
 	}
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -930,6 +933,9 @@ func (t ReadTransaction) ListAlbumsRows(
 		}
 		params[param] = value
 	}
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{
 			Select: spansql.Select{
@@ -1153,6 +1159,9 @@ func (t ReadTransaction) ListSongsRows(
 			panic(fmt.Errorf("invalid param: %s", param))
 		}
 		params[param] = value
+	}
+	if query.Where == nil {
+		query.Where = spansql.True
 	}
 	stmt := spanner.Statement{
 		SQL: spansql.Query{

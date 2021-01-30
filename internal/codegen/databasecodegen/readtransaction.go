@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"cloud.google.com/go/spanner/spansql"
 	"github.com/stoewer/go-strcase"
 	"go.einride.tech/spanner-aip/internal/codegen"
 	"go.einride.tech/spanner-aip/spanddl"
@@ -235,6 +236,9 @@ func (g ReadTransactionCodeGenerator) generateListQueryStruct(f *codegen.File, t
 	f.P("Limit  int32")
 	f.P("Offset int64")
 	f.P("Params map[string]interface{}")
+	if g.hasSoftDelete(table) {
+		f.P("ShowDeleted bool")
+	}
 	g.generateInterleavedTablesStructFields(f, table)
 	f.P("}")
 	if len(table.InterleavedTables) > 0 {
@@ -280,6 +284,21 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 	f.P("}")
 	f.P("params[param] = value")
 	f.P("}")
+	f.P("if query.Where == nil {")
+	f.P("query.Where = ", spansqlPkg, ".True")
+	f.P("}")
+	if g.hasSoftDelete(table) {
+		f.P("if !query.ShowDeleted {")
+		f.P("query.Where = ", spansqlPkg, ".LogicalOp{")
+		f.P("Op: ", spansqlPkg, ".And,")
+		f.P("LHS: ", spansqlPkg, ".Paren{Expr: query.Where},")
+		f.P("RHS: ", spansqlPkg, ".IsOp{")
+		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(g.softDeleteTimestampColumnName())), "),")
+		f.P("RHS: ", spansqlPkg, ".Null,")
+		f.P("},")
+		f.P("}")
+		f.P("}")
+	}
 	f.P("stmt := ", spannerPkg, ".Statement{")
 	f.P("SQL: ", spansqlPkg, ".Query{")
 	f.P("Select: ", spansqlPkg, ".Select{")
@@ -494,4 +513,19 @@ func (g ReadTransactionCodeGenerator) forwardInterleavedTablesStructFields(
 	for _, interleavedTable := range table.InterleavedTables {
 		pTable(interleavedTable)
 	}
+}
+
+func (g ReadTransactionCodeGenerator) hasSoftDelete(table *spanddl.Table) bool {
+	for _, column := range table.Columns {
+		if column.Name == g.softDeleteTimestampColumnName() &&
+			!column.NotNull &&
+			column.Type == (spansql.Type{Base: spansql.Timestamp}) {
+			return true
+		}
+	}
+	return false
+}
+
+func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName() spansql.ID {
+	return "delete_time"
 }
