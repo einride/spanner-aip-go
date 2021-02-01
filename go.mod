@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/spanner v1.13.0
 	github.com/stoewer/go-strcase v1.2.0
 	go.einride.tech/aip v0.22.0
-	google.golang.org/api v0.36.0
+	google.golang.org/api v0.38.0
 	google.golang.org/genproto v0.0.0-20210113195801-ae06605f4595
 	google.golang.org/grpc v1.35.0
 	google.golang.org/protobuf v1.25.0
