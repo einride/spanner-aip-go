@@ -160,19 +160,24 @@ func (ShippersKey) Order() []spansql.Order {
 }
 
 func (k ShippersKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
+	cmp0 := spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("shipper_id"),
 		RHS: spansql.StringLiteral(k.ShipperId),
-	})
+	}
+	cmp1 := spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("revision_id"),
+		RHS: spansql.StringLiteral(k.RevisionId.StringVal),
+	}
+	if !k.RevisionId.Valid {
+		cmp1.RHS = spansql.Null
+	}
+	b := spansql.BoolExpr(cmp0)
 	b = spansql.LogicalOp{
 		Op:  spansql.And,
 		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("revision_id"),
-			RHS: spansql.StringLiteral(k.RevisionId.StringVal),
-		},
+		RHS: cmp1,
 	}
 	return spansql.Paren{Expr: b}
 }
