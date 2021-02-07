@@ -10,4 +10,5 @@ CREATE TABLE shipments (
     pickup_latest_time TIMESTAMP,
     delivery_earliest_time TIMESTAMP,
     delivery_latest_time TIMESTAMP,
-) PRIMARY KEY(shipper_id, shipment_id);
+) PRIMARY KEY(shipper_id, shipment_id),
+  INTERLEAVE IN PARENT shippers ON DELETE CASCADE;

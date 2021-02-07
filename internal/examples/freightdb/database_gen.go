@@ -20,6 +20,7 @@ type ShippersRow struct {
 	CreateTime time.Time        `spanner:"create_time"`
 	UpdateTime time.Time        `spanner:"update_time"`
 	DeleteTime spanner.NullTime `spanner:"delete_time"`
+	Shipments  []*ShipmentsRow  `spanner:"shipments"`
 }
 
 func (*ShippersRow) ColumnNames() []string {
@@ -74,6 +75,10 @@ func (r *ShippersRow) UnmarshalSpannerRow(row *spanner.Row) error {
 		case "delete_time":
 			if err := row.Column(i, &r.DeleteTime); err != nil {
 				return fmt.Errorf("unmarshal shippers row: delete_time column: %w", err)
+			}
+		case "shipments":
+			if err := row.Column(i, &r.Shipments); err != nil {
+				return fmt.Errorf("unmarshal shippers interleaved row: shipments column: %w", err)
 			}
 		default:
 			return fmt.Errorf("unmarshal shippers row: unhandled column: %s", row.ColumnName(i))
@@ -922,13 +927,22 @@ func (t ReadTransaction) ReadShippersRows(
 }
 
 type GetShippersRowQuery struct {
-	Key ShippersKey
+	Key       ShippersKey
+	Shipments bool
+	LineItems bool
+}
+
+func (q *GetShippersRowQuery) hasInterleavedTables() bool {
+	return q.Shipments || q.LineItems
 }
 
 func (t ReadTransaction) GetShippersRow(
 	ctx context.Context,
 	query GetShippersRowQuery,
 ) (*ShippersRow, error) {
+	if query.hasInterleavedTables() {
+		return t.getShippersRowInterleaved(ctx, query)
+	}
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"shippers",
@@ -946,13 +960,22 @@ func (t ReadTransaction) GetShippersRow(
 }
 
 type BatchGetShippersRowsQuery struct {
-	Keys []ShippersKey
+	Keys      []ShippersKey
+	Shipments bool
+	LineItems bool
+}
+
+func (q *BatchGetShippersRowsQuery) hasInterleavedTables() bool {
+	return q.Shipments || q.LineItems
 }
 
 func (t ReadTransaction) BatchGetShippersRows(
 	ctx context.Context,
 	query BatchGetShippersRowsQuery,
 ) (map[ShippersKey]*ShippersRow, error) {
+	if query.hasInterleavedTables() {
+		return t.batchGetShippersRowsInterleaved(ctx, query)
+	}
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
@@ -974,12 +997,21 @@ type ListShippersRowsQuery struct {
 	Offset      int64
 	Params      map[string]interface{}
 	ShowDeleted bool
+	Shipments   bool
+	LineItems   bool
+}
+
+func (q *ListShippersRowsQuery) hasInterleavedTables() bool {
+	return q.Shipments || q.LineItems
 }
 
 func (t ReadTransaction) ListShippersRows(
 	ctx context.Context,
 	query ListShippersRowsQuery,
 ) *ShippersRowIterator {
+	if query.hasInterleavedTables() {
+		return t.listShippersRowsInterleaved(ctx, query)
+	}
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
 	}
@@ -1024,6 +1056,176 @@ func (t ReadTransaction) ListShippersRows(
 	return &ShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+}
+
+func (t ReadTransaction) listShippersRowsInterleaved(
+	ctx context.Context,
+	query ListShippersRowsQuery,
+) *ShippersRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = ShippersKey{}.Order()
+	}
+	var q strings.Builder
+	_, _ = q.WriteString(`
+SELECT
+    shipper_id,
+    create_time,
+    update_time,
+    delete_time,
+`)
+	if query.Shipments {
+		_, _ = q.WriteString(`
+    ARRAY(
+        SELECT AS STRUCT
+            shipper_id,
+            shipment_id,
+            create_time,
+            update_time,
+            delete_time,
+            origin_site_id,
+            destination_site_id,
+            pickup_earliest_time,
+            pickup_latest_time,
+            delivery_earliest_time,
+            delivery_latest_time,
+`)
+		if query.LineItems {
+			_, _ = q.WriteString(`
+            ARRAY(
+                SELECT AS STRUCT
+                    shipper_id,
+                    shipment_id,
+                    line_number,
+                    title,
+                    quantity,
+                    weight_kg,
+                    volume_m3,
+`)
+			_, _ = q.WriteString(`
+                FROM 
+                    line_items
+                WHERE 
+                    line_items.shipper_id = shipments.shipper_id AND
+                    line_items.shipment_id = shipments.shipment_id
+                ORDER BY 
+                    shipper_id,
+                    shipment_id,
+                    line_number
+            ) AS line_items,
+`)
+		}
+		_, _ = q.WriteString(`
+        FROM 
+            shipments
+        WHERE 
+`)
+		if !query.ShowDeleted {
+			_, _ = q.WriteString(`
+            delete_time IS NULL AND
+`)
+		}
+		_, _ = q.WriteString(`
+            shipments.shipper_id = shippers.shipper_id
+        ORDER BY 
+            shipper_id,
+            shipment_id
+    ) AS shipments,
+`)
+	}
+	_, _ = q.WriteString(`
+FROM
+    shippers
+`)
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
+	if !query.ShowDeleted {
+		query.Where = spansql.LogicalOp{
+			Op:  spansql.And,
+			LHS: spansql.Paren{Expr: query.Where},
+			RHS: spansql.IsOp{
+				LHS: spansql.ID("delete_time"),
+				RHS: spansql.Null,
+			},
+		}
+	}
+	_, _ = q.WriteString("WHERE (")
+	_, _ = q.WriteString(query.Where.SQL())
+	_, _ = q.WriteString(") ")
+	if len(query.Order) > 0 {
+		_, _ = q.WriteString("ORDER BY ")
+		for i, order := range query.Order {
+			_, _ = q.WriteString(order.SQL())
+			if i < len(query.Order)-1 {
+				_, _ = q.WriteString(", ")
+			} else {
+				_, _ = q.WriteString(" ")
+			}
+		}
+	}
+	_, _ = q.WriteString("LIMIT @__limit ")
+	_, _ = q.WriteString("OFFSET @__offset ")
+	stmt := spanner.Statement{
+		SQL: q.String(),
+		Params: map[string]interface{}{
+			"__limit":  int64(query.Limit),
+			"__offset": query.Offset,
+		},
+	}
+	return &ShippersRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+}
+
+func (t ReadTransaction) getShippersRowInterleaved(
+	ctx context.Context,
+	query GetShippersRowQuery,
+) (*ShippersRow, error) {
+	it := t.listShippersRowsInterleaved(ctx, ListShippersRowsQuery{
+		Limit:     1,
+		Where:     query.Key.BoolExpr(),
+		Shipments: query.Shipments,
+		LineItems: query.LineItems,
+	})
+	defer it.Stop()
+	row, err := it.Next()
+	if err != nil {
+		if err == iterator.Done {
+			return nil, status.Errorf(codes.NotFound, "not found: %v", query.Key)
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func (t ReadTransaction) batchGetShippersRowsInterleaved(
+	ctx context.Context,
+	query BatchGetShippersRowsQuery,
+) (map[ShippersKey]*ShippersRow, error) {
+	if len(query.Keys) == 0 {
+		return nil, nil
+	}
+	where := query.Keys[0].BoolExpr()
+	for _, key := range query.Keys[1:] {
+		where = spansql.LogicalOp{
+			Op:  spansql.Or,
+			LHS: where,
+			RHS: key.BoolExpr(),
+		}
+	}
+	foundRows := make(map[ShippersKey]*ShippersRow, len(query.Keys))
+	if err := t.ListShippersRows(ctx, ListShippersRowsQuery{
+		Where:     spansql.Paren{Expr: where},
+		Limit:     int32(len(query.Keys)),
+		Shipments: query.Shipments,
+		LineItems: query.LineItems,
+	}).Do(func(row *ShippersRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
 }
 
 func (t ReadTransaction) ReadSitesRows(
@@ -1339,11 +1541,22 @@ SELECT
 FROM
     shipments
 `)
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
+	if query.Where == nil {
+		query.Where = spansql.True
 	}
+	if !query.ShowDeleted {
+		query.Where = spansql.LogicalOp{
+			Op:  spansql.And,
+			LHS: spansql.Paren{Expr: query.Where},
+			RHS: spansql.IsOp{
+				LHS: spansql.ID("delete_time"),
+				RHS: spansql.Null,
+			},
+		}
+	}
+	_, _ = q.WriteString("WHERE (")
+	_, _ = q.WriteString(query.Where.SQL())
+	_, _ = q.WriteString(") ")
 	if len(query.Order) > 0 {
 		_, _ = q.WriteString("ORDER BY ")
 		for i, order := range query.Order {
@@ -1355,13 +1568,13 @@ FROM
 			}
 		}
 	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
+	_, _ = q.WriteString("LIMIT @__limit ")
+	_, _ = q.WriteString("OFFSET @__offset ")
 	stmt := spanner.Statement{
 		SQL: q.String(),
 		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
+			"__limit":  int64(query.Limit),
+			"__offset": query.Offset,
 		},
 	}
 	return &ShipmentsRowIterator{

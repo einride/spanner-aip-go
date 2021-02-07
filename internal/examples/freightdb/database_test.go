@@ -46,6 +46,42 @@ func TestReadTransaction(t *testing.T) {
 		assert.DeepEqual(t, expectedIDs, gotIDs)
 	})
 
+	t.Run("hide deleted interleaved by default", func(t *testing.T) {
+		t.Parallel()
+		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/freight/*.up.sql")
+		const count = 10
+		mutations := make([]*spanner.Mutation, 0, count)
+		shipper := &freightdb.ShippersRow{ShipperId: "shipper"}
+		mutations = append(mutations, spanner.Insert(shipper.Mutate()))
+		expectedShipmentIDs := make([]string, 0, count)
+		for i := 0; i < count; i++ {
+			shipment := &freightdb.ShipmentsRow{ShipperId: shipper.ShipperId, ShipmentId: strconv.Itoa(i)}
+			if i%2 == 1 {
+				shipment.DeleteTime = spanner.NullTime{
+					Time:  spanner.CommitTimestamp,
+					Valid: true,
+				}
+			} else {
+				expectedShipmentIDs = append(expectedShipmentIDs, shipment.ShipmentId)
+			}
+			mutations = append(mutations, spanner.Insert(shipment.Mutate()))
+		}
+		_, err := client.Apply(fx.Ctx, mutations)
+		assert.NilError(t, err)
+		tx := client.Single()
+		defer tx.Close()
+		gotShipper, err := freightdb.Query(tx).GetShippersRow(fx.Ctx, freightdb.GetShippersRowQuery{
+			Key:       freightdb.ShippersKey{ShipperId: shipper.ShipperId},
+			Shipments: true,
+		})
+		assert.NilError(t, err)
+		gotShipmentIDs := make([]string, 0, len(gotShipper.Shipments))
+		for _, gotShipment := range gotShipper.Shipments {
+			gotShipmentIDs = append(gotShipmentIDs, gotShipment.ShipmentId)
+		}
+		assert.DeepEqual(t, expectedShipmentIDs, gotShipmentIDs)
+	})
+
 	t.Run("show deleted", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/freight/*.up.sql")
