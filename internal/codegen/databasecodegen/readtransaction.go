@@ -293,7 +293,7 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 		f.P("Op: ", spansqlPkg, ".And,")
 		f.P("LHS: ", spansqlPkg, ".Paren{Expr: query.Where},")
 		f.P("RHS: ", spansqlPkg, ".IsOp{")
-		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(g.softDeleteTimestampColumnName())), "),")
+		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(g.softDeleteTimestampColumnName(table))), "),")
 		f.P("RHS: ", spansqlPkg, ".Null,")
 		f.P("},")
 		f.P("}")
@@ -322,14 +322,15 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 
 func (g ReadTransactionCodeGenerator) generateListInterleavedMethod(f *codegen.File, table *spanddl.Table) {
 	const (
-		limitParam  = "limit"
-		offsetParam = "offset"
+		limitParam  = "__limit"
+		offsetParam = "__offset"
 	)
 	rowIterator := RowIteratorCodeGenerator{Table: table}
 	key := KeyCodeGenerator{Table: table}
 	contextPkg := f.Import("context")
 	stringsPkg := f.Import("strings")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
+	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
 	f.P("func (t ", g.Type(), ") ", g.ListInterleavedMethod(table), "(")
 	f.P("ctx ", contextPkg, ".Context,")
@@ -365,6 +366,15 @@ func (g ReadTransactionCodeGenerator) generateListInterleavedMethod(f *codegen.F
 		f.P(t(l+1), "FROM ")
 		f.P(t(l+2), child.Name)
 		f.P(t(l+1), "WHERE ")
+		if g.hasSoftDelete(child) {
+			f.P("`)")
+			f.P("if !query.ShowDeleted {")
+			f.P("_, _ = q.WriteString(`")
+			f.P(t(l+2), g.softDeleteTimestampColumnName(child), " IS NULL AND")
+			f.P("`)")
+			f.P("}")
+			f.P("_, _ = q.WriteString(`")
+		}
 		for i, keyPart := range parent.PrimaryKey {
 			var and string
 			if i < len(parent.PrimaryKey)-1 {
@@ -395,11 +405,24 @@ func (g ReadTransactionCodeGenerator) generateListInterleavedMethod(f *codegen.F
 	f.P(t(0), "FROM")
 	f.P(t(1), table.Name)
 	f.P("`)")
-	f.P("if query.Where != nil {")
+	f.P("if query.Where == nil {")
+	f.P("query.Where = ", spansqlPkg, ".True")
+	f.P("}")
+	if g.hasSoftDelete(table) {
+		f.P("if !query.ShowDeleted {")
+		f.P("query.Where = ", spansqlPkg, ".LogicalOp{")
+		f.P("Op: ", spansqlPkg, ".And,")
+		f.P("LHS: ", spansqlPkg, ".Paren{Expr: query.Where},")
+		f.P("RHS: ", spansqlPkg, ".IsOp{")
+		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(g.softDeleteTimestampColumnName(table))), "),")
+		f.P("RHS: ", spansqlPkg, ".Null,")
+		f.P("},")
+		f.P("}")
+		f.P("}")
+	}
 	f.P(`_, _ = q.WriteString("WHERE (")`)
 	f.P(`_, _ = q.WriteString(query.Where.SQL())`)
 	f.P(`_, _ = q.WriteString(") ")`)
-	f.P("}")
 	f.P("if len(query.Order) > 0 {")
 	f.P(`_, _ = q.WriteString("ORDER BY ")`)
 	f.P(`for i, order := range query.Order {`)
@@ -517,7 +540,7 @@ func (g ReadTransactionCodeGenerator) forwardInterleavedTablesStructFields(
 
 func (g ReadTransactionCodeGenerator) hasSoftDelete(table *spanddl.Table) bool {
 	for _, column := range table.Columns {
-		if column.Name == g.softDeleteTimestampColumnName() &&
+		if column.Name == g.softDeleteTimestampColumnName(table) &&
 			!column.NotNull &&
 			column.Type == (spansql.Type{Base: spansql.Timestamp}) {
 			return true
@@ -526,6 +549,6 @@ func (g ReadTransactionCodeGenerator) hasSoftDelete(table *spanddl.Table) bool {
 	return false
 }
 
-func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName() spansql.ID {
+func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName(table *spanddl.Table) spansql.ID {
 	return "delete_time"
 }

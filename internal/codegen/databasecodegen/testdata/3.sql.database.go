@@ -743,11 +743,12 @@ SELECT
 FROM
     Singers
 `)
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
+	if query.Where == nil {
+		query.Where = spansql.True
 	}
+	_, _ = q.WriteString("WHERE (")
+	_, _ = q.WriteString(query.Where.SQL())
+	_, _ = q.WriteString(") ")
 	if len(query.Order) > 0 {
 		_, _ = q.WriteString("ORDER BY ")
 		for i, order := range query.Order {
@@ -759,13 +760,13 @@ FROM
 			}
 		}
 	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
+	_, _ = q.WriteString("LIMIT @__limit ")
+	_, _ = q.WriteString("OFFSET @__offset ")
 	stmt := spanner.Statement{
 		SQL: q.String(),
 		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
+			"__limit":  int64(query.Limit),
+			"__offset": query.Offset,
 		},
 	}
 	return &SingersRowIterator{
@@ -996,11 +997,12 @@ SELECT
 FROM
     Albums
 `)
-	if query.Where != nil {
-		_, _ = q.WriteString("WHERE (")
-		_, _ = q.WriteString(query.Where.SQL())
-		_, _ = q.WriteString(") ")
+	if query.Where == nil {
+		query.Where = spansql.True
 	}
+	_, _ = q.WriteString("WHERE (")
+	_, _ = q.WriteString(query.Where.SQL())
+	_, _ = q.WriteString(") ")
 	if len(query.Order) > 0 {
 		_, _ = q.WriteString("ORDER BY ")
 		for i, order := range query.Order {
@@ -1012,13 +1014,13 @@ FROM
 			}
 		}
 	}
-	_, _ = q.WriteString("LIMIT @limit ")
-	_, _ = q.WriteString("OFFSET @offset ")
+	_, _ = q.WriteString("LIMIT @__limit ")
+	_, _ = q.WriteString("OFFSET @__offset ")
 	stmt := spanner.Statement{
 		SQL: q.String(),
 		Params: map[string]interface{}{
-			"limit":  int64(query.Limit),
-			"offset": query.Offset,
+			"__limit":  int64(query.Limit),
+			"__offset": query.Offset,
 		},
 	}
 	return &AlbumsRowIterator{
