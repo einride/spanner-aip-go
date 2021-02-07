@@ -177,7 +177,6 @@ func inspectPortAddress(t *testing.T, containerID string, containerPort string) 
 		}
 	}
 	stdout := execCommand(t, "docker", "inspect", containerID)
-	t.Log(stdout)
 	assert.NilError(t, json.NewDecoder(strings.NewReader(stdout)).Decode(&containers))
 	var host string
 	var port string
