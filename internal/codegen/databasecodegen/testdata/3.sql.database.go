@@ -352,11 +352,12 @@ func (SingersKey) Order() []spansql.Order {
 }
 
 func (k SingersKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
+	cmp0 := spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
 		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
+	}
+	b := spansql.BoolExpr(cmp0)
 	return spansql.Paren{Expr: b}
 }
 
@@ -388,19 +389,21 @@ func (AlbumsKey) Order() []spansql.Order {
 }
 
 func (k AlbumsKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
+	cmp0 := spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
 		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
+	}
+	cmp1 := spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("AlbumId"),
+		RHS: spansql.IntegerLiteral(k.AlbumId),
+	}
+	b := spansql.BoolExpr(cmp0)
 	b = spansql.LogicalOp{
 		Op:  spansql.And,
 		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("AlbumId"),
-			RHS: spansql.IntegerLiteral(k.AlbumId),
-		},
+		RHS: cmp1,
 	}
 	return spansql.Paren{Expr: b}
 }
@@ -436,28 +439,31 @@ func (SongsKey) Order() []spansql.Order {
 }
 
 func (k SongsKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
+	cmp0 := spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
 		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
+	}
+	cmp1 := spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("AlbumId"),
+		RHS: spansql.IntegerLiteral(k.AlbumId),
+	}
+	cmp2 := spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("TrackId"),
+		RHS: spansql.IntegerLiteral(k.TrackId),
+	}
+	b := spansql.BoolExpr(cmp0)
 	b = spansql.LogicalOp{
 		Op:  spansql.And,
 		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("AlbumId"),
-			RHS: spansql.IntegerLiteral(k.AlbumId),
-		},
+		RHS: cmp1,
 	}
 	b = spansql.LogicalOp{
 		Op:  spansql.And,
 		LHS: b,
-		RHS: spansql.ComparisonOp{
-			Op:  spansql.Eq,
-			LHS: spansql.ID("TrackId"),
-			RHS: spansql.IntegerLiteral(k.TrackId),
-		},
+		RHS: cmp2,
 	}
 	return spansql.Paren{Expr: b}
 }

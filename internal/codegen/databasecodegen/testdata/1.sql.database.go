@@ -144,11 +144,12 @@ func (SingersKey) Order() []spansql.Order {
 }
 
 func (k SingersKey) BoolExpr() spansql.BoolExpr {
-	b := spansql.BoolExpr(spansql.ComparisonOp{
+	cmp0 := spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("SingerId"),
 		RHS: spansql.IntegerLiteral(k.SingerId),
-	})
+	}
+	b := spansql.BoolExpr(cmp0)
 	return spansql.Paren{Expr: b}
 }
 

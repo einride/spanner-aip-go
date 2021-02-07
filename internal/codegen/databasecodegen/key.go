@@ -72,29 +72,32 @@ func (g KeyCodeGenerator) generateOrderMethod(f *codegen.File) {
 func (g KeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
 	f.P()
-	k0 := g.Table.PrimaryKey[0]
 	f.P("func (k ", g.Type(), ") BoolExpr() ", spansqlPkg, ".BoolExpr {")
-	f.P("b := ", spansqlPkg, ".BoolExpr(", spansqlPkg, ".ComparisonOp{")
-	f.P("Op: ", spansqlPkg, ".Eq,")
-	f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(k0.Column)), "),")
-	f.P(
-		"RHS: ", g.columnSpanSQLType(f, k0),
-		"(k.", g.FieldName(k0), typescodegen.ValueAccessor(g.keyColumn(k0)), "),",
-	)
-	f.P("})")
-	for _, keyPart := range g.Table.PrimaryKey[1:] {
-		f.P("b = ", spansqlPkg, ".LogicalOp{")
-		f.P("Op: ", spansqlPkg, ".And,")
-		f.P("LHS: b,")
-		f.P("RHS: ", spansqlPkg, ".ComparisonOp{")
+	for i, keyPart := range g.Table.PrimaryKey {
+		f.P("cmp", i, " := ", spansqlPkg, ".ComparisonOp{")
 		f.P("Op: ", spansqlPkg, ".Eq,")
 		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(keyPart.Column)), "),")
 		f.P(
 			"RHS: ", g.columnSpanSQLType(f, keyPart),
 			"(k.", g.FieldName(keyPart), typescodegen.ValueAccessor(g.keyColumn(keyPart)), "),",
 		)
-		f.P("},")
 		f.P("}")
+		if !g.keyColumn(keyPart).NotNull {
+			f.P("if !k.", g.FieldName(keyPart), ".Valid {")
+			f.P("cmp", i, ".RHS = ", spansqlPkg, ".Null")
+			f.P("}")
+		}
+	}
+	for i := range g.Table.PrimaryKey {
+		if i == 0 {
+			f.P("b := ", spansqlPkg, ".BoolExpr(cmp", i, ")")
+		} else {
+			f.P("b = ", spansqlPkg, ".LogicalOp{")
+			f.P("Op: ", spansqlPkg, ".And,")
+			f.P("LHS: b,")
+			f.P("RHS: cmp", i, ",")
+			f.P("}")
+		}
 	}
 	f.P("return ", spansqlPkg, ".Paren{Expr: b}")
 	f.P("}")
