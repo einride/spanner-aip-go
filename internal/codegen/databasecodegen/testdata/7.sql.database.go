@@ -292,10 +292,9 @@ func (t ReadTransaction) ListShippersRows(
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
 	}
-	params := map[string]interface{}{
-		"__limit":  int64(query.Limit),
-		"__offset": query.Offset,
-	}
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
 	for param, value := range query.Params {
 		if _, ok := params[param]; ok {
 			panic(fmt.Errorf("invalid param: %s", param))

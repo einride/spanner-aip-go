@@ -1023,10 +1023,9 @@ func (t ReadTransaction) ListShippersRows(
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
 	}
-	params := map[string]interface{}{
-		"__limit":  int64(query.Limit),
-		"__offset": query.Offset,
-	}
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
 	for param, value := range query.Params {
 		if _, ok := params[param]; ok {
 			panic(fmt.Errorf("invalid param: %s", param))
@@ -1173,12 +1172,18 @@ FROM
 	}
 	_, _ = q.WriteString("LIMIT @__limit ")
 	_, _ = q.WriteString("OFFSET @__offset ")
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
+	}
 	stmt := spanner.Statement{
-		SQL: q.String(),
-		Params: map[string]interface{}{
-			"__limit":  int64(query.Limit),
-			"__offset": query.Offset,
-		},
+		SQL:    q.String(),
+		Params: params,
 	}
 	return &ShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
@@ -1312,10 +1317,9 @@ func (t ReadTransaction) ListSitesRows(
 	if len(query.Order) == 0 {
 		query.Order = SitesKey{}.Order()
 	}
-	params := map[string]interface{}{
-		"__limit":  int64(query.Limit),
-		"__offset": query.Offset,
-	}
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
 	for param, value := range query.Params {
 		if _, ok := params[param]; ok {
 			panic(fmt.Errorf("invalid param: %s", param))
@@ -1455,10 +1459,9 @@ func (t ReadTransaction) ListShipmentsRows(
 	if len(query.Order) == 0 {
 		query.Order = ShipmentsKey{}.Order()
 	}
-	params := map[string]interface{}{
-		"__limit":  int64(query.Limit),
-		"__offset": query.Offset,
-	}
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
 	for param, value := range query.Params {
 		if _, ok := params[param]; ok {
 			panic(fmt.Errorf("invalid param: %s", param))
@@ -1578,12 +1581,18 @@ FROM
 	}
 	_, _ = q.WriteString("LIMIT @__limit ")
 	_, _ = q.WriteString("OFFSET @__offset ")
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
+	}
 	stmt := spanner.Statement{
-		SQL: q.String(),
-		Params: map[string]interface{}{
-			"__limit":  int64(query.Limit),
-			"__offset": query.Offset,
-		},
+		SQL:    q.String(),
+		Params: params,
 	}
 	return &ShipmentsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
@@ -1714,10 +1723,9 @@ func (t ReadTransaction) ListLineItemsRows(
 	if len(query.Order) == 0 {
 		query.Order = LineItemsKey{}.Order()
 	}
-	params := map[string]interface{}{
-		"__limit":  int64(query.Limit),
-		"__offset": query.Offset,
-	}
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
 	for param, value := range query.Params {
 		if _, ok := params[param]; ok {
 			panic(fmt.Errorf("invalid param: %s", param))
