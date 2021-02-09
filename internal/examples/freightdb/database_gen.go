@@ -1195,10 +1195,11 @@ func (t ReadTransaction) getShippersRowInterleaved(
 	query GetShippersRowQuery,
 ) (*ShippersRow, error) {
 	it := t.listShippersRowsInterleaved(ctx, ListShippersRowsQuery{
-		Limit:     1,
-		Where:     query.Key.BoolExpr(),
-		Shipments: query.Shipments,
-		LineItems: query.LineItems,
+		Limit:       1,
+		Where:       query.Key.BoolExpr(),
+		ShowDeleted: true,
+		Shipments:   query.Shipments,
+		LineItems:   query.LineItems,
 	})
 	defer it.Stop()
 	row, err := it.Next()
@@ -1228,10 +1229,11 @@ func (t ReadTransaction) batchGetShippersRowsInterleaved(
 	}
 	foundRows := make(map[ShippersKey]*ShippersRow, len(query.Keys))
 	if err := t.ListShippersRows(ctx, ListShippersRowsQuery{
-		Where:     spansql.Paren{Expr: where},
-		Limit:     int32(len(query.Keys)),
-		Shipments: query.Shipments,
-		LineItems: query.LineItems,
+		Where:       spansql.Paren{Expr: where},
+		Limit:       int32(len(query.Keys)),
+		ShowDeleted: true,
+		Shipments:   query.Shipments,
+		LineItems:   query.LineItems,
 	}).Do(func(row *ShippersRow) error {
 		foundRows[row.Key()] = row
 		return nil
@@ -1604,9 +1606,10 @@ func (t ReadTransaction) getShipmentsRowInterleaved(
 	query GetShipmentsRowQuery,
 ) (*ShipmentsRow, error) {
 	it := t.listShipmentsRowsInterleaved(ctx, ListShipmentsRowsQuery{
-		Limit:     1,
-		Where:     query.Key.BoolExpr(),
-		LineItems: query.LineItems,
+		Limit:       1,
+		Where:       query.Key.BoolExpr(),
+		ShowDeleted: true,
+		LineItems:   query.LineItems,
 	})
 	defer it.Stop()
 	row, err := it.Next()
@@ -1636,9 +1639,10 @@ func (t ReadTransaction) batchGetShipmentsRowsInterleaved(
 	}
 	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(query.Keys))
 	if err := t.ListShipmentsRows(ctx, ListShipmentsRowsQuery{
-		Where:     spansql.Paren{Expr: where},
-		Limit:     int32(len(query.Keys)),
-		LineItems: query.LineItems,
+		Where:       spansql.Paren{Expr: where},
+		Limit:       int32(len(query.Keys)),
+		ShowDeleted: true,
+		LineItems:   query.LineItems,
 	}).Do(func(row *ShipmentsRow) error {
 		foundRows[row.Key()] = row
 		return nil
