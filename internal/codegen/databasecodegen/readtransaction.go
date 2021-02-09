@@ -165,6 +165,9 @@ func (g ReadTransactionCodeGenerator) generateGetInterleavedMethod(f *codegen.Fi
 	f.P("it := t.", g.ListInterleavedMethod(table), "(ctx, ", g.ListQueryStruct(table), "{")
 	f.P("Limit: 1,")
 	f.P("Where: query.Key.BoolExpr(),")
+	if g.hasSoftDelete(table) {
+		f.P("ShowDeleted: true,")
+	}
 	g.forwardInterleavedTablesStructFields(f, table, "query")
 	f.P("})")
 	f.P("defer it.Stop()")
@@ -480,6 +483,9 @@ func (g ReadTransactionCodeGenerator) generateBatchGetInterleavedMethod(f *codeg
 	f.P("if err := t.", g.ListMethod(table), "(ctx, ", g.ListQueryStruct(table), "{")
 	f.P("Where: ", spansqlPkg, ".Paren{Expr: where},")
 	f.P("Limit: int32(len(query.Keys)),")
+	if g.hasSoftDelete(table) {
+		f.P("ShowDeleted: true,")
+	}
 	g.forwardInterleavedTablesStructFields(f, table, "query")
 	f.P("}).Do(func(row *", row.Type(), ") error {")
 	f.P("foundRows[row.", row.KeyMethod(), "()] = row")
