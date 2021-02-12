@@ -121,17 +121,17 @@ func (UserAccessLogKey) Order() []spansql.Order {
 }
 
 func (k UserAccessLogKey) BoolExpr() spansql.BoolExpr {
-	cmp0 := spansql.ComparisonOp{
+	cmp0 := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("UserId"),
 		RHS: spansql.IntegerLiteral(k.UserId),
-	}
-	cmp1 := spansql.ComparisonOp{
+	})
+	cmp1 := spansql.BoolExpr(spansql.ComparisonOp{
 		Op:  spansql.Eq,
 		LHS: spansql.ID("LastAccess"),
 		RHS: spansql.TimestampLiteral(k.LastAccess),
-	}
-	b := spansql.BoolExpr(cmp0)
+	})
+	b := cmp0
 	b = spansql.LogicalOp{
 		Op:  spansql.And,
 		LHS: b,
