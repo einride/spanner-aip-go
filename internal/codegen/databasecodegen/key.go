@@ -74,23 +74,26 @@ func (g KeyCodeGenerator) generateBoolExprMethod(f *codegen.File) {
 	f.P()
 	f.P("func (k ", g.Type(), ") BoolExpr() ", spansqlPkg, ".BoolExpr {")
 	for i, keyPart := range g.Table.PrimaryKey {
-		f.P("cmp", i, " := ", spansqlPkg, ".ComparisonOp{")
+		f.P("cmp", i, " := ", spansqlPkg, ".BoolExpr(", spansqlPkg, ".ComparisonOp{")
 		f.P("Op: ", spansqlPkg, ".Eq,")
 		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(keyPart.Column)), "),")
 		f.P(
 			"RHS: ", g.columnSpanSQLType(f, keyPart),
 			"(k.", g.FieldName(keyPart), typescodegen.ValueAccessor(g.keyColumn(keyPart)), "),",
 		)
-		f.P("}")
+		f.P("})")
 		if !g.keyColumn(keyPart).NotNull {
 			f.P("if !k.", g.FieldName(keyPart), ".Valid {")
-			f.P("cmp", i, ".RHS = ", spansqlPkg, ".Null")
+			f.P("cmp", i, "= ", spansqlPkg, ".IsOp{")
+			f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(keyPart.Column)), "),")
+			f.P("RHS: ", spansqlPkg, ".Null,")
+			f.P("}")
 			f.P("}")
 		}
 	}
 	for i := range g.Table.PrimaryKey {
 		if i == 0 {
-			f.P("b := ", spansqlPkg, ".BoolExpr(cmp", i, ")")
+			f.P("b := cmp", i)
 		} else {
 			f.P("b = ", spansqlPkg, ".LogicalOp{")
 			f.P("Op: ", spansqlPkg, ".And,")

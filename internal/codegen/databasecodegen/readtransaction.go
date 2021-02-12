@@ -1,6 +1,7 @@
 package databasecodegen
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -383,7 +384,15 @@ func (g ReadTransactionCodeGenerator) generateListInterleavedMethod(f *codegen.F
 			if i < len(parent.PrimaryKey)-1 {
 				and = " AND"
 			}
-			f.P(t(l+2), child.Name, ".", keyPart.Column, " = ", parent.Name, ".", keyPart.Column, and)
+			if keyColumn(child, keyPart).NotNull {
+				f.P(t(l+2), child.Name, ".", keyPart.Column, " = ", parent.Name, ".", keyPart.Column, and)
+			} else {
+				// comparing null with null (null = null) returns a "falsy" value in spanner
+				f.P(
+					t(l+2), "((", child.Name, ".", keyPart.Column, " IS NULL AND ", parent.Name, ".", keyPart.Column,
+					" IS NULL) OR ", child.Name, ".", keyPart.Column, " = ", parent.Name, ".", keyPart.Column, ")", and,
+				)
+			}
 		}
 		f.P(t(l+1), "ORDER BY ")
 		for i, keyPart := range child.PrimaryKey {
@@ -563,4 +572,12 @@ func (g ReadTransactionCodeGenerator) hasSoftDelete(table *spanddl.Table) bool {
 
 func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName(table *spanddl.Table) spansql.ID {
 	return "delete_time"
+}
+
+func keyColumn(table *spanddl.Table, keyPart spansql.KeyPart) *spanddl.Column {
+	column, ok := table.Column(keyPart.Column)
+	if !ok {
+		panic(fmt.Errorf("table %s has no column %s", table.Name, keyPart.Column))
+	}
+	return column
 }
