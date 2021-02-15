@@ -1,6 +1,7 @@
 package freightdb_test
 
 import (
+	"context"
 	"strconv"
 	"testing"
 
@@ -12,7 +13,9 @@ import (
 
 func TestReadTransaction(t *testing.T) {
 	t.Parallel()
-	fx := spantest.NewEmulatorDockerFixture(t)
+	fx := spantest.NewEmulatorFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 
 	t.Run("hide deleted by default", func(t *testing.T) {
 		t.Parallel()
@@ -32,12 +35,12 @@ func TestReadTransaction(t *testing.T) {
 			}
 			mutations = append(mutations, spanner.Insert(shipper.Mutate()))
 		}
-		_, err := client.Apply(fx.Ctx, mutations)
+		_, err := client.Apply(ctx, mutations)
 		assert.NilError(t, err)
 		gotIDs := make([]string, 0, count)
 		tx := client.Single()
 		defer tx.Close()
-		assert.NilError(t, freightdb.Query(tx).ListShippersRows(fx.Ctx, freightdb.ListShippersRowsQuery{
+		assert.NilError(t, freightdb.Query(tx).ListShippersRows(ctx, freightdb.ListShippersRowsQuery{
 			Limit: count,
 		}).Do(func(row *freightdb.ShippersRow) error {
 			gotIDs = append(gotIDs, row.ShipperId)
@@ -71,11 +74,11 @@ func TestReadTransaction(t *testing.T) {
 			expectedShipmentIDs = append(expectedShipmentIDs, shipment.ShipmentId)
 			mutations = append(mutations, spanner.Insert(shipment.Mutate()))
 		}
-		_, err := client.Apply(fx.Ctx, mutations)
+		_, err := client.Apply(ctx, mutations)
 		assert.NilError(t, err)
 		tx := client.Single()
 		defer tx.Close()
-		gotShipper, err := freightdb.Query(tx).GetShippersRow(fx.Ctx, freightdb.GetShippersRowQuery{
+		gotShipper, err := freightdb.Query(tx).GetShippersRow(ctx, freightdb.GetShippersRowQuery{
 			Key:       freightdb.ShippersKey{ShipperId: shipper.ShipperId},
 			Shipments: true,
 		})
@@ -104,12 +107,12 @@ func TestReadTransaction(t *testing.T) {
 			expectedIDs = append(expectedIDs, shipper.ShipperId)
 			mutations = append(mutations, spanner.Insert(shipper.Mutate()))
 		}
-		_, err := client.Apply(fx.Ctx, mutations)
+		_, err := client.Apply(ctx, mutations)
 		assert.NilError(t, err)
 		gotIDs := make([]string, 0, count)
 		tx := client.Single()
 		defer tx.Close()
-		assert.NilError(t, freightdb.Query(tx).ListShippersRows(fx.Ctx, freightdb.ListShippersRowsQuery{
+		assert.NilError(t, freightdb.Query(tx).ListShippersRows(ctx, freightdb.ListShippersRowsQuery{
 			Limit:       count,
 			ShowDeleted: true,
 		}).Do(func(row *freightdb.ShippersRow) error {
