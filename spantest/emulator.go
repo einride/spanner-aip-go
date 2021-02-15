@@ -8,9 +8,9 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -26,43 +26,51 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-// EmulatorDockerFixture is a test fixture running the Spanner emulator.
-type EmulatorDockerFixture struct {
-	Ctx                 context.Context
-	Conn                *grpc.ClientConn
-	InstanceAdminClient *instance.InstanceAdminClient
-	DatabaseAdminClient *database.DatabaseAdminClient
-	EmulatorHost        string
-	ProjectID           string
-	InstanceID          string
+// EmulatorFixture is a test fixture running the Spanner emulator.
+type EmulatorFixture struct {
+	ctx                 context.Context
+	conn                *grpc.ClientConn
+	instanceAdminClient *instance.InstanceAdminClient
+	databaseAdminClient *database.DatabaseAdminClient
+	emulatorHost        string
+	projectID           string
+	instanceID          string
 }
 
-// NewEmulatorDockerFixture creates a test fixture for a containerized Spanner emulator.
-func NewEmulatorDockerFixture(t *testing.T) *EmulatorDockerFixture {
+// NewEmulatorFixture creates a test fixture for a containerized Spanner emulator.
+func NewEmulatorFixture(t *testing.T) Fixture {
 	t.Helper()
-	if !HasDocker() {
-		t.Fatal("No Docker client available for running the Spanner emulator container.")
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	if deadline, ok := t.Deadline(); ok {
 		ctx, cancel = context.WithDeadline(ctx, deadline)
 		t.Cleanup(cancel)
 	}
-	const cloudSpannerEmulatorImage = "gcr.io/cloud-spanner-emulator/emulator:latest"
-	dockerPull(t, cloudSpannerEmulatorImage)
-	var containerID string
-	if isRunningOnCloudBuild(t) {
-		containerID = dockerRunDetached(t, "--network", "cloudbuild", "--publish-all", cloudSpannerEmulatorImage)
+	emulatorHost, ok := os.LookupEnv("SPANNER_EMULATOR_HOST")
+	if !ok {
+		if !HasDocker() {
+			t.Fatal("No Docker client available for running the Spanner emulator container.")
+		}
+		if !IsDockerDaemonRunning() {
+			t.Fatal("Docker is available, but the daemon does not seem to be running.")
+		}
+		const cloudSpannerEmulatorImage = "gcr.io/cloud-spanner-emulator/emulator:latest"
+		dockerPull(t, cloudSpannerEmulatorImage)
+		var containerID string
+		if isRunningOnCloudBuild(t) {
+			containerID = dockerRunDetached(t, "--network", "cloudbuild", "--publish-all", cloudSpannerEmulatorImage)
+		} else {
+			containerID = dockerRunDetached(t, "--publish-all", cloudSpannerEmulatorImage)
+		}
+		t.Cleanup(func() {
+			t.Log(dockerLogs(t, containerID))
+			dockerKill(t, containerID)
+			dockerRm(t, containerID)
+		})
+		emulatorHost = inspectPortAddress(t, containerID, "9010/tcp")
 	} else {
-		containerID = dockerRunDetached(t, "--publish-all", cloudSpannerEmulatorImage)
+		t.Log("using emulator from environment")
 	}
-	t.Cleanup(func() {
-		t.Log(dockerLogs(t, containerID))
-		dockerKill(t, containerID)
-		dockerRm(t, containerID)
-	})
-	emulatorHost := inspectPortAddress(t, containerID, "9010/tcp")
 	t.Log("emulator host:", emulatorHost)
 	awaitReachable(t, emulatorHost, 1*time.Second, 10*time.Second)
 	conn, err := grpc.Dial(emulatorHost, grpc.WithInsecure())
@@ -73,13 +81,11 @@ func NewEmulatorDockerFixture(t *testing.T) *EmulatorDockerFixture {
 	instanceAdminClient, err := instance.NewInstanceAdminClient(ctx, option.WithGRPCConn(conn))
 	assert.NilError(t, err)
 	t.Log("creating instance...")
-	const (
-		projectID  = "spanner-aip-go"
-		instanceID = "emulator"
-	)
+	const projectID = "spanner-aip-go"
+	instanceID := fmt.Sprintf("emulator-%d", rand.Uint64()) // nolint: gosec
 	createInstanceOp, err := instanceAdminClient.CreateInstance(ctx, &instancepb.CreateInstanceRequest{
 		Parent:     fmt.Sprintf("projects/%s", projectID),
-		InstanceId: "emulator",
+		InstanceId: instanceID,
 		Instance: &instancepb.Instance{
 			DisplayName: "Emulator",
 			NodeCount:   1,
@@ -91,19 +97,23 @@ func NewEmulatorDockerFixture(t *testing.T) *EmulatorDockerFixture {
 	t.Log("instance:", createdInstance.String())
 	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx, option.WithGRPCConn(conn))
 	assert.NilError(t, err)
-	return &EmulatorDockerFixture{
-		Ctx:                 ctx,
-		Conn:                conn,
-		InstanceAdminClient: instanceAdminClient,
-		DatabaseAdminClient: databaseAdminClient,
-		ProjectID:           projectID,
-		InstanceID:          instanceID,
-		EmulatorHost:        emulatorHost,
+	return &EmulatorFixture{
+		ctx:                 ctx,
+		conn:                conn,
+		instanceAdminClient: instanceAdminClient,
+		databaseAdminClient: databaseAdminClient,
+		projectID:           projectID,
+		instanceID:          instanceID,
+		emulatorHost:        emulatorHost,
 	}
 }
 
+func (fx *EmulatorFixture) Context() context.Context {
+	return fx.ctx
+}
+
 // NewDatabaseFromDDLFiles creates a new database with a random ID from the provided DDL file path glob.
-func (fx *EmulatorDockerFixture) NewDatabaseFromDDLFiles(t *testing.T, glob string) *spanner.Client {
+func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, glob string) *spanner.Client {
 	t.Helper()
 	files, err := filepath.Glob(glob)
 	assert.NilError(t, err)
@@ -122,21 +132,21 @@ func (fx *EmulatorDockerFixture) NewDatabaseFromDDLFiles(t *testing.T, glob stri
 }
 
 // NewDatabaseFromDDLFiles creates a new database with a random ID from the provided statements.
-func (fx *EmulatorDockerFixture) NewDatabaseFromStatements(t *testing.T, statements []string) *spanner.Client {
+func (fx *EmulatorFixture) NewDatabaseFromStatements(t *testing.T, statements []string) *spanner.Client {
 	t.Helper()
-	databaseID := "db" + strconv.Itoa(rand.Int()) // nolint: gosec
-	createDatabaseOp, err := fx.DatabaseAdminClient.CreateDatabase(fx.Ctx, &databasepb.CreateDatabaseRequest{
-		Parent:          fmt.Sprintf("projects/%s/instances/%s", fx.ProjectID, fx.InstanceID),
+	databaseID := fmt.Sprintf("db%d", rand.Uint64()) // nolint: gosec
+	createDatabaseOp, err := fx.databaseAdminClient.CreateDatabase(fx.ctx, &databasepb.CreateDatabaseRequest{
+		Parent:          fmt.Sprintf("projects/%s/instances/%s", fx.projectID, fx.instanceID),
 		CreateStatement: fmt.Sprintf("CREATE DATABASE %s", databaseID),
 		ExtraStatements: statements,
 	})
 	assert.NilError(t, err)
-	createdDatabase, err := createDatabaseOp.Wait(fx.Ctx)
+	createdDatabase, err := createDatabaseOp.Wait(fx.ctx)
 	assert.NilError(t, err)
 	t.Log("database:", createdDatabase.String())
-	conn, err := grpc.Dial(fx.EmulatorHost, grpc.WithInsecure())
+	conn, err := grpc.Dial(fx.emulatorHost, grpc.WithInsecure())
 	assert.NilError(t, err)
-	client, err := spanner.NewClient(fx.Ctx, createdDatabase.Name, option.WithGRPCConn(conn))
+	client, err := spanner.NewClient(fx.ctx, createdDatabase.Name, option.WithGRPCConn(conn))
 	assert.NilError(t, err)
 	t.Cleanup(client.Close)
 	return client
@@ -146,6 +156,11 @@ func (fx *EmulatorDockerFixture) NewDatabaseFromStatements(t *testing.T, stateme
 func HasDocker() bool {
 	_, err := exec.LookPath("docker")
 	return err == nil
+}
+
+// IsDockerDaemonRunning reports if the Docker daemon is running.
+func IsDockerDaemonRunning() bool {
+	return exec.Command("docker", "info").Run() == nil
 }
 
 func dockerPull(t *testing.T, image string) {
