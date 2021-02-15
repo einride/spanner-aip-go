@@ -22,6 +22,9 @@ func (t *Transpiler) Init(filter filtering.Filter) {
 }
 
 func (t *Transpiler) Transpile() (spansql.BoolExpr, error) {
+	if t.filter.CheckedExpr == nil {
+		return spansql.True, nil
+	}
 	resultExpr, err := t.transpileExpr(t.filter.CheckedExpr.Expr)
 	if err != nil {
 		return nil, err

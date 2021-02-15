@@ -65,6 +65,15 @@ func TestTranspileFilter(t *testing.T) {
 			},
 			expectedSQL: `(example_enum = 1)`,
 		},
+
+		{
+			name:   "empty filter",
+			filter: ``,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
+			},
+			expectedSQL: `TRUE`,
+		},
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
