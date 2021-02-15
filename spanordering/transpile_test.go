@@ -1,4 +1,4 @@
-package aipspansql
+package spanordering
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-func TestOrder(t *testing.T) {
+func TestTranspileOrderBy(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
 		name     string
@@ -74,7 +74,7 @@ func TestOrder(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.DeepEqual(t, tt.expected, Order(tt.orderBy))
+			assert.DeepEqual(t, tt.expected, TranspileOrderBy(tt.orderBy))
 		})
 	}
 }

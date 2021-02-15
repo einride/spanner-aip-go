@@ -1,4 +1,4 @@
-package aipspansql
+package spanordering
 
 import (
 	"strings"
@@ -7,8 +7,8 @@ import (
 	"go.einride.tech/aip/ordering"
 )
 
-// Order translates a valid ordering.OrderBy expression to a spansql.Order expression.
-func Order(orderBy ordering.OrderBy) []spansql.Order {
+// TranspileOrderBy transpiles a valid ordering.OrderBy expression to a spansql.Order expression.
+func TranspileOrderBy(orderBy ordering.OrderBy) []spansql.Order {
 	if len(orderBy.Fields) == 0 {
 		return nil
 	}
