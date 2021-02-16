@@ -43,6 +43,9 @@ func NewEmulatorDockerFixture(t *testing.T) *EmulatorDockerFixture {
 	if !HasDocker() {
 		t.Fatal("No Docker client available for running the Spanner emulator container.")
 	}
+	if !IsDockerDaemonRunning() {
+		t.Fatal("Docker is available, but the daemon does not seem to be running.")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	if deadline, ok := t.Deadline(); ok {
@@ -146,6 +149,11 @@ func (fx *EmulatorDockerFixture) NewDatabaseFromStatements(t *testing.T, stateme
 func HasDocker() bool {
 	_, err := exec.LookPath("docker")
 	return err == nil
+}
+
+// IsDockerDaemonRunning reports if the Docker daemon is running.
+func IsDockerDaemonRunning() bool {
+	return exec.Command("docker", "info").Run() == nil
 }
 
 func dockerPull(t *testing.T, image string) {
