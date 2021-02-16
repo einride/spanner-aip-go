@@ -57,10 +57,16 @@ func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
 
 func (t *Transpiler) transpileConstExpr(e *expr.Expr) (spansql.Expr, error) {
 	switch kind := e.GetConstExpr().ConstantKind.(type) {
-	case *expr.Constant_StringValue:
-		return spansql.StringLiteral(kind.StringValue), nil
+	case *expr.Constant_BoolValue:
+		return spansql.BoolLiteral(kind.BoolValue), nil
+	case *expr.Constant_DoubleValue:
+		return spansql.FloatLiteral(kind.DoubleValue), nil
 	case *expr.Constant_Int64Value:
 		return spansql.IntegerLiteral(kind.Int64Value), nil
+	case *expr.Constant_StringValue:
+		return spansql.StringLiteral(kind.StringValue), nil
+	case *expr.Constant_Uint64Value:
+		return spansql.IntegerLiteral(kind.Uint64Value), nil
 	default:
 		return nil, fmt.Errorf("unsupported const expr: %v", kind)
 	}
