@@ -2,6 +2,7 @@ package spanfiltering
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"cloud.google.com/go/spanner/spansql"
@@ -12,28 +13,35 @@ import (
 )
 
 type Transpiler struct {
-	filter filtering.Filter
+	filter       filtering.Filter
+	params       map[string]interface{}
+	paramCounter int
 }
 
 func (t *Transpiler) Init(filter filtering.Filter) {
 	*t = Transpiler{
 		filter: filter,
+		params: make(map[string]interface{}),
 	}
 }
 
-func (t *Transpiler) Transpile() (spansql.BoolExpr, error) {
+func (t *Transpiler) Transpile() (spansql.BoolExpr, map[string]interface{}, error) {
 	if t.filter.CheckedExpr == nil {
-		return spansql.True, nil
+		return spansql.True, nil, nil
 	}
 	resultExpr, err := t.transpileExpr(t.filter.CheckedExpr.Expr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	resultBoolExpr, ok := resultExpr.(spansql.BoolExpr)
 	if !ok {
-		return nil, fmt.Errorf("not a bool expr")
+		return nil, nil, fmt.Errorf("not a bool expr")
 	}
-	return resultBoolExpr, nil
+	params := t.params
+	if t.paramCounter == 0 {
+		params = nil
+	}
+	return resultBoolExpr, params, nil
 }
 
 func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
@@ -58,15 +66,16 @@ func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
 func (t *Transpiler) transpileConstExpr(e *expr.Expr) (spansql.Expr, error) {
 	switch kind := e.GetConstExpr().ConstantKind.(type) {
 	case *expr.Constant_BoolValue:
-		return spansql.BoolLiteral(kind.BoolValue), nil
+		return t.param(kind.BoolValue), nil
 	case *expr.Constant_DoubleValue:
-		return spansql.FloatLiteral(kind.DoubleValue), nil
+		return t.param(kind.DoubleValue), nil
 	case *expr.Constant_Int64Value:
-		return spansql.IntegerLiteral(kind.Int64Value), nil
+		return t.param(kind.Int64Value), nil
 	case *expr.Constant_StringValue:
-		return spansql.StringLiteral(kind.StringValue), nil
+		return t.param(kind.StringValue), nil
 	case *expr.Constant_Uint64Value:
-		return spansql.IntegerLiteral(kind.Uint64Value), nil
+		// spanner does not support uint64
+		return t.param(int64(kind.Uint64Value)), nil
 	default:
 		return nil, fmt.Errorf("unsupported const expr: %v", kind)
 	}
@@ -109,7 +118,8 @@ func (t *Transpiler) transpileIdentExpr(e *expr.Expr) (spansql.Expr, error) {
 		if enumType, err := protoregistry.GlobalTypes.FindEnumByName(protoreflect.FullName(messageType)); err == nil {
 			if enumValue := enumType.Descriptor().Values().ByName(protoreflect.Name(identExpr.Name)); enumValue != nil {
 				// TODO: Configurable support for string literals.
-				return spansql.IntegerLiteral(enumValue.Number()), nil
+				// spanner does not support int32
+				return t.param(int64(enumValue.Number())), nil
 			}
 		}
 	}
@@ -225,24 +235,36 @@ func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 	return nil, fmt.Errorf("TODO: add support for transpiling `:`")
 }
 
-func (t *Transpiler) transpileTimestampCallExpr(e *expr.Expr) (spansql.TimestampLiteral, error) {
+func (t *Transpiler) transpileTimestampCallExpr(e *expr.Expr) (spansql.Expr, error) {
 	callExpr := e.GetCallExpr()
 	if len(callExpr.Args) != 1 {
-		return spansql.TimestampLiteral{}, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"unexpected number of arguments to `%s`: %d", callExpr.Function, len(callExpr.Args),
 		)
 	}
-	arg, err := t.transpileExpr(callExpr.Args[0])
-	if err != nil {
-		return spansql.TimestampLiteral{}, err
-	}
-	stringArg, ok := arg.(spansql.StringLiteral)
+	constArg, ok := callExpr.Args[0].ExprKind.(*expr.Expr_ConstExpr)
 	if !ok {
-		return spansql.TimestampLiteral{}, fmt.Errorf("expected string arg to %s", callExpr.Function)
+		return nil, fmt.Errorf("expected constant string arg to %s", callExpr.Function)
 	}
-	timeArg, err := time.Parse(time.RFC3339, string(stringArg))
+	stringArg, ok := constArg.ConstExpr.ConstantKind.(*expr.Constant_StringValue)
+	if !ok {
+		return nil, fmt.Errorf("expected constant string arg to %s", callExpr.Function)
+	}
+	timeArg, err := time.Parse(time.RFC3339, stringArg.StringValue)
 	if err != nil {
-		return spansql.TimestampLiteral{}, fmt.Errorf("invalid string arg to %s: %w", callExpr.Function, err)
+		return nil, fmt.Errorf("invalid string arg to %s: %w", callExpr.Function, err)
 	}
-	return spansql.TimestampLiteral(timeArg), nil
+	return t.param(timeArg), nil
+}
+
+func (t *Transpiler) param(param interface{}) spansql.Param {
+	p := t.nextParam()
+	t.params[p] = param
+	return spansql.Param(p)
+}
+
+func (t *Transpiler) nextParam() string {
+	param := "param_" + strconv.Itoa(t.paramCounter)
+	t.paramCounter++
+	return param
 }

@@ -2,6 +2,7 @@ package spanfiltering
 
 import (
 	"testing"
+	"time"
 
 	syntaxv1 "go.einride.tech/aip/examples/proto/gen/einride/example/syntax/v1"
 	"go.einride.tech/aip/filtering"
@@ -11,11 +12,12 @@ import (
 func TestTranspileFilter(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
-		name          string
-		filter        string
-		declarations  []filtering.DeclarationOption
-		expectedSQL   string
-		errorContains string
+		name           string
+		filter         string
+		declarations   []filtering.DeclarationOption
+		expectedSQL    string
+		expectedParams map[string]interface{}
+		errorContains  string
 	}{
 		{
 			name:   "simple flag",
@@ -44,17 +46,23 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("author", filtering.TypeString),
 				filtering.DeclareIdent("read", filtering.TypeBool),
 			},
-			expectedSQL: `((author = "Karin Boye") AND (NOT read))`,
+			expectedSQL: `((author = @param_0) AND (NOT read))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "Karin Boye",
+			},
 		},
 
 		{
-			name:   "string equality and flag",
+			name:   "timestamp",
 			filter: `create_time > timestamp("2021-02-14T14:49:34+01:00")`,
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
 			},
-			expectedSQL: `(create_time > (TIMESTAMP '2021-02-14 14:49:34.000000 +01:00'))`,
+			expectedSQL: `(create_time > (@param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": mustParseTime(t, "2021-02-14T14:49:34+01:00"),
+			},
 		},
 
 		{
@@ -63,7 +71,10 @@ func TestTranspileFilter(t *testing.T) {
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
 			},
-			expectedSQL: `(example_enum = 1)`,
+			expectedSQL: `(example_enum = @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": int64(1),
+			},
 		},
 
 		{
@@ -86,15 +97,23 @@ func TestTranspileFilter(t *testing.T) {
 				return
 			}
 			assert.NilError(t, err)
-			actual, err := TranspileFilter(filter)
+			actual, params, err := TranspileFilter(filter)
 			if err != nil && tt.errorContains != "" {
 				assert.ErrorContains(t, err, tt.errorContains)
 				return
 			}
 			assert.NilError(t, err)
 			assert.Equal(t, tt.expectedSQL, actual.SQL())
+			assert.DeepEqual(t, tt.expectedParams, params)
 		})
 	}
+}
+
+func mustParseTime(t *testing.T, s string) time.Time {
+	t.Helper()
+	tm, err := time.Parse(time.RFC3339, s)
+	assert.NilError(t, err)
+	return tm
 }
 
 type mockRequest struct {
