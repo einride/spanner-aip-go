@@ -220,6 +220,7 @@ func dockerRunDetached(t *testing.T, args ...string) string {
 }
 
 func awaitReachable(t *testing.T, addr string, wait, maxWait time.Duration) {
+	t.Helper()
 	deadline := time.Now().Add(maxWait)
 	for time.Now().Before(deadline) {
 		if c, err := net.Dial("tcp", addr); err == nil {

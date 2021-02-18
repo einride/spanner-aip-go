@@ -16,6 +16,6 @@ linters:
     - unparam # allow constant parameters
     - goerr113 # allow "dynamic" errors
     - dogsled # allow blank identifiers
-    - gocyclo # allow complex functions
+    - cyclop # allow complex functions
     - nlreturn # allow return/break without whitespace
     - exhaustivestruct # don't require exhaustive fields in struct initializers
