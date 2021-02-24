@@ -232,7 +232,38 @@ func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 	if len(callExpr.Args) != 2 {
 		return nil, fmt.Errorf("unexpected number of arguments to `in` expression: %d", len(callExpr.Args))
 	}
-	return nil, fmt.Errorf("TODO: add support for transpiling `:`")
+	identExpr := callExpr.Args[0]
+	constExpr := callExpr.Args[1]
+	if identExpr.GetIdentExpr() == nil {
+		return nil, fmt.Errorf("TODO: add support for transpiling `:` where LHS is other than Ident")
+	}
+	if constExpr.GetConstExpr() == nil {
+		return nil, fmt.Errorf("TODO: add support for transpiling `:` where RHS is other than Const")
+	}
+	identType, ok := t.filter.CheckedExpr.TypeMap[callExpr.Args[0].Id]
+	if !ok {
+		return nil, fmt.Errorf("unknown type of ident expr %d", e.Id)
+	}
+	switch {
+	// Repeated primitives:
+	// > Repeated fields query to see if the repeated structure contains a matching element.
+	case identType.GetListType().GetElemType().GetPrimitive() != expr.Type_PRIMITIVE_TYPE_UNSPECIFIED:
+		iden, err := t.transpileIdentExpr(identExpr)
+		if err != nil {
+			return nil, err
+		}
+		con, err := t.transpileConstExpr(constExpr)
+		if err != nil {
+			return nil, err
+		}
+		return spansql.InOp{
+			Unnest: true,
+			LHS:    con,
+			RHS:    []spansql.Expr{iden},
+		}, nil
+	default:
+		return nil, fmt.Errorf("TODO: add support for transpiling `:` on other types than repeated primitives")
+	}
 }
 
 func (t *Transpiler) transpileTimestampCallExpr(e *expr.Expr) (spansql.Expr, error) {

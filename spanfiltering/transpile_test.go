@@ -78,6 +78,19 @@ func TestTranspileFilter(t *testing.T) {
 		},
 
 		{
+			name:   "has: repeated string",
+			filter: `repeated_string:"value"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("repeated_string", filtering.TypeList(filtering.TypeString)),
+			},
+			expectedSQL: `(@param_0 IN UNNEST(repeated_string))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "value",
+			},
+		},
+
+		{
 			name:   "empty filter",
 			filter: ``,
 			declarations: []filtering.DeclarationOption{
