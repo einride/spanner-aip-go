@@ -8,6 +8,8 @@ import (
 	"cloud.google.com/go/spanner"
 	"go.einride.tech/spanner-aip/internal/examples/freightdb"
 	"go.einride.tech/spanner-aip/spantest"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gotest.tools/v3/assert"
 )
 
@@ -16,6 +18,163 @@ func TestReadTransaction(t *testing.T) {
 	fx := spantest.NewEmulatorFixture(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
+
+	client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/freight/*.up.sql")
+	shippers := []*freightdb.ShippersRow{
+		{
+			ShipperId: "allexists",
+			Shipments: []*freightdb.ShipmentsRow{
+				{
+					ShipperId:  "allexists",
+					ShipmentId: "allexists",
+					LineItems: []*freightdb.LineItemsRow{
+						{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 1},
+						{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 2},
+					},
+				},
+			},
+		},
+		{
+			ShipperId: "deleted",
+			DeleteTime: spanner.NullTime{
+				Valid: true,
+				Time:  spanner.CommitTimestamp,
+			},
+			Shipments: []*freightdb.ShipmentsRow{
+				{
+					ShipperId:  "deleted",
+					ShipmentId: "deleted",
+					LineItems: []*freightdb.LineItemsRow{
+						{ShipperId: "deleted", ShipmentId: "deleted", LineNumber: 1},
+						{ShipperId: "deleted", ShipmentId: "deleted", LineNumber: 2},
+					},
+				},
+			},
+		},
+		{
+			ShipperId: "interleavedeleted",
+			Shipments: []*freightdb.ShipmentsRow{
+				{
+					ShipperId:  "interleavedeleted",
+					ShipmentId: "interleavedeleted",
+					DeleteTime: spanner.NullTime{
+						Valid: true,
+						Time:  spanner.CommitTimestamp,
+					},
+					LineItems: []*freightdb.LineItemsRow{
+						{ShipperId: "interleavedeleted", ShipmentId: "interleavedeleted", LineNumber: 1},
+						{ShipperId: "interleavedeleted", ShipmentId: "interleavedeleted", LineNumber: 2},
+					},
+				},
+			},
+		},
+	}
+	mutations := make([]*spanner.Mutation, 0, 20)
+	for _, shipper := range shippers {
+		mutations = append(mutations, spanner.Insert(shipper.Mutate()))
+		for _, shipment := range shipper.Shipments {
+			mutations = append(mutations, spanner.Insert(shipment.Mutate()))
+			for _, lineItem := range shipment.LineItems {
+				mutations = append(mutations, spanner.Insert(lineItem.Mutate()))
+			}
+		}
+	}
+	commitTimestamp, err := client.Apply(ctx, mutations)
+	assert.NilError(t, err)
+
+	t.Run("Get", func(t *testing.T) {
+		t.Parallel()
+		t.Run("OK", func(t *testing.T) {
+			t.Run("found", func(t *testing.T) {
+				t.Parallel()
+				tx := client.Single()
+				defer tx.Close()
+
+				row, err := freightdb.Query(tx).GetShippersRow(ctx, freightdb.GetShippersRowQuery{
+					Key: freightdb.ShippersKey{ShipperId: "allexists"},
+				})
+				assert.NilError(t, err)
+				assert.DeepEqual(t, &freightdb.ShippersRow{ShipperId: "allexists"}, row)
+			})
+
+			t.Run("deleted", func(t *testing.T) {
+				t.Parallel()
+				tx := client.Single()
+				defer tx.Close()
+
+				row, err := freightdb.Query(tx).GetShippersRow(ctx, freightdb.GetShippersRowQuery{
+					Key: freightdb.ShippersKey{ShipperId: "deleted"},
+				})
+				assert.NilError(t, err)
+				assert.DeepEqual(
+					t,
+					&freightdb.ShippersRow{
+						ShipperId: "deleted",
+						DeleteTime: spanner.NullTime{
+							Valid: true,
+							Time:  commitTimestamp,
+						},
+					},
+					row,
+				)
+			})
+
+			t.Run("interleaved", func(t *testing.T) {
+				t.Parallel()
+				tx := client.ReadOnlyTransaction()
+				defer tx.Close()
+
+				row, err := freightdb.Query(tx).GetShippersRow(ctx, freightdb.GetShippersRowQuery{
+					Key:       freightdb.ShippersKey{ShipperId: "allexists"},
+					Shipments: true,
+					LineItems: true,
+				})
+				assert.NilError(t, err)
+				assert.DeepEqual(
+					t,
+					&freightdb.ShippersRow{
+						ShipperId: "allexists",
+						Shipments: []*freightdb.ShipmentsRow{
+							{
+								ShipperId:  "allexists",
+								ShipmentId: "allexists",
+								LineItems: []*freightdb.LineItemsRow{
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 1},
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 2},
+								},
+							},
+						},
+					},
+					row,
+				)
+			})
+
+			t.Run("interleaved deleted", func(t *testing.T) {
+				t.Parallel()
+				tx := client.ReadOnlyTransaction()
+				defer tx.Close()
+
+				row, err := freightdb.Query(tx).GetShippersRow(ctx, freightdb.GetShippersRowQuery{
+					Key:       freightdb.ShippersKey{ShipperId: "interleavedeleted"},
+					Shipments: true,
+					LineItems: true,
+				})
+				assert.NilError(t, err)
+				assert.DeepEqual(t, &freightdb.ShippersRow{ShipperId: "interleavedeleted"}, row)
+			})
+		})
+
+		t.Run("NotFound", func(t *testing.T) {
+			t.Parallel()
+			tx := client.Single()
+			defer tx.Close()
+
+			_, err := freightdb.Query(tx).GetShippersRow(ctx, freightdb.GetShippersRowQuery{
+				Key: freightdb.ShippersKey{ShipperId: "notfound"},
+			})
+			assert.Equal(t, codes.NotFound, status.Code(err), err)
+		})
+	})
 
 	t.Run("hide deleted by default", func(t *testing.T) {
 		t.Parallel()
@@ -70,13 +229,14 @@ func TestReadTransaction(t *testing.T) {
 					Time:  spanner.CommitTimestamp,
 					Valid: true,
 				}
+			} else {
+				expectedShipmentIDs = append(expectedShipmentIDs, shipment.ShipmentId)
 			}
-			expectedShipmentIDs = append(expectedShipmentIDs, shipment.ShipmentId)
 			mutations = append(mutations, spanner.Insert(shipment.Mutate()))
 		}
 		_, err := client.Apply(ctx, mutations)
 		assert.NilError(t, err)
-		tx := client.Single()
+		tx := client.ReadOnlyTransaction()
 		defer tx.Close()
 		gotShipper, err := freightdb.Query(tx).GetShippersRow(ctx, freightdb.GetShippersRowQuery{
 			Key:       freightdb.ShippersKey{ShipperId: shipper.ShipperId},

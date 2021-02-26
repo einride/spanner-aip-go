@@ -55,10 +55,6 @@ func (g ReadTransactionCodeGenerator) ListInterleavedMethod(table *spanddl.Table
 	return strcase.LowerCamelCase(g.ListMethod(table)) + "Interleaved"
 }
 
-func (g ReadTransactionCodeGenerator) GetInterleavedMethod(table *spanddl.Table) string {
-	return strcase.LowerCamelCase(g.GetMethod(table)) + "Interleaved"
-}
-
 func (g ReadTransactionCodeGenerator) BatchGetInterleavedMethod(table *spanddl.Table) string {
 	return strcase.LowerCamelCase(g.BatchGetMethod(table)) + "Interleaved"
 }
@@ -95,7 +91,6 @@ func (g ReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 			g.generateReadInterleavedRowsResult(f, table)
 			g.generateReadInterleavedRowsMethod(f, table)
 			g.generateListInterleavedMethod(f, table)
-			g.generateGetInterleavedMethod(f, table)
 			g.generateBatchGetInterleavedMethod(f, table)
 		}
 	}
@@ -145,11 +140,6 @@ func (g ReadTransactionCodeGenerator) generateGetMethod(f *codegen.File, table *
 	f.P("ctx ", contextPkg, ".Context,")
 	f.P("query ", g.GetQueryStruct(table), ",")
 	f.P(") (*", row.Type(), ", error) {")
-	if len(table.InterleavedTables) > 0 {
-		f.P("if query.hasInterleavedTables() {")
-		f.P("return t.", g.GetInterleavedMethod(table), "(ctx, query)")
-		f.P("}")
-	}
 	f.P("spannerRow, err := t.Tx.ReadRow(")
 	f.P("ctx,")
 	f.P(strconv.Quote(string(table.Name)), ",")
@@ -163,38 +153,28 @@ func (g ReadTransactionCodeGenerator) generateGetMethod(f *codegen.File, table *
 	f.P("if err := row.", row.UnmarshalSpannerRowMethod(), "(spannerRow); err != nil {")
 	f.P("return nil, err")
 	f.P("}")
+	if len(table.InterleavedTables) == 0 {
+		f.P("return &row, nil")
+		f.P("}")
+		return
+	}
+	f.P("if !query.hasInterleavedTables() {")
 	f.P("return &row, nil")
 	f.P("}")
-}
-
-func (g ReadTransactionCodeGenerator) generateGetInterleavedMethod(f *codegen.File, table *spanddl.Table) {
-	row := RowCodeGenerator{Table: table}
-	contextPkg := f.Import("context")
-	iteratorPkg := f.Import("google.golang.org/api/iterator")
-	codesPkg := f.Import("google.golang.org/grpc/codes")
-	statusPkg := f.Import("google.golang.org/grpc/status")
-	f.P()
-	f.P("func (t ", g.Type(), ") ", g.GetInterleavedMethod(table), "(")
-	f.P("ctx ", contextPkg, ".Context,")
-	f.P("query ", g.GetQueryStruct(table), ",")
-	f.P(") (*", row.Type(), ", error) {")
-	f.P("it := t.", g.ListInterleavedMethod(table), "(ctx, ", g.ListQueryStruct(table), "{")
-	f.P("Limit: 1,")
-	f.P("Where: query.Key.BoolExpr(),")
-	if g.hasSoftDelete(table) {
-		f.P("ShowDeleted: true,")
-	}
+	f.P("interleaved, err := t.", g.ReadInterleavedMethod(table), "(ctx, ", g.ReadInterleavedQuery(table), "{")
+	f.P("KeySet: row.Key().SpannerKey().AsPrefix(),")
 	g.forwardInterleavedTablesStructFields(f, table, "query")
 	f.P("})")
-	f.P("defer it.Stop()")
-	f.P("row, err := it.Next()")
 	f.P("if err != nil {")
-	f.P("if err == ", iteratorPkg, ".Done {")
-	f.P(`return nil, `, statusPkg, `.Errorf(`, codesPkg, `.NotFound, "not found: %v", query.Key)`)
-	f.P("}")
 	f.P("return nil, err")
 	f.P("}")
-	f.P("return row, nil")
+	for _, child := range table.InterleavedTables {
+		childName := strcase.UpperCamelCase(string(child.Name))
+		f.P("if rs, ok := interleaved.", childName, "[row.Key()]; ok {")
+		f.P("row.", childName, " = rs")
+		f.P("}")
+	}
+	f.P("return &row, nil")
 	f.P("}")
 }
 

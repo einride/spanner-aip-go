@@ -12,8 +12,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
 	"google.golang.org/api/iterator"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type SingersRow struct {
@@ -469,9 +467,6 @@ func (t ReadTransaction) GetSingersRow(
 	ctx context.Context,
 	query GetSingersRowQuery,
 ) (*SingersRow, error) {
-	if query.hasInterleavedTables() {
-		return t.getSingersRowInterleaved(ctx, query)
-	}
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"Singers",
@@ -484,6 +479,19 @@ func (t ReadTransaction) GetSingersRow(
 	var row SingersRow
 	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
 		return nil, err
+	}
+	if !query.hasInterleavedTables() {
+		return &row, nil
+	}
+	interleaved, err := t.readInterleavedSingersRows(ctx, readInterleavedSingersRowsQuery{
+		KeySet: row.Key().SpannerKey().AsPrefix(),
+		Albums: query.Albums,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if rs, ok := interleaved.Albums[row.Key()]; ok {
+		row.Albums = rs
 	}
 	return &row, nil
 }
@@ -675,26 +683,6 @@ FROM
 	return &streamingSingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
-}
-
-func (t ReadTransaction) getSingersRowInterleaved(
-	ctx context.Context,
-	query GetSingersRowQuery,
-) (*SingersRow, error) {
-	it := t.listSingersRowsInterleaved(ctx, ListSingersRowsQuery{
-		Limit:  1,
-		Where:  query.Key.BoolExpr(),
-		Albums: query.Albums,
-	})
-	defer it.Stop()
-	row, err := it.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", query.Key)
-		}
-		return nil, err
-	}
-	return row, nil
 }
 
 func (t ReadTransaction) batchGetSingersRowsInterleaved(

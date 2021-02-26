@@ -151,7 +151,7 @@ func TestReadTransaction(t *testing.T) {
 			}
 			_, err := client.Apply(ctx, mutations)
 			assert.NilError(t, err)
-			tx := client.Single()
+			tx := client.ReadOnlyTransaction()
 			actual, err := musicdb.Query(tx).GetSingersRow(ctx, musicdb.GetSingersRowQuery{
 				Key:    expected.Key(),
 				Albums: true,
