@@ -376,9 +376,10 @@ func (t ReadTransaction) ListShippersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingShippersRowIterator{
+	iter := &streamingShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	return iter
 }
 
 type SpannerReadTransaction interface {

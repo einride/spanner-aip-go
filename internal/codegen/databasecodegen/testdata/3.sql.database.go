@@ -7,7 +7,6 @@ package testdata
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
@@ -797,9 +796,6 @@ func (t ReadTransaction) ListSingersRows(
 	ctx context.Context,
 	query ListSingersRowsQuery,
 ) SingersRowIterator {
-	if query.hasInterleavedTables() {
-		return t.listSingersRowsInterleaved(ctx, query)
-	}
 	if len(query.Order) == 0 {
 		query.Order = SingersKey{}.Order()
 	}
@@ -830,9 +826,38 @@ func (t ReadTransaction) ListSingersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingSingersRowIterator{
+	iter := &streamingSingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	if !query.hasInterleavedTables() {
+		return iter
+	}
+	rows := make([]*SingersRow, 0, query.Limit)
+	lookup := make(map[SingersKey]*SingersRow, query.Limit)
+	prefixes := make([]spanner.KeySet, 0, query.Limit)
+	if err := iter.Do(func(row *SingersRow) error {
+		k := row.Key()
+		rows = append(rows, row)
+		lookup[k] = row
+		prefixes = append(prefixes, k.SpannerKey().AsPrefix())
+		return nil
+	}); err != nil {
+		return &bufferedSingersRowIterator{err: err}
+	}
+	interleaved, err := t.readInterleavedSingersRows(ctx, readInterleavedSingersRowsQuery{
+		KeySet: spanner.KeySets(prefixes...),
+		Albums: query.Albums,
+		Songs:  query.Songs,
+	})
+	if err != nil {
+		return &bufferedSingersRowIterator{err: err}
+	}
+	for key, row := range lookup {
+		if rs, ok := interleaved.Albums[key]; ok {
+			row.Albums = rs
+		}
+	}
+	return &bufferedSingersRowIterator{rows: rows}
 }
 
 type readInterleavedSingersRowsQuery struct {
@@ -879,103 +904,6 @@ func (t ReadTransaction) readInterleavedSingersRows(
 		}
 	}
 	return &r, nil
-}
-
-func (t ReadTransaction) listSingersRowsInterleaved(
-	ctx context.Context,
-	query ListSingersRowsQuery,
-) SingersRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = SingersKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString(`
-SELECT
-    SingerId,
-    FirstName,
-    LastName,
-    SingerInfo,
-`)
-	if query.Albums {
-		_, _ = q.WriteString(`
-    ARRAY(
-        SELECT AS STRUCT
-            SingerId,
-            AlbumId,
-            AlbumTitle,
-`)
-		if query.Songs {
-			_, _ = q.WriteString(`
-            ARRAY(
-                SELECT AS STRUCT
-                    SingerId,
-                    AlbumId,
-                    TrackId,
-                    SongName,
-`)
-			_, _ = q.WriteString(`
-                FROM 
-                    Songs
-                WHERE 
-                    Songs.SingerId = Albums.SingerId AND
-                    Songs.AlbumId = Albums.AlbumId
-                ORDER BY 
-                    SingerId,
-                    AlbumId,
-                    TrackId
-            ) AS Songs,
-`)
-		}
-		_, _ = q.WriteString(`
-        FROM 
-            Albums
-        WHERE 
-            Albums.SingerId = Singers.SingerId
-        ORDER BY 
-            SingerId,
-            AlbumId
-    ) AS Albums,
-`)
-	}
-	_, _ = q.WriteString(`
-FROM
-    Singers
-`)
-	if query.Where == nil {
-		query.Where = spansql.True
-	}
-	_, _ = q.WriteString("WHERE (")
-	_, _ = q.WriteString(query.Where.SQL())
-	_, _ = q.WriteString(") ")
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @__limit ")
-	_, _ = q.WriteString("OFFSET @__offset ")
-	params := make(map[string]interface{}, len(query.Params)+2)
-	params["__limit"] = int64(query.Limit)
-	params["__offset"] = int64(query.Offset)
-	for param, value := range query.Params {
-		if _, ok := params[param]; ok {
-			panic(fmt.Errorf("invalid param: %s", param))
-		}
-		params[param] = value
-	}
-	stmt := spanner.Statement{
-		SQL:    q.String(),
-		Params: params,
-	}
-	return &streamingSingersRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
 }
 
 func (t ReadTransaction) ReadAlbumsRows(
@@ -1095,9 +1023,6 @@ func (t ReadTransaction) ListAlbumsRows(
 	ctx context.Context,
 	query ListAlbumsRowsQuery,
 ) AlbumsRowIterator {
-	if query.hasInterleavedTables() {
-		return t.listAlbumsRowsInterleaved(ctx, query)
-	}
 	if len(query.Order) == 0 {
 		query.Order = AlbumsKey{}.Order()
 	}
@@ -1128,9 +1053,37 @@ func (t ReadTransaction) ListAlbumsRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingAlbumsRowIterator{
+	iter := &streamingAlbumsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	if !query.hasInterleavedTables() {
+		return iter
+	}
+	rows := make([]*AlbumsRow, 0, query.Limit)
+	lookup := make(map[AlbumsKey]*AlbumsRow, query.Limit)
+	prefixes := make([]spanner.KeySet, 0, query.Limit)
+	if err := iter.Do(func(row *AlbumsRow) error {
+		k := row.Key()
+		rows = append(rows, row)
+		lookup[k] = row
+		prefixes = append(prefixes, k.SpannerKey().AsPrefix())
+		return nil
+	}); err != nil {
+		return &bufferedAlbumsRowIterator{err: err}
+	}
+	interleaved, err := t.readInterleavedAlbumsRows(ctx, readInterleavedAlbumsRowsQuery{
+		KeySet: spanner.KeySets(prefixes...),
+		Songs:  query.Songs,
+	})
+	if err != nil {
+		return &bufferedAlbumsRowIterator{err: err}
+	}
+	for key, row := range lookup {
+		if rs, ok := interleaved.Songs[key]; ok {
+			row.Songs = rs
+		}
+	}
+	return &bufferedAlbumsRowIterator{rows: rows}
 }
 
 type readInterleavedAlbumsRowsQuery struct {
@@ -1161,83 +1114,6 @@ func (t ReadTransaction) readInterleavedAlbumsRows(
 		}
 	}
 	return &r, nil
-}
-
-func (t ReadTransaction) listAlbumsRowsInterleaved(
-	ctx context.Context,
-	query ListAlbumsRowsQuery,
-) AlbumsRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = AlbumsKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString(`
-SELECT
-    SingerId,
-    AlbumId,
-    AlbumTitle,
-`)
-	if query.Songs {
-		_, _ = q.WriteString(`
-    ARRAY(
-        SELECT AS STRUCT
-            SingerId,
-            AlbumId,
-            TrackId,
-            SongName,
-`)
-		_, _ = q.WriteString(`
-        FROM 
-            Songs
-        WHERE 
-            Songs.SingerId = Albums.SingerId AND
-            Songs.AlbumId = Albums.AlbumId
-        ORDER BY 
-            SingerId,
-            AlbumId,
-            TrackId
-    ) AS Songs,
-`)
-	}
-	_, _ = q.WriteString(`
-FROM
-    Albums
-`)
-	if query.Where == nil {
-		query.Where = spansql.True
-	}
-	_, _ = q.WriteString("WHERE (")
-	_, _ = q.WriteString(query.Where.SQL())
-	_, _ = q.WriteString(") ")
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @__limit ")
-	_, _ = q.WriteString("OFFSET @__offset ")
-	params := make(map[string]interface{}, len(query.Params)+2)
-	params["__limit"] = int64(query.Limit)
-	params["__offset"] = int64(query.Offset)
-	for param, value := range query.Params {
-		if _, ok := params[param]; ok {
-			panic(fmt.Errorf("invalid param: %s", param))
-		}
-		params[param] = value
-	}
-	stmt := spanner.Statement{
-		SQL:    q.String(),
-		Params: params,
-	}
-	return &streamingAlbumsRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
 }
 
 func (t ReadTransaction) ReadSongsRows(
@@ -1344,9 +1220,10 @@ func (t ReadTransaction) ListSongsRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingSongsRowIterator{
+	iter := &streamingSongsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	return iter
 }
 
 type SpannerReadTransaction interface {
