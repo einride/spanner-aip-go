@@ -13,8 +13,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
 	"google.golang.org/api/iterator"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type ShippersRow struct {
@@ -495,9 +493,6 @@ func (t ReadTransaction) GetShippersRow(
 	ctx context.Context,
 	query GetShippersRowQuery,
 ) (*ShippersRow, error) {
-	if query.hasInterleavedTables() {
-		return t.getShippersRowInterleaved(ctx, query)
-	}
 	spannerRow, err := t.Tx.ReadRow(
 		ctx,
 		"shippers",
@@ -510,6 +505,19 @@ func (t ReadTransaction) GetShippersRow(
 	var row ShippersRow
 	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
 		return nil, err
+	}
+	if !query.hasInterleavedTables() {
+		return &row, nil
+	}
+	interleaved, err := t.readInterleavedShippersRows(ctx, readInterleavedShippersRowsQuery{
+		KeySet:    row.Key().SpannerKey().AsPrefix(),
+		Shipments: query.Shipments,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if rs, ok := interleaved.Shipments[row.Key()]; ok {
+		row.Shipments = rs
 	}
 	return &row, nil
 }
@@ -734,27 +742,6 @@ FROM
 	return &streamingShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
-}
-
-func (t ReadTransaction) getShippersRowInterleaved(
-	ctx context.Context,
-	query GetShippersRowQuery,
-) (*ShippersRow, error) {
-	it := t.listShippersRowsInterleaved(ctx, ListShippersRowsQuery{
-		Limit:       1,
-		Where:       query.Key.BoolExpr(),
-		ShowDeleted: true,
-		Shipments:   query.Shipments,
-	})
-	defer it.Stop()
-	row, err := it.Next()
-	if err != nil {
-		if err == iterator.Done {
-			return nil, status.Errorf(codes.NotFound, "not found: %v", query.Key)
-		}
-		return nil, err
-	}
-	return row, nil
 }
 
 func (t ReadTransaction) batchGetShippersRowsInterleaved(
