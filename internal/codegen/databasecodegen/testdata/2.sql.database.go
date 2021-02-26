@@ -573,6 +573,35 @@ func (t ReadTransaction) ListSingersRows(
 	}
 }
 
+type readInterleavedSingersRowsQuery struct {
+	KeySet spanner.KeySet
+	Albums bool
+}
+
+type readInterleavedSingersRowsResult struct {
+	Albums map[SingersKey][]*AlbumsRow
+}
+
+func (t ReadTransaction) readInterleavedSingersRows(
+	ctx context.Context,
+	query readInterleavedSingersRowsQuery,
+) (*readInterleavedSingersRowsResult, error) {
+	var r readInterleavedSingersRowsResult
+	if query.Albums {
+		r.Albums = make(map[SingersKey][]*AlbumsRow)
+		if err := t.ReadAlbumsRows(ctx, query.KeySet).Do(func(row *AlbumsRow) error {
+			k := SingersKey{
+				SingerId: row.SingerId,
+			}
+			r.Albums[k] = append(r.Albums[k], row)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return &r, nil
+}
+
 func (t ReadTransaction) listSingersRowsInterleaved(
 	ctx context.Context,
 	query ListSingersRowsQuery,

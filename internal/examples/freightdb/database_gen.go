@@ -1229,6 +1229,55 @@ func (t ReadTransaction) ListShippersRows(
 	}
 }
 
+type readInterleavedShippersRowsQuery struct {
+	KeySet    spanner.KeySet
+	Shipments bool
+	LineItems bool
+}
+
+type readInterleavedShippersRowsResult struct {
+	Shipments map[ShippersKey][]*ShipmentsRow
+}
+
+func (t ReadTransaction) readInterleavedShippersRows(
+	ctx context.Context,
+	query readInterleavedShippersRowsQuery,
+) (*readInterleavedShippersRowsResult, error) {
+	var r readInterleavedShippersRowsResult
+	interleavedShipments := make(map[ShipmentsKey]*ShipmentsRow)
+	if query.Shipments {
+		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
+		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
+			if row.DeleteTime.Valid {
+				return nil
+			}
+			k := ShippersKey{
+				ShipperId: row.ShipperId,
+			}
+			r.Shipments[k] = append(r.Shipments[k], row)
+			interleavedShipments[row.Key()] = row
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	if query.LineItems {
+		if err := t.ReadLineItemsRows(ctx, query.KeySet).Do(func(row *LineItemsRow) error {
+			k := ShipmentsKey{
+				ShipperId:  row.ShipperId,
+				ShipmentId: row.ShipmentId,
+			}
+			if p, ok := interleavedShipments[k]; ok {
+				p.LineItems = append(p.LineItems, row)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return &r, nil
+}
+
 func (t ReadTransaction) listShippersRowsInterleaved(
 	ctx context.Context,
 	query ListShippersRowsQuery,
@@ -1665,6 +1714,36 @@ func (t ReadTransaction) ListShipmentsRows(
 	return &streamingShipmentsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+}
+
+type readInterleavedShipmentsRowsQuery struct {
+	KeySet    spanner.KeySet
+	LineItems bool
+}
+
+type readInterleavedShipmentsRowsResult struct {
+	LineItems map[ShipmentsKey][]*LineItemsRow
+}
+
+func (t ReadTransaction) readInterleavedShipmentsRows(
+	ctx context.Context,
+	query readInterleavedShipmentsRowsQuery,
+) (*readInterleavedShipmentsRowsResult, error) {
+	var r readInterleavedShipmentsRowsResult
+	if query.LineItems {
+		r.LineItems = make(map[ShipmentsKey][]*LineItemsRow)
+		if err := t.ReadLineItemsRows(ctx, query.KeySet).Do(func(row *LineItemsRow) error {
+			k := ShipmentsKey{
+				ShipperId:  row.ShipperId,
+				ShipmentId: row.ShipmentId,
+			}
+			r.LineItems[k] = append(r.LineItems[k], row)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return &r, nil
 }
 
 func (t ReadTransaction) listShipmentsRowsInterleaved(
