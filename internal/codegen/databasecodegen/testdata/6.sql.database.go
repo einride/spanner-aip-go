@@ -7,7 +7,6 @@ package testdata
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -584,9 +583,6 @@ func (t ReadTransaction) ListShippersRows(
 	ctx context.Context,
 	query ListShippersRowsQuery,
 ) ShippersRowIterator {
-	if query.hasInterleavedTables() {
-		return t.listShippersRowsInterleaved(ctx, query)
-	}
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
 	}
@@ -627,9 +623,37 @@ func (t ReadTransaction) ListShippersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingShippersRowIterator{
+	iter := &streamingShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	if !query.hasInterleavedTables() {
+		return iter
+	}
+	rows := make([]*ShippersRow, 0, query.Limit)
+	lookup := make(map[ShippersKey]*ShippersRow, query.Limit)
+	prefixes := make([]spanner.KeySet, 0, query.Limit)
+	if err := iter.Do(func(row *ShippersRow) error {
+		k := row.Key()
+		rows = append(rows, row)
+		lookup[k] = row
+		prefixes = append(prefixes, k.SpannerKey().AsPrefix())
+		return nil
+	}); err != nil {
+		return &bufferedShippersRowIterator{err: err}
+	}
+	interleaved, err := t.readInterleavedShippersRows(ctx, readInterleavedShippersRowsQuery{
+		KeySet:    spanner.KeySets(prefixes...),
+		Shipments: query.Shipments,
+	})
+	if err != nil {
+		return &bufferedShippersRowIterator{err: err}
+	}
+	for key, row := range lookup {
+		if rs, ok := interleaved.Shipments[key]; ok {
+			row.Shipments = rs
+		}
+	}
+	return &bufferedShippersRowIterator{rows: rows}
 }
 
 type readInterleavedShippersRowsQuery struct {
@@ -662,100 +686,6 @@ func (t ReadTransaction) readInterleavedShippersRows(
 		}
 	}
 	return &r, nil
-}
-
-func (t ReadTransaction) listShippersRowsInterleaved(
-	ctx context.Context,
-	query ListShippersRowsQuery,
-) ShippersRowIterator {
-	if len(query.Order) == 0 {
-		query.Order = ShippersKey{}.Order()
-	}
-	var q strings.Builder
-	_, _ = q.WriteString(`
-SELECT
-    shipper_id,
-    create_time,
-    update_time,
-    delete_time,
-`)
-	if query.Shipments {
-		_, _ = q.WriteString(`
-    ARRAY(
-        SELECT AS STRUCT
-            shipper_id,
-            shipment_id,
-            create_time,
-            update_time,
-            delete_time,
-`)
-		_, _ = q.WriteString(`
-        FROM 
-            shipments
-        WHERE 
-`)
-		if !query.ShowDeleted {
-			_, _ = q.WriteString(`
-            delete_time IS NULL AND
-`)
-		}
-		_, _ = q.WriteString(`
-            shipments.shipper_id = shippers.shipper_id
-        ORDER BY 
-            shipper_id,
-            shipment_id
-    ) AS shipments,
-`)
-	}
-	_, _ = q.WriteString(`
-FROM
-    shippers
-`)
-	if query.Where == nil {
-		query.Where = spansql.True
-	}
-	if !query.ShowDeleted {
-		query.Where = spansql.LogicalOp{
-			Op:  spansql.And,
-			LHS: spansql.Paren{Expr: query.Where},
-			RHS: spansql.IsOp{
-				LHS: spansql.ID("delete_time"),
-				RHS: spansql.Null,
-			},
-		}
-	}
-	_, _ = q.WriteString("WHERE (")
-	_, _ = q.WriteString(query.Where.SQL())
-	_, _ = q.WriteString(") ")
-	if len(query.Order) > 0 {
-		_, _ = q.WriteString("ORDER BY ")
-		for i, order := range query.Order {
-			_, _ = q.WriteString(order.SQL())
-			if i < len(query.Order)-1 {
-				_, _ = q.WriteString(", ")
-			} else {
-				_, _ = q.WriteString(" ")
-			}
-		}
-	}
-	_, _ = q.WriteString("LIMIT @__limit ")
-	_, _ = q.WriteString("OFFSET @__offset ")
-	params := make(map[string]interface{}, len(query.Params)+2)
-	params["__limit"] = int64(query.Limit)
-	params["__offset"] = int64(query.Offset)
-	for param, value := range query.Params {
-		if _, ok := params[param]; ok {
-			panic(fmt.Errorf("invalid param: %s", param))
-		}
-		params[param] = value
-	}
-	stmt := spanner.Statement{
-		SQL:    q.String(),
-		Params: params,
-	}
-	return &streamingShippersRowIterator{
-		RowIterator: t.Tx.Query(ctx, stmt),
-	}
 }
 
 func (t ReadTransaction) ReadShipmentsRows(
@@ -873,9 +803,10 @@ func (t ReadTransaction) ListShipmentsRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingShipmentsRowIterator{
+	iter := &streamingShipmentsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	return iter
 }
 
 type SpannerReadTransaction interface {

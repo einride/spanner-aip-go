@@ -320,9 +320,10 @@ func (t ReadTransaction) ListUserAccessLogRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingUserAccessLogRowIterator{
+	iter := &streamingUserAccessLogRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	return iter
 }
 
 type SpannerReadTransaction interface {

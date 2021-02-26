@@ -318,6 +318,151 @@ func TestReadTransaction(t *testing.T) {
 		})
 	})
 
+	t.Run("List", func(t *testing.T) {
+		t.Parallel()
+		t.Run("hide deleted by default", func(t *testing.T) {
+			t.Parallel()
+			tx := client.Single()
+			defer tx.Close()
+
+			var got []*freightdb.ShippersRow
+			assert.NilError(t, freightdb.Query(tx).ListShippersRows(ctx, freightdb.ListShippersRowsQuery{
+				Limit: 10,
+			}).Do(func(row *freightdb.ShippersRow) error {
+				got = append(got, row)
+				return nil
+			}))
+			assert.DeepEqual(
+				t,
+				[]*freightdb.ShippersRow{
+					{ShipperId: "allexists"},
+					{ShipperId: "interleavedeleted"},
+				},
+				got,
+			)
+		})
+
+		t.Run("show deleted", func(t *testing.T) {
+			t.Parallel()
+			tx := client.Single()
+			defer tx.Close()
+
+			var got []*freightdb.ShippersRow
+			assert.NilError(t, freightdb.Query(tx).ListShippersRows(ctx, freightdb.ListShippersRowsQuery{
+				Limit:       10,
+				ShowDeleted: true,
+			}).Do(func(row *freightdb.ShippersRow) error {
+				got = append(got, row)
+				return nil
+			}))
+			assert.DeepEqual(
+				t,
+				[]*freightdb.ShippersRow{
+					{ShipperId: "allexists"},
+					{
+						ShipperId: "deleted",
+						DeleteTime: spanner.NullTime{
+							Valid: true,
+							Time:  commitTimestamp,
+						},
+					},
+					{ShipperId: "interleavedeleted"},
+				},
+				got,
+			)
+		})
+
+		t.Run("interleaved", func(t *testing.T) {
+			t.Parallel()
+			tx := client.ReadOnlyTransaction()
+			defer tx.Close()
+
+			var got []*freightdb.ShippersRow
+			assert.NilError(t, freightdb.Query(tx).ListShippersRows(ctx, freightdb.ListShippersRowsQuery{
+				Limit:     10,
+				Shipments: true,
+				LineItems: true,
+			}).Do(func(row *freightdb.ShippersRow) error {
+				got = append(got, row)
+				return nil
+			}))
+			assert.DeepEqual(
+				t,
+				[]*freightdb.ShippersRow{
+					{
+						ShipperId: "allexists",
+						Shipments: []*freightdb.ShipmentsRow{
+							{
+								ShipperId:  "allexists",
+								ShipmentId: "allexists",
+								LineItems: []*freightdb.LineItemsRow{
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 1},
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 2},
+								},
+							},
+						},
+					},
+					{ShipperId: "interleavedeleted"},
+				},
+				got,
+			)
+		})
+
+		t.Run("interleaved show deleted", func(t *testing.T) {
+			t.Parallel()
+			tx := client.ReadOnlyTransaction()
+			defer tx.Close()
+
+			var got []*freightdb.ShippersRow
+			assert.NilError(t, freightdb.Query(tx).ListShippersRows(ctx, freightdb.ListShippersRowsQuery{
+				Limit:       10,
+				ShowDeleted: true,
+				Shipments:   true,
+				LineItems:   true,
+			}).Do(func(row *freightdb.ShippersRow) error {
+				got = append(got, row)
+				return nil
+			}))
+			assert.DeepEqual(
+				t,
+				[]*freightdb.ShippersRow{
+					{
+						ShipperId: "allexists",
+						Shipments: []*freightdb.ShipmentsRow{
+							{
+								ShipperId:  "allexists",
+								ShipmentId: "allexists",
+								LineItems: []*freightdb.LineItemsRow{
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 1},
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 2},
+								},
+							},
+						},
+					},
+					{
+						ShipperId: "deleted",
+						DeleteTime: spanner.NullTime{
+							Valid: true,
+							Time:  commitTimestamp,
+						},
+						Shipments: []*freightdb.ShipmentsRow{
+							{
+								ShipperId:  "deleted",
+								ShipmentId: "deleted",
+								LineItems: []*freightdb.LineItemsRow{
+									{ShipperId: "deleted", ShipmentId: "deleted", LineNumber: 1},
+									{ShipperId: "deleted", ShipmentId: "deleted", LineNumber: 2},
+								},
+							},
+						},
+					},
+					{ShipperId: "interleavedeleted"},
+				},
+				got,
+			)
+		})
+	})
+
 	t.Run("hide deleted by default", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/freight/*.up.sql")

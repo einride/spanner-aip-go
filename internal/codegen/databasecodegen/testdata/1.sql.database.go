@@ -333,9 +333,10 @@ func (t ReadTransaction) ListSingersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &streamingSingersRowIterator{
+	iter := &streamingSingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+	return iter
 }
 
 type SpannerReadTransaction interface {
