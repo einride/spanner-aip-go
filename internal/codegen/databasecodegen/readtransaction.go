@@ -55,10 +55,6 @@ func (g ReadTransactionCodeGenerator) ListInterleavedMethod(table *spanddl.Table
 	return strcase.LowerCamelCase(g.ListMethod(table)) + "Interleaved"
 }
 
-func (g ReadTransactionCodeGenerator) BatchGetInterleavedMethod(table *spanddl.Table) string {
-	return strcase.LowerCamelCase(g.BatchGetMethod(table)) + "Interleaved"
-}
-
 func (g ReadTransactionCodeGenerator) ReadInterleavedMethod(table *spanddl.Table) string {
 	return "readInterleaved" + strcase.UpperCamelCase(string(table.Name)) + "Rows"
 }
@@ -91,7 +87,6 @@ func (g ReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 			g.generateReadInterleavedRowsResult(f, table)
 			g.generateReadInterleavedRowsMethod(f, table)
 			g.generateListInterleavedMethod(f, table)
-			g.generateBatchGetInterleavedMethod(f, table)
 		}
 	}
 }
@@ -203,14 +198,11 @@ func (g ReadTransactionCodeGenerator) generateBatchGetMethod(f *codegen.File, ta
 	f.P("ctx ", contextPkg, ".Context,")
 	f.P("query ", g.BatchGetQueryStruct(table), ",")
 	f.P(") (map[", key.Type(), "]*", row.Type(), ", error) {")
-	if len(table.InterleavedTables) > 0 {
-		f.P("if query.hasInterleavedTables() {")
-		f.P("return t.", g.BatchGetInterleavedMethod(table), "(ctx, query)")
-		f.P("}")
-	}
 	f.P("spannerKeys := make([]", spannerPkg, ".KeySet, 0, len(query.Keys))")
+	f.P("spannerPrefixKeys :=  make([]", spannerPkg, ".KeySet, 0, len(query.Keys))")
 	f.P("for _, key := range query.Keys {")
 	f.P("spannerKeys = append(spannerKeys, key.SpannerKey())")
+	f.P("spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())")
 	f.P("}")
 	f.P("foundRows := make(map[", key.Type(), "]*", row.Type(), ", len(query.Keys))")
 	f.P(
@@ -221,6 +213,29 @@ func (g ReadTransactionCodeGenerator) generateBatchGetMethod(f *codegen.File, ta
 	f.P("return nil")
 	f.P("}); err != nil {")
 	f.P("return nil, err")
+	f.P("}")
+	if len(table.InterleavedTables) == 0 {
+		f.P("return foundRows, nil")
+		f.P("}")
+		return
+	}
+	f.P("if !query.hasInterleavedTables() {")
+	f.P("return foundRows, nil")
+	f.P("}")
+	f.P("interleaved, err := t.", g.ReadInterleavedMethod(table), "(ctx, ", g.ReadInterleavedQuery(table), "{")
+	f.P("KeySet: ", spannerPkg, ".KeySets(spannerPrefixKeys...),")
+	g.forwardInterleavedTablesStructFields(f, table, "query")
+	f.P("})")
+	f.P("if err != nil {")
+	f.P("return nil, err")
+	f.P("}")
+	f.P("for _, row := range foundRows {")
+	for _, child := range table.InterleavedTables {
+		childName := strcase.UpperCamelCase(string(child.Name))
+		f.P("if rs, ok := interleaved.", childName, "[row.Key()]; ok {")
+		f.P("row.", childName, " = rs")
+		f.P("}")
+	}
 	f.P("}")
 	f.P("return foundRows, nil")
 	f.P("}")
@@ -536,45 +551,6 @@ func (g ReadTransactionCodeGenerator) generateListInterleavedMethod(f *codegen.F
 	f.P("return &", rowIterator.StreamingType(), "{")
 	f.P("RowIterator: t.Tx.Query(ctx, stmt),")
 	f.P("}")
-	f.P("}")
-}
-
-func (g ReadTransactionCodeGenerator) generateBatchGetInterleavedMethod(f *codegen.File, table *spanddl.Table) {
-	key := KeyCodeGenerator{Table: table}
-	row := RowCodeGenerator{Table: table}
-	contextPkg := f.Import("context")
-	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
-	f.P()
-	f.P("func (t ", g.Type(), ") ", g.BatchGetInterleavedMethod(table), "(")
-	f.P("ctx ", contextPkg, ".Context,")
-	f.P("query ", g.BatchGetQueryStruct(table), ",")
-	f.P(") (map[", key.Type(), "]*", row.Type(), ", error) {")
-	f.P("if len(query.Keys) == 0 {")
-	f.P("return nil, nil")
-	f.P("}")
-	f.P("where := query.Keys[0].BoolExpr()")
-	f.P("for _, key := range query.Keys[1:] {")
-	f.P("where = ", spansqlPkg, ".LogicalOp{")
-	f.P("Op: ", spansqlPkg, ".Or,")
-	f.P("LHS: where,")
-	f.P("RHS: key.BoolExpr(),")
-	f.P("}")
-	f.P("}")
-	f.P("foundRows := make(map[", key.Type(), "]*", row.Type(), ", len(query.Keys))")
-	f.P("if err := t.", g.ListMethod(table), "(ctx, ", g.ListQueryStruct(table), "{")
-	f.P("Where: ", spansqlPkg, ".Paren{Expr: where},")
-	f.P("Limit: int32(len(query.Keys)),")
-	if g.hasSoftDelete(table) {
-		f.P("ShowDeleted: true,")
-	}
-	g.forwardInterleavedTablesStructFields(f, table, "query")
-	f.P("}).Do(func(row *", row.Type(), ") error {")
-	f.P("foundRows[row.", row.KeyMethod(), "()] = row")
-	f.P("return nil")
-	f.P("}); err != nil {")
-	f.P("return nil, err")
-	f.P("}")
-	f.P("return foundRows, nil")
 	f.P("}")
 }
 
