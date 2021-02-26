@@ -153,11 +153,17 @@ func (k SingersKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-type SingersRowIterator struct {
+type SingersRowIterator interface {
+	Next() (*SingersRow, error)
+	Do(f func(row *SingersRow) error) error
+	Stop()
+}
+
+type streamingSingersRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *SingersRowIterator) Next() (*SingersRow, error) {
+func (i *streamingSingersRowIterator) Next() (*SingersRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -169,7 +175,7 @@ func (i *SingersRowIterator) Next() (*SingersRow, error) {
 	return &row, nil
 }
 
-func (i *SingersRowIterator) Do(f func(row *SingersRow) error) error {
+func (i *streamingSingersRowIterator) Do(f func(row *SingersRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row SingersRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -190,8 +196,8 @@ func Query(tx SpannerReadTransaction) ReadTransaction {
 func (t ReadTransaction) ReadSingersRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *SingersRowIterator {
-	return &SingersRowIterator{
+) SingersRowIterator {
+	return &streamingSingersRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"Singers",
@@ -258,7 +264,7 @@ type ListSingersRowsQuery struct {
 func (t ReadTransaction) ListSingersRows(
 	ctx context.Context,
 	query ListSingersRowsQuery,
-) *SingersRowIterator {
+) SingersRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = SingersKey{}.Order()
 	}
@@ -289,7 +295,7 @@ func (t ReadTransaction) ListSingersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &SingersRowIterator{
+	return &streamingSingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
