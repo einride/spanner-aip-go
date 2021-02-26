@@ -263,8 +263,10 @@ func (t ReadTransaction) BatchGetUserAccessLogRows(
 	query BatchGetUserAccessLogRowsQuery,
 ) (map[UserAccessLogKey]*UserAccessLogRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[UserAccessLogKey]*UserAccessLogRow, len(query.Keys))
 	if err := t.ReadUserAccessLogRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *UserAccessLogRow) error {

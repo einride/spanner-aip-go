@@ -213,7 +213,7 @@ func TestReadTransaction(t *testing.T) {
 				singersAndAlbums[3].Key(): singersAndAlbums[3],
 				singersAndAlbums[5].Key(): singersAndAlbums[5],
 			}
-			tx := client.Single()
+			tx := client.ReadOnlyTransaction()
 			actual, err := musicdb.Query(tx).BatchGetSingersRows(ctx, musicdb.BatchGetSingersRowsQuery{
 				Keys: []musicdb.SingersKey{
 					singersAndAlbums[1].Key(),

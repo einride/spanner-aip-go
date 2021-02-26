@@ -988,12 +988,11 @@ func (t ReadTransaction) BatchGetSingersRows(
 	ctx context.Context,
 	query BatchGetSingersRowsQuery,
 ) (map[SingersKey]*SingersRow, error) {
-	if query.hasInterleavedTables() {
-		return t.batchGetSingersRowsInterleaved(ctx, query)
-	}
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[SingersKey]*SingersRow, len(query.Keys))
 	if err := t.ReadSingersRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SingersRow) error {
@@ -1001,6 +1000,26 @@ func (t ReadTransaction) BatchGetSingersRows(
 		return nil
 	}); err != nil {
 		return nil, err
+	}
+	if !query.hasInterleavedTables() {
+		return foundRows, nil
+	}
+	interleaved, err := t.readInterleavedSingersRows(ctx, readInterleavedSingersRowsQuery{
+		KeySet:  spanner.KeySets(spannerPrefixKeys...),
+		Albums:  query.Albums,
+		Songs:   query.Songs,
+		Singles: query.Singles,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range foundRows {
+		if rs, ok := interleaved.Albums[row.Key()]; ok {
+			row.Albums = rs
+		}
+		if rs, ok := interleaved.Singles[row.Key()]; ok {
+			row.Singles = rs
+		}
 	}
 	return foundRows, nil
 }
@@ -1240,37 +1259,6 @@ FROM
 	}
 }
 
-func (t ReadTransaction) batchGetSingersRowsInterleaved(
-	ctx context.Context,
-	query BatchGetSingersRowsQuery,
-) (map[SingersKey]*SingersRow, error) {
-	if len(query.Keys) == 0 {
-		return nil, nil
-	}
-	where := query.Keys[0].BoolExpr()
-	for _, key := range query.Keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[SingersKey]*SingersRow, len(query.Keys))
-	if err := t.ListSingersRows(ctx, ListSingersRowsQuery{
-		Where:   spansql.Paren{Expr: where},
-		Limit:   int32(len(query.Keys)),
-		Albums:  query.Albums,
-		Songs:   query.Songs,
-		Singles: query.Singles,
-	}).Do(func(row *SingersRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
 func (t ReadTransaction) ReadAlbumsRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -1340,12 +1328,11 @@ func (t ReadTransaction) BatchGetAlbumsRows(
 	ctx context.Context,
 	query BatchGetAlbumsRowsQuery,
 ) (map[AlbumsKey]*AlbumsRow, error) {
-	if query.hasInterleavedTables() {
-		return t.batchGetAlbumsRowsInterleaved(ctx, query)
-	}
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[AlbumsKey]*AlbumsRow, len(query.Keys))
 	if err := t.ReadAlbumsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *AlbumsRow) error {
@@ -1353,6 +1340,21 @@ func (t ReadTransaction) BatchGetAlbumsRows(
 		return nil
 	}); err != nil {
 		return nil, err
+	}
+	if !query.hasInterleavedTables() {
+		return foundRows, nil
+	}
+	interleaved, err := t.readInterleavedAlbumsRows(ctx, readInterleavedAlbumsRowsQuery{
+		KeySet: spanner.KeySets(spannerPrefixKeys...),
+		Songs:  query.Songs,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range foundRows {
+		if rs, ok := interleaved.Songs[row.Key()]; ok {
+			row.Songs = rs
+		}
 	}
 	return foundRows, nil
 }
@@ -1519,35 +1521,6 @@ FROM
 	}
 }
 
-func (t ReadTransaction) batchGetAlbumsRowsInterleaved(
-	ctx context.Context,
-	query BatchGetAlbumsRowsQuery,
-) (map[AlbumsKey]*AlbumsRow, error) {
-	if len(query.Keys) == 0 {
-		return nil, nil
-	}
-	where := query.Keys[0].BoolExpr()
-	for _, key := range query.Keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[AlbumsKey]*AlbumsRow, len(query.Keys))
-	if err := t.ListAlbumsRows(ctx, ListAlbumsRowsQuery{
-		Where: spansql.Paren{Expr: where},
-		Limit: int32(len(query.Keys)),
-		Songs: query.Songs,
-	}).Do(func(row *AlbumsRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
 func (t ReadTransaction) ReadSongsRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -1595,8 +1568,10 @@ func (t ReadTransaction) BatchGetSongsRows(
 	query BatchGetSongsRowsQuery,
 ) (map[SongsKey]*SongsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[SongsKey]*SongsRow, len(query.Keys))
 	if err := t.ReadSongsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SongsRow) error {
@@ -1702,8 +1677,10 @@ func (t ReadTransaction) BatchGetSinglesRows(
 	query BatchGetSinglesRowsQuery,
 ) (map[SinglesKey]*SinglesRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[SinglesKey]*SinglesRow, len(query.Keys))
 	if err := t.ReadSinglesRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *SinglesRow) error {

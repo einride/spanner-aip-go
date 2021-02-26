@@ -308,8 +308,10 @@ func (t ReadTransaction) BatchGetShippersRows(
 	query BatchGetShippersRowsQuery,
 ) (map[ShippersKey]*ShippersRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[ShippersKey]*ShippersRow, len(query.Keys))
 	if err := t.ReadShippersRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShippersRow) error {

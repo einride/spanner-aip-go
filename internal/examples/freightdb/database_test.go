@@ -176,6 +176,148 @@ func TestReadTransaction(t *testing.T) {
 		})
 	})
 
+	t.Run("BatchGet", func(t *testing.T) {
+		t.Parallel()
+		t.Run("all keys exists", func(t *testing.T) {
+			t.Parallel()
+			tx := client.Single()
+			defer tx.Close()
+
+			found, err := freightdb.Query(tx).BatchGetShippersRows(ctx, freightdb.BatchGetShippersRowsQuery{
+				Keys: []freightdb.ShippersKey{
+					{ShipperId: "allexists"},
+					{ShipperId: "deleted"},
+				},
+			})
+			assert.NilError(t, err)
+			assert.DeepEqual(
+				t,
+				map[freightdb.ShippersKey]*freightdb.ShippersRow{
+					{ShipperId: "allexists"}: {
+						ShipperId: "allexists",
+					},
+					{ShipperId: "deleted"}: {
+						ShipperId: "deleted",
+						DeleteTime: spanner.NullTime{
+							Valid: true,
+							Time:  commitTimestamp,
+						},
+					},
+				},
+				found,
+			)
+		})
+
+		t.Run("one key missing", func(t *testing.T) {
+			t.Parallel()
+			tx := client.Single()
+			defer tx.Close()
+
+			found, err := freightdb.Query(tx).BatchGetShippersRows(ctx, freightdb.BatchGetShippersRowsQuery{
+				Keys: []freightdb.ShippersKey{
+					{ShipperId: "allexists"},
+					{ShipperId: "notfound"},
+				},
+			})
+			assert.NilError(t, err)
+			assert.DeepEqual(
+				t,
+				map[freightdb.ShippersKey]*freightdb.ShippersRow{
+					{ShipperId: "allexists"}: {
+						ShipperId: "allexists",
+					},
+				},
+				found,
+			)
+		})
+		t.Run("all keys exists interleaved", func(t *testing.T) {
+			t.Parallel()
+			tx := client.ReadOnlyTransaction()
+			defer tx.Close()
+
+			found, err := freightdb.Query(tx).BatchGetShippersRows(ctx, freightdb.BatchGetShippersRowsQuery{
+				Keys: []freightdb.ShippersKey{
+					{ShipperId: "allexists"},
+					{ShipperId: "deleted"},
+				},
+				Shipments: true,
+				LineItems: true,
+			})
+			assert.NilError(t, err)
+			assert.DeepEqual(
+				t,
+				map[freightdb.ShippersKey]*freightdb.ShippersRow{
+					{ShipperId: "allexists"}: {
+						ShipperId: "allexists",
+						Shipments: []*freightdb.ShipmentsRow{
+							{
+								ShipperId:  "allexists",
+								ShipmentId: "allexists",
+								LineItems: []*freightdb.LineItemsRow{
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 1},
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 2},
+								},
+							},
+						},
+					},
+					{ShipperId: "deleted"}: {
+						ShipperId: "deleted",
+						DeleteTime: spanner.NullTime{
+							Valid: true,
+							Time:  commitTimestamp,
+						},
+						Shipments: []*freightdb.ShipmentsRow{
+							{
+								ShipperId:  "deleted",
+								ShipmentId: "deleted",
+								LineItems: []*freightdb.LineItemsRow{
+									{ShipperId: "deleted", ShipmentId: "deleted", LineNumber: 1},
+									{ShipperId: "deleted", ShipmentId: "deleted", LineNumber: 2},
+								},
+							},
+						},
+					},
+				},
+				found,
+			)
+		})
+
+		t.Run("one key missing interleaved", func(t *testing.T) {
+			t.Parallel()
+			tx := client.ReadOnlyTransaction()
+			defer tx.Close()
+
+			found, err := freightdb.Query(tx).BatchGetShippersRows(ctx, freightdb.BatchGetShippersRowsQuery{
+				Keys: []freightdb.ShippersKey{
+					{ShipperId: "allexists"},
+					{ShipperId: "notfound"},
+				},
+				Shipments: true,
+				LineItems: true,
+			})
+			assert.NilError(t, err)
+			assert.DeepEqual(
+				t,
+				map[freightdb.ShippersKey]*freightdb.ShippersRow{
+					{ShipperId: "allexists"}: {
+						ShipperId: "allexists",
+						Shipments: []*freightdb.ShipmentsRow{
+							{
+								ShipperId:  "allexists",
+								ShipmentId: "allexists",
+								LineItems: []*freightdb.LineItemsRow{
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 1},
+									{ShipperId: "allexists", ShipmentId: "allexists", LineNumber: 2},
+								},
+							},
+						},
+					},
+				},
+				found,
+			)
+		})
+	})
+
 	t.Run("hide deleted by default", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/freight/*.up.sql")

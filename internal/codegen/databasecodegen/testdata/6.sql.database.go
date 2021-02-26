@@ -535,12 +535,11 @@ func (t ReadTransaction) BatchGetShippersRows(
 	ctx context.Context,
 	query BatchGetShippersRowsQuery,
 ) (map[ShippersKey]*ShippersRow, error) {
-	if query.hasInterleavedTables() {
-		return t.batchGetShippersRowsInterleaved(ctx, query)
-	}
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[ShippersKey]*ShippersRow, len(query.Keys))
 	if err := t.ReadShippersRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShippersRow) error {
@@ -548,6 +547,21 @@ func (t ReadTransaction) BatchGetShippersRows(
 		return nil
 	}); err != nil {
 		return nil, err
+	}
+	if !query.hasInterleavedTables() {
+		return foundRows, nil
+	}
+	interleaved, err := t.readInterleavedShippersRows(ctx, readInterleavedShippersRowsQuery{
+		KeySet:    spanner.KeySets(spannerPrefixKeys...),
+		Shipments: query.Shipments,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range foundRows {
+		if rs, ok := interleaved.Shipments[row.Key()]; ok {
+			row.Shipments = rs
+		}
 	}
 	return foundRows, nil
 }
@@ -744,36 +758,6 @@ FROM
 	}
 }
 
-func (t ReadTransaction) batchGetShippersRowsInterleaved(
-	ctx context.Context,
-	query BatchGetShippersRowsQuery,
-) (map[ShippersKey]*ShippersRow, error) {
-	if len(query.Keys) == 0 {
-		return nil, nil
-	}
-	where := query.Keys[0].BoolExpr()
-	for _, key := range query.Keys[1:] {
-		where = spansql.LogicalOp{
-			Op:  spansql.Or,
-			LHS: where,
-			RHS: key.BoolExpr(),
-		}
-	}
-	foundRows := make(map[ShippersKey]*ShippersRow, len(query.Keys))
-	if err := t.ListShippersRows(ctx, ListShippersRowsQuery{
-		Where:       spansql.Paren{Expr: where},
-		Limit:       int32(len(query.Keys)),
-		ShowDeleted: true,
-		Shipments:   query.Shipments,
-	}).Do(func(row *ShippersRow) error {
-		foundRows[row.Key()] = row
-		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return foundRows, nil
-}
-
 func (t ReadTransaction) ReadShipmentsRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
@@ -821,8 +805,10 @@ func (t ReadTransaction) BatchGetShipmentsRows(
 	query BatchGetShipmentsRowsQuery,
 ) (map[ShipmentsKey]*ShipmentsRow, error) {
 	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
 	for _, key := range query.Keys {
 		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
 	}
 	foundRows := make(map[ShipmentsKey]*ShipmentsRow, len(query.Keys))
 	if err := t.ReadShipmentsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *ShipmentsRow) error {
