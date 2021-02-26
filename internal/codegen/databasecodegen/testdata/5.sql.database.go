@@ -140,11 +140,17 @@ func (k UserAccessLogKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-type UserAccessLogRowIterator struct {
+type UserAccessLogRowIterator interface {
+	Next() (*UserAccessLogRow, error)
+	Do(f func(row *UserAccessLogRow) error) error
+	Stop()
+}
+
+type streamingUserAccessLogRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *UserAccessLogRowIterator) Next() (*UserAccessLogRow, error) {
+func (i *streamingUserAccessLogRowIterator) Next() (*UserAccessLogRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -156,7 +162,7 @@ func (i *UserAccessLogRowIterator) Next() (*UserAccessLogRow, error) {
 	return &row, nil
 }
 
-func (i *UserAccessLogRowIterator) Do(f func(row *UserAccessLogRow) error) error {
+func (i *streamingUserAccessLogRowIterator) Do(f func(row *UserAccessLogRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row UserAccessLogRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -177,8 +183,8 @@ func Query(tx SpannerReadTransaction) ReadTransaction {
 func (t ReadTransaction) ReadUserAccessLogRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *UserAccessLogRowIterator {
-	return &UserAccessLogRowIterator{
+) UserAccessLogRowIterator {
+	return &streamingUserAccessLogRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"UserAccessLog",
@@ -245,7 +251,7 @@ type ListUserAccessLogRowsQuery struct {
 func (t ReadTransaction) ListUserAccessLogRows(
 	ctx context.Context,
 	query ListUserAccessLogRowsQuery,
-) *UserAccessLogRowIterator {
+) UserAccessLogRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = UserAccessLogKey{}.Order()
 	}
@@ -276,7 +282,7 @@ func (t ReadTransaction) ListUserAccessLogRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &UserAccessLogRowIterator{
+	return &streamingUserAccessLogRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }

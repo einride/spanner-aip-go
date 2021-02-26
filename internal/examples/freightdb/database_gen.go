@@ -808,11 +808,17 @@ func (k LineItemsKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-type ShippersRowIterator struct {
+type ShippersRowIterator interface {
+	Next() (*ShippersRow, error)
+	Do(f func(row *ShippersRow) error) error
+	Stop()
+}
+
+type streamingShippersRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *ShippersRowIterator) Next() (*ShippersRow, error) {
+func (i *streamingShippersRowIterator) Next() (*ShippersRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -824,7 +830,7 @@ func (i *ShippersRowIterator) Next() (*ShippersRow, error) {
 	return &row, nil
 }
 
-func (i *ShippersRowIterator) Do(f func(row *ShippersRow) error) error {
+func (i *streamingShippersRowIterator) Do(f func(row *ShippersRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row ShippersRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -834,11 +840,17 @@ func (i *ShippersRowIterator) Do(f func(row *ShippersRow) error) error {
 	})
 }
 
-type SitesRowIterator struct {
+type SitesRowIterator interface {
+	Next() (*SitesRow, error)
+	Do(f func(row *SitesRow) error) error
+	Stop()
+}
+
+type streamingSitesRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *SitesRowIterator) Next() (*SitesRow, error) {
+func (i *streamingSitesRowIterator) Next() (*SitesRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -850,7 +862,7 @@ func (i *SitesRowIterator) Next() (*SitesRow, error) {
 	return &row, nil
 }
 
-func (i *SitesRowIterator) Do(f func(row *SitesRow) error) error {
+func (i *streamingSitesRowIterator) Do(f func(row *SitesRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row SitesRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -860,11 +872,17 @@ func (i *SitesRowIterator) Do(f func(row *SitesRow) error) error {
 	})
 }
 
-type ShipmentsRowIterator struct {
+type ShipmentsRowIterator interface {
+	Next() (*ShipmentsRow, error)
+	Do(f func(row *ShipmentsRow) error) error
+	Stop()
+}
+
+type streamingShipmentsRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *ShipmentsRowIterator) Next() (*ShipmentsRow, error) {
+func (i *streamingShipmentsRowIterator) Next() (*ShipmentsRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -876,7 +894,7 @@ func (i *ShipmentsRowIterator) Next() (*ShipmentsRow, error) {
 	return &row, nil
 }
 
-func (i *ShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) error {
+func (i *streamingShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row ShipmentsRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -886,11 +904,17 @@ func (i *ShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) error {
 	})
 }
 
-type LineItemsRowIterator struct {
+type LineItemsRowIterator interface {
+	Next() (*LineItemsRow, error)
+	Do(f func(row *LineItemsRow) error) error
+	Stop()
+}
+
+type streamingLineItemsRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *LineItemsRowIterator) Next() (*LineItemsRow, error) {
+func (i *streamingLineItemsRowIterator) Next() (*LineItemsRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -902,7 +926,7 @@ func (i *LineItemsRowIterator) Next() (*LineItemsRow, error) {
 	return &row, nil
 }
 
-func (i *LineItemsRowIterator) Do(f func(row *LineItemsRow) error) error {
+func (i *streamingLineItemsRowIterator) Do(f func(row *LineItemsRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row LineItemsRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -923,8 +947,8 @@ func Query(tx SpannerReadTransaction) ReadTransaction {
 func (t ReadTransaction) ReadShippersRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *ShippersRowIterator {
-	return &ShippersRowIterator{
+) ShippersRowIterator {
+	return &streamingShippersRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"shippers",
@@ -1016,7 +1040,7 @@ func (q *ListShippersRowsQuery) hasInterleavedTables() bool {
 func (t ReadTransaction) ListShippersRows(
 	ctx context.Context,
 	query ListShippersRowsQuery,
-) *ShippersRowIterator {
+) ShippersRowIterator {
 	if query.hasInterleavedTables() {
 		return t.listShippersRowsInterleaved(ctx, query)
 	}
@@ -1060,7 +1084,7 @@ func (t ReadTransaction) ListShippersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &ShippersRowIterator{
+	return &streamingShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
@@ -1068,7 +1092,7 @@ func (t ReadTransaction) ListShippersRows(
 func (t ReadTransaction) listShippersRowsInterleaved(
 	ctx context.Context,
 	query ListShippersRowsQuery,
-) *ShippersRowIterator {
+) ShippersRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
 	}
@@ -1185,7 +1209,7 @@ FROM
 		SQL:    q.String(),
 		Params: params,
 	}
-	return &ShippersRowIterator{
+	return &streamingShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
@@ -1246,8 +1270,8 @@ func (t ReadTransaction) batchGetShippersRowsInterleaved(
 func (t ReadTransaction) ReadSitesRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *SitesRowIterator {
-	return &SitesRowIterator{
+) SitesRowIterator {
+	return &streamingSitesRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"sites",
@@ -1315,7 +1339,7 @@ type ListSitesRowsQuery struct {
 func (t ReadTransaction) ListSitesRows(
 	ctx context.Context,
 	query ListSitesRowsQuery,
-) *SitesRowIterator {
+) SitesRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = SitesKey{}.Order()
 	}
@@ -1356,7 +1380,7 @@ func (t ReadTransaction) ListSitesRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &SitesRowIterator{
+	return &streamingSitesRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
@@ -1364,8 +1388,8 @@ func (t ReadTransaction) ListSitesRows(
 func (t ReadTransaction) ReadShipmentsRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *ShipmentsRowIterator {
-	return &ShipmentsRowIterator{
+) ShipmentsRowIterator {
+	return &streamingShipmentsRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"shipments",
@@ -1454,7 +1478,7 @@ func (q *ListShipmentsRowsQuery) hasInterleavedTables() bool {
 func (t ReadTransaction) ListShipmentsRows(
 	ctx context.Context,
 	query ListShipmentsRowsQuery,
-) *ShipmentsRowIterator {
+) ShipmentsRowIterator {
 	if query.hasInterleavedTables() {
 		return t.listShipmentsRowsInterleaved(ctx, query)
 	}
@@ -1498,7 +1522,7 @@ func (t ReadTransaction) ListShipmentsRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &ShipmentsRowIterator{
+	return &streamingShipmentsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
@@ -1506,7 +1530,7 @@ func (t ReadTransaction) ListShipmentsRows(
 func (t ReadTransaction) listShipmentsRowsInterleaved(
 	ctx context.Context,
 	query ListShipmentsRowsQuery,
-) *ShipmentsRowIterator {
+) ShipmentsRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = ShipmentsKey{}.Order()
 	}
@@ -1596,7 +1620,7 @@ FROM
 		SQL:    q.String(),
 		Params: params,
 	}
-	return &ShipmentsRowIterator{
+	return &streamingShipmentsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
@@ -1655,8 +1679,8 @@ func (t ReadTransaction) batchGetShipmentsRowsInterleaved(
 func (t ReadTransaction) ReadLineItemsRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *LineItemsRowIterator {
-	return &LineItemsRowIterator{
+) LineItemsRowIterator {
+	return &streamingLineItemsRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"line_items",
@@ -1723,7 +1747,7 @@ type ListLineItemsRowsQuery struct {
 func (t ReadTransaction) ListLineItemsRows(
 	ctx context.Context,
 	query ListLineItemsRowsQuery,
-) *LineItemsRowIterator {
+) LineItemsRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = LineItemsKey{}.Order()
 	}
@@ -1754,7 +1778,7 @@ func (t ReadTransaction) ListLineItemsRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &LineItemsRowIterator{
+	return &streamingLineItemsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }

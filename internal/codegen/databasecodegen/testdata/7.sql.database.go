@@ -185,11 +185,17 @@ func (k ShippersKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-type ShippersRowIterator struct {
+type ShippersRowIterator interface {
+	Next() (*ShippersRow, error)
+	Do(f func(row *ShippersRow) error) error
+	Stop()
+}
+
+type streamingShippersRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *ShippersRowIterator) Next() (*ShippersRow, error) {
+func (i *streamingShippersRowIterator) Next() (*ShippersRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -201,7 +207,7 @@ func (i *ShippersRowIterator) Next() (*ShippersRow, error) {
 	return &row, nil
 }
 
-func (i *ShippersRowIterator) Do(f func(row *ShippersRow) error) error {
+func (i *streamingShippersRowIterator) Do(f func(row *ShippersRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row ShippersRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -222,8 +228,8 @@ func Query(tx SpannerReadTransaction) ReadTransaction {
 func (t ReadTransaction) ReadShippersRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *ShippersRowIterator {
-	return &ShippersRowIterator{
+) ShippersRowIterator {
+	return &streamingShippersRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"shippers",
@@ -291,7 +297,7 @@ type ListShippersRowsQuery struct {
 func (t ReadTransaction) ListShippersRows(
 	ctx context.Context,
 	query ListShippersRowsQuery,
-) *ShippersRowIterator {
+) ShippersRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = ShippersKey{}.Order()
 	}
@@ -332,7 +338,7 @@ func (t ReadTransaction) ListShippersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &ShippersRowIterator{
+	return &streamingShippersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }

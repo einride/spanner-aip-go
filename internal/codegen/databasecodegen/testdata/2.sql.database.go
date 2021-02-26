@@ -300,11 +300,17 @@ func (k AlbumsKey) BoolExpr() spansql.BoolExpr {
 	return spansql.Paren{Expr: b}
 }
 
-type SingersRowIterator struct {
+type SingersRowIterator interface {
+	Next() (*SingersRow, error)
+	Do(f func(row *SingersRow) error) error
+	Stop()
+}
+
+type streamingSingersRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *SingersRowIterator) Next() (*SingersRow, error) {
+func (i *streamingSingersRowIterator) Next() (*SingersRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -316,7 +322,7 @@ func (i *SingersRowIterator) Next() (*SingersRow, error) {
 	return &row, nil
 }
 
-func (i *SingersRowIterator) Do(f func(row *SingersRow) error) error {
+func (i *streamingSingersRowIterator) Do(f func(row *SingersRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row SingersRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -326,11 +332,17 @@ func (i *SingersRowIterator) Do(f func(row *SingersRow) error) error {
 	})
 }
 
-type AlbumsRowIterator struct {
+type AlbumsRowIterator interface {
+	Next() (*AlbumsRow, error)
+	Do(f func(row *AlbumsRow) error) error
+	Stop()
+}
+
+type streamingAlbumsRowIterator struct {
 	*spanner.RowIterator
 }
 
-func (i *AlbumsRowIterator) Next() (*AlbumsRow, error) {
+func (i *streamingAlbumsRowIterator) Next() (*AlbumsRow, error) {
 	spannerRow, err := i.RowIterator.Next()
 	if err != nil {
 		return nil, err
@@ -342,7 +354,7 @@ func (i *AlbumsRowIterator) Next() (*AlbumsRow, error) {
 	return &row, nil
 }
 
-func (i *AlbumsRowIterator) Do(f func(row *AlbumsRow) error) error {
+func (i *streamingAlbumsRowIterator) Do(f func(row *AlbumsRow) error) error {
 	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
 		var row AlbumsRow
 		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
@@ -363,8 +375,8 @@ func Query(tx SpannerReadTransaction) ReadTransaction {
 func (t ReadTransaction) ReadSingersRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *SingersRowIterator {
-	return &SingersRowIterator{
+) SingersRowIterator {
+	return &streamingSingersRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"Singers",
@@ -452,7 +464,7 @@ func (q *ListSingersRowsQuery) hasInterleavedTables() bool {
 func (t ReadTransaction) ListSingersRows(
 	ctx context.Context,
 	query ListSingersRowsQuery,
-) *SingersRowIterator {
+) SingersRowIterator {
 	if query.hasInterleavedTables() {
 		return t.listSingersRowsInterleaved(ctx, query)
 	}
@@ -486,7 +498,7 @@ func (t ReadTransaction) ListSingersRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &SingersRowIterator{
+	return &streamingSingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
@@ -494,7 +506,7 @@ func (t ReadTransaction) ListSingersRows(
 func (t ReadTransaction) listSingersRowsInterleaved(
 	ctx context.Context,
 	query ListSingersRowsQuery,
-) *SingersRowIterator {
+) SingersRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = SingersKey{}.Order()
 	}
@@ -561,7 +573,7 @@ FROM
 		SQL:    q.String(),
 		Params: params,
 	}
-	return &SingersRowIterator{
+	return &streamingSingersRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
@@ -618,8 +630,8 @@ func (t ReadTransaction) batchGetSingersRowsInterleaved(
 func (t ReadTransaction) ReadAlbumsRows(
 	ctx context.Context,
 	keySet spanner.KeySet,
-) *AlbumsRowIterator {
-	return &AlbumsRowIterator{
+) AlbumsRowIterator {
+	return &streamingAlbumsRowIterator{
 		RowIterator: t.Tx.Read(
 			ctx,
 			"Albums",
@@ -686,7 +698,7 @@ type ListAlbumsRowsQuery struct {
 func (t ReadTransaction) ListAlbumsRows(
 	ctx context.Context,
 	query ListAlbumsRowsQuery,
-) *AlbumsRowIterator {
+) AlbumsRowIterator {
 	if len(query.Order) == 0 {
 		query.Order = AlbumsKey{}.Order()
 	}
@@ -717,7 +729,7 @@ func (t ReadTransaction) ListAlbumsRows(
 		}.SQL(),
 		Params: params,
 	}
-	return &AlbumsRowIterator{
+	return &streamingAlbumsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 }
