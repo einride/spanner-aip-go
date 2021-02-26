@@ -610,6 +610,38 @@ func (t ReadTransaction) ListShippersRows(
 	}
 }
 
+type readInterleavedShippersRowsQuery struct {
+	KeySet    spanner.KeySet
+	Shipments bool
+}
+
+type readInterleavedShippersRowsResult struct {
+	Shipments map[ShippersKey][]*ShipmentsRow
+}
+
+func (t ReadTransaction) readInterleavedShippersRows(
+	ctx context.Context,
+	query readInterleavedShippersRowsQuery,
+) (*readInterleavedShippersRowsResult, error) {
+	var r readInterleavedShippersRowsResult
+	if query.Shipments {
+		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
+		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
+			if row.DeleteTime.Valid {
+				return nil
+			}
+			k := ShippersKey{
+				ShipperId: row.ShipperId,
+			}
+			r.Shipments[k] = append(r.Shipments[k], row)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return &r, nil
+}
+
 func (t ReadTransaction) listShippersRowsInterleaved(
 	ctx context.Context,
 	query ListShippersRowsQuery,

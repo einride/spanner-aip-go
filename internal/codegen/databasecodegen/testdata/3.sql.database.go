@@ -811,6 +811,52 @@ func (t ReadTransaction) ListSingersRows(
 	}
 }
 
+type readInterleavedSingersRowsQuery struct {
+	KeySet spanner.KeySet
+	Albums bool
+	Songs  bool
+}
+
+type readInterleavedSingersRowsResult struct {
+	Albums map[SingersKey][]*AlbumsRow
+}
+
+func (t ReadTransaction) readInterleavedSingersRows(
+	ctx context.Context,
+	query readInterleavedSingersRowsQuery,
+) (*readInterleavedSingersRowsResult, error) {
+	var r readInterleavedSingersRowsResult
+	interleavedAlbums := make(map[AlbumsKey]*AlbumsRow)
+	if query.Albums {
+		r.Albums = make(map[SingersKey][]*AlbumsRow)
+		if err := t.ReadAlbumsRows(ctx, query.KeySet).Do(func(row *AlbumsRow) error {
+			k := SingersKey{
+				SingerId: row.SingerId,
+			}
+			r.Albums[k] = append(r.Albums[k], row)
+			interleavedAlbums[row.Key()] = row
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	if query.Songs {
+		if err := t.ReadSongsRows(ctx, query.KeySet).Do(func(row *SongsRow) error {
+			k := AlbumsKey{
+				SingerId: row.SingerId,
+				AlbumId:  row.AlbumId,
+			}
+			if p, ok := interleavedAlbums[k]; ok {
+				p.Songs = append(p.Songs, row)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return &r, nil
+}
+
 func (t ReadTransaction) listSingersRowsInterleaved(
 	ctx context.Context,
 	query ListSingersRowsQuery,
@@ -1088,6 +1134,36 @@ func (t ReadTransaction) ListAlbumsRows(
 	return &streamingAlbumsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
+}
+
+type readInterleavedAlbumsRowsQuery struct {
+	KeySet spanner.KeySet
+	Songs  bool
+}
+
+type readInterleavedAlbumsRowsResult struct {
+	Songs map[AlbumsKey][]*SongsRow
+}
+
+func (t ReadTransaction) readInterleavedAlbumsRows(
+	ctx context.Context,
+	query readInterleavedAlbumsRowsQuery,
+) (*readInterleavedAlbumsRowsResult, error) {
+	var r readInterleavedAlbumsRowsResult
+	if query.Songs {
+		r.Songs = make(map[AlbumsKey][]*SongsRow)
+		if err := t.ReadSongsRows(ctx, query.KeySet).Do(func(row *SongsRow) error {
+			k := AlbumsKey{
+				SingerId: row.SingerId,
+				AlbumId:  row.AlbumId,
+			}
+			r.Songs[k] = append(r.Songs[k], row)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return &r, nil
 }
 
 func (t ReadTransaction) listAlbumsRowsInterleaved(

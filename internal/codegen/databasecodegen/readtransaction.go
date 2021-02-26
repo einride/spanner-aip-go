@@ -63,6 +63,18 @@ func (g ReadTransactionCodeGenerator) BatchGetInterleavedMethod(table *spanddl.T
 	return strcase.LowerCamelCase(g.BatchGetMethod(table)) + "Interleaved"
 }
 
+func (g ReadTransactionCodeGenerator) ReadInterleavedMethod(table *spanddl.Table) string {
+	return "readInterleaved" + strcase.UpperCamelCase(string(table.Name)) + "Rows"
+}
+
+func (g ReadTransactionCodeGenerator) ReadInterleavedQuery(table *spanddl.Table) string {
+	return g.ReadInterleavedMethod(table) + "Query"
+}
+
+func (g ReadTransactionCodeGenerator) ReadInterleavedResult(table *spanddl.Table) string {
+	return g.ReadInterleavedMethod(table) + "Result"
+}
+
 func (g ReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 	common := CommonCodeGenerator{}
 	f.P()
@@ -79,6 +91,9 @@ func (g ReadTransactionCodeGenerator) GenerateCode(f *codegen.File) {
 		g.generateListQueryStruct(f, table)
 		g.generateListMethod(f, table)
 		if len(table.InterleavedTables) > 0 {
+			g.generateReadInterleavedRowsQuery(f, table)
+			g.generateReadInterleavedRowsResult(f, table)
+			g.generateReadInterleavedRowsMethod(f, table)
 			g.generateListInterleavedMethod(f, table)
 			g.generateGetInterleavedMethod(f, table)
 			g.generateBatchGetInterleavedMethod(f, table)
@@ -320,6 +335,83 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 	f.P("return &", rowIterator.StreamingType(), "{")
 	f.P("RowIterator: t.Tx.Query(ctx, stmt),")
 	f.P("}")
+	f.P("}")
+}
+
+func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsQuery(f *codegen.File, table *spanddl.Table) {
+	spannerPkg := f.Import("cloud.google.com/go/spanner")
+	f.P()
+	f.P("type ", g.ReadInterleavedQuery(table), " struct {")
+	f.P("KeySet ", spannerPkg, ".KeySet")
+	g.generateInterleavedTablesStructFields(f, table)
+	f.P("}")
+}
+
+func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsResult(f *codegen.File, table *spanddl.Table) {
+	key := KeyCodeGenerator{Table: table}
+	f.P()
+	f.P("type ", g.ReadInterleavedResult(table), " struct {")
+	for _, child := range table.InterleavedTables {
+		f.P(strcase.UpperCamelCase(string(child.Name)), " map[", key.Type(), "][]*", RowCodeGenerator{Table: child}.Type())
+	}
+	f.P("}")
+}
+
+func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codegen.File, table *spanddl.Table) {
+	ctxPkg := f.Import("context")
+	key := KeyCodeGenerator{Table: table}
+	f.P("func (t ", g.Type(), ") ", g.ReadInterleavedMethod(table), "(")
+	f.P("ctx ", ctxPkg, ".Context,")
+	f.P("query ", g.ReadInterleavedQuery(table), ",")
+	f.P(") (*", g.ReadInterleavedResult(table), ", error) {")
+	f.P("var r ", g.ReadInterleavedResult(table))
+	rangeInterleavedTables(table, func(_, child *spanddl.Table) {
+		if len(child.InterleavedTables) == 0 {
+			return
+		}
+		key := KeyCodeGenerator{Table: child}
+		name := strcase.UpperCamelCase(string(child.Name))
+		row := RowCodeGenerator{Table: child}
+		f.P("interleaved", name, ":=make(map[", key.Type(), "]*", row.Type(), ")")
+	})
+	rangeInterleavedTables(table, func(parent, child *spanddl.Table) {
+		isTopLevel := parent.Name == table.Name
+		parentKey := KeyCodeGenerator{Table: parent}
+		parentName := strcase.UpperCamelCase(string(parent.Name))
+		row := RowCodeGenerator{Table: child}
+		childName := strcase.UpperCamelCase(string(child.Name))
+		f.P("if query.", childName, " {")
+		if isTopLevel {
+			f.P("r.", childName, " = make(map[", key.Type(), "][]*", row.Type(), ")")
+		}
+		f.P("if err := t.", g.ReadMethod(child), "(ctx, query.KeySet).Do(func(row *", row.Type(), ") error {")
+		if g.hasSoftDelete(child) {
+			f.P("if row.", g.softDeleteTimestampFieldName(table), ".Valid {")
+			f.P("return nil")
+			f.P("}")
+		}
+		f.P("k := ", parentKey.Type(), "{")
+		for _, part := range parent.PrimaryKey {
+			f.P(key.FieldName(part), ": row.", key.FieldName(part), ",")
+		}
+		f.P("}")
+		if isTopLevel {
+			f.P("r.", childName, "[k] = append(r.", childName, "[k], row)")
+		} else {
+			f.P("if p, ok := interleaved", parentName, "[k]; ok {")
+			f.P("p.", childName, " = append(p.", childName, ", row)")
+			f.P("}")
+		}
+		if len(child.InterleavedTables) > 0 {
+			f.P("interleaved", childName, "[row.Key()] = row")
+		}
+		f.P("return nil")
+		f.P("}); err != nil {")
+		f.P("return nil, err")
+		f.P("}")
+		f.P("}")
+	})
+	f.P("return &r, nil")
 	f.P("}")
 }
 
@@ -574,10 +666,21 @@ func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName(table *spand
 	return "delete_time"
 }
 
+func (g ReadTransactionCodeGenerator) softDeleteTimestampFieldName(table *spanddl.Table) spansql.ID {
+	return "DeleteTime"
+}
+
 func keyColumn(table *spanddl.Table, keyPart spansql.KeyPart) *spanddl.Column {
 	column, ok := table.Column(keyPart.Column)
 	if !ok {
 		panic(fmt.Errorf("table %s has no column %s", table.Name, keyPart.Column))
 	}
 	return column
+}
+
+func rangeInterleavedTables(table *spanddl.Table, f func(parent, child *spanddl.Table)) {
+	for _, interleaved := range table.InterleavedTables {
+		f(table, interleaved)
+		rangeInterleavedTables(interleaved, f)
+	}
 }
