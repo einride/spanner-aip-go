@@ -840,6 +840,41 @@ func (i *streamingShippersRowIterator) Do(f func(row *ShippersRow) error) error 
 	})
 }
 
+type bufferedShippersRowIterator struct {
+	rows []*ShippersRow
+	err  error
+}
+
+func (i *bufferedShippersRowIterator) Next() (*ShippersRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedShippersRowIterator) Do(f func(row *ShippersRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedShippersRowIterator) Stop() {}
+
 type SitesRowIterator interface {
 	Next() (*SitesRow, error)
 	Do(f func(row *SitesRow) error) error
@@ -871,6 +906,41 @@ func (i *streamingSitesRowIterator) Do(f func(row *SitesRow) error) error {
 		return f(&row)
 	})
 }
+
+type bufferedSitesRowIterator struct {
+	rows []*SitesRow
+	err  error
+}
+
+func (i *bufferedSitesRowIterator) Next() (*SitesRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedSitesRowIterator) Do(f func(row *SitesRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedSitesRowIterator) Stop() {}
 
 type ShipmentsRowIterator interface {
 	Next() (*ShipmentsRow, error)
@@ -904,6 +974,41 @@ func (i *streamingShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) erro
 	})
 }
 
+type bufferedShipmentsRowIterator struct {
+	rows []*ShipmentsRow
+	err  error
+}
+
+func (i *bufferedShipmentsRowIterator) Next() (*ShipmentsRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedShipmentsRowIterator) Do(f func(row *ShipmentsRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedShipmentsRowIterator) Stop() {}
+
 type LineItemsRowIterator interface {
 	Next() (*LineItemsRow, error)
 	Do(f func(row *LineItemsRow) error) error
@@ -935,6 +1040,41 @@ func (i *streamingLineItemsRowIterator) Do(f func(row *LineItemsRow) error) erro
 		return f(&row)
 	})
 }
+
+type bufferedLineItemsRowIterator struct {
+	rows []*LineItemsRow
+	err  error
+}
+
+func (i *bufferedLineItemsRowIterator) Next() (*LineItemsRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedLineItemsRowIterator) Do(f func(row *LineItemsRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedLineItemsRowIterator) Stop() {}
 
 type ReadTransaction struct {
 	Tx SpannerReadTransaction

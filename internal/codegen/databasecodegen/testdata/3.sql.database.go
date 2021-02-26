@@ -500,6 +500,41 @@ func (i *streamingSingersRowIterator) Do(f func(row *SingersRow) error) error {
 	})
 }
 
+type bufferedSingersRowIterator struct {
+	rows []*SingersRow
+	err  error
+}
+
+func (i *bufferedSingersRowIterator) Next() (*SingersRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedSingersRowIterator) Do(f func(row *SingersRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedSingersRowIterator) Stop() {}
+
 type AlbumsRowIterator interface {
 	Next() (*AlbumsRow, error)
 	Do(f func(row *AlbumsRow) error) error
@@ -532,6 +567,41 @@ func (i *streamingAlbumsRowIterator) Do(f func(row *AlbumsRow) error) error {
 	})
 }
 
+type bufferedAlbumsRowIterator struct {
+	rows []*AlbumsRow
+	err  error
+}
+
+func (i *bufferedAlbumsRowIterator) Next() (*AlbumsRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedAlbumsRowIterator) Do(f func(row *AlbumsRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedAlbumsRowIterator) Stop() {}
+
 type SongsRowIterator interface {
 	Next() (*SongsRow, error)
 	Do(f func(row *SongsRow) error) error
@@ -563,6 +633,41 @@ func (i *streamingSongsRowIterator) Do(f func(row *SongsRow) error) error {
 		return f(&row)
 	})
 }
+
+type bufferedSongsRowIterator struct {
+	rows []*SongsRow
+	err  error
+}
+
+func (i *bufferedSongsRowIterator) Next() (*SongsRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedSongsRowIterator) Do(f func(row *SongsRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedSongsRowIterator) Stop() {}
 
 type ReadTransaction struct {
 	Tx SpannerReadTransaction

@@ -11,6 +11,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
+	"google.golang.org/api/iterator"
 )
 
 type ShippersRow struct {
@@ -216,6 +217,41 @@ func (i *streamingShippersRowIterator) Do(f func(row *ShippersRow) error) error 
 		return f(&row)
 	})
 }
+
+type bufferedShippersRowIterator struct {
+	rows []*ShippersRow
+	err  error
+}
+
+func (i *bufferedShippersRowIterator) Next() (*ShippersRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedShippersRowIterator) Do(f func(row *ShippersRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedShippersRowIterator) Stop() {}
 
 type ReadTransaction struct {
 	Tx SpannerReadTransaction

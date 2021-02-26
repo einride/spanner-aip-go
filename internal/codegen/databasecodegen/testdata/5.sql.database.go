@@ -11,6 +11,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
+	"google.golang.org/api/iterator"
 )
 
 type UserAccessLogRow struct {
@@ -171,6 +172,41 @@ func (i *streamingUserAccessLogRowIterator) Do(f func(row *UserAccessLogRow) err
 		return f(&row)
 	})
 }
+
+type bufferedUserAccessLogRowIterator struct {
+	rows []*UserAccessLogRow
+	err  error
+}
+
+func (i *bufferedUserAccessLogRowIterator) Next() (*UserAccessLogRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedUserAccessLogRowIterator) Do(f func(row *UserAccessLogRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedUserAccessLogRowIterator) Stop() {}
 
 type ReadTransaction struct {
 	Tx SpannerReadTransaction
