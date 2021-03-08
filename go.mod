@@ -9,7 +9,7 @@ require (
 	go.einride.tech/aip v0.32.0
 	google.golang.org/api v0.40.0
 	google.golang.org/genproto v0.0.0-20210222152913-aa3ee6e6a81c
-	google.golang.org/grpc v1.35.0
+	google.golang.org/grpc v1.36.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/yaml.v2 v2.4.0
 	gotest.tools/v3 v3.0.3
