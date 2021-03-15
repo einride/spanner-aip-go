@@ -14,11 +14,11 @@ databases:
       path: ./internal/examples/freightdb
 
     resources:
-      - message: go.einride.tech/aip/examples/proto/gen/einride/example/freight/v1.Shipper
+      - message: go.einride.tech/aip/proto/gen/einride/example/freight/v1.Shipper
         table: shippers
 
-      - message: go.einride.tech/aip/examples/proto/gen/einride/example/freight/v1.Site
+      - message: go.einride.tech/aip/proto/gen/einride/example/freight/v1.Site
         table: sites
 
-      - message: go.einride.tech/aip/examples/proto/gen/einride/example/freight/v1.Shipment
+      - message: go.einride.tech/aip/proto/gen/einride/example/freight/v1.Shipment
         table: shipments
