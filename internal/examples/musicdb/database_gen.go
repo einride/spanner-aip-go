@@ -117,6 +117,24 @@ func (r *SingersRow) MutateColumns(columns []string) (string, []string, []interf
 	return "Singers", columns, values
 }
 
+func (r *SingersRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"SingerId",
+	)
+	if !r.FirstName.IsNull() {
+		columns = append(columns, "FirstName")
+	}
+	if !r.LastName.IsNull() {
+		columns = append(columns, "LastName")
+	}
+	if len(r.SingerInfo) != 0 {
+		columns = append(columns, "SingerInfo")
+	}
+	return r.MutateColumns(columns)
+}
+
 func (r *SingersRow) Key() SingersKey {
 	return SingersKey{
 		SingerId: r.SingerId,
@@ -210,6 +228,19 @@ func (r *AlbumsRow) MutateColumns(columns []string) (string, []string, []interfa
 		}
 	}
 	return "Albums", columns, values
+}
+
+func (r *AlbumsRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"SingerId",
+		"AlbumId",
+	)
+	if !r.AlbumTitle.IsNull() {
+		columns = append(columns, "AlbumTitle")
+	}
+	return r.MutateColumns(columns)
 }
 
 func (r *AlbumsRow) Key() AlbumsKey {
@@ -312,6 +343,20 @@ func (r *SongsRow) MutateColumns(columns []string) (string, []string, []interfac
 		}
 	}
 	return "Songs", columns, values
+}
+
+func (r *SongsRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"SingerId",
+		"AlbumId",
+		"TrackId",
+	)
+	if !r.SongName.IsNull() {
+		columns = append(columns, "SongName")
+	}
+	return r.MutateColumns(columns)
 }
 
 func (r *SongsRow) Key() SongsKey {
