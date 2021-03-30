@@ -67,6 +67,7 @@ func (g RowCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateUnmarshalFunction(f)
 	g.generateMutationFunction(f)
 	g.generateMutationForColumnsFunction(f)
+	g.generateMutationForPresentColumnsFunction(f)
 	g.generatePrimaryKeyMethod(f)
 }
 
@@ -169,6 +170,46 @@ func (g RowCodeGenerator) generateMutationForColumnsFunction(f *codegen.File) {
 	f.P("}")
 	f.P("return ", strconv.Quote(string(g.Table.Name)), ", columns, values")
 	f.P("}")
+}
+
+func (g RowCodeGenerator) generateMutationForPresentColumnsFunction(f *codegen.File) {
+	f.P()
+	f.P("func (r *", g.Type(), ") MutatePresentColumns() (string, []string, []interface{}) {")
+	f.P("columns := make([]string, 0, len(r.", g.ColumnNamesMethod(), "()))")
+	// non-nullable fields
+	f.P("columns = append(")
+	f.P("columns,")
+	for _, column := range g.Table.Columns {
+		if column.NotNull {
+			f.P(strconv.Quote(string(column.Name)), ",")
+		}
+	}
+	f.P(")")
+	// nullable fields
+	for _, column := range g.Table.Columns {
+		if column.NotNull {
+			continue
+		}
+		f.P("if ", g.isPresentPredicate(column), " {")
+		f.P("columns = append(columns, ", strconv.Quote(string(column.Name)), ")")
+		f.P("}")
+	}
+	f.P("return r.MutateColumns(columns)")
+	f.P("}")
+}
+
+func (g RowCodeGenerator) isPresentPredicate(column *spanddl.Column) string {
+	switch {
+	case column.Type.Array:
+		return "len(r." + g.ColumnFieldName(column) + ") != 0"
+	case column.Type.Base == spansql.Bytes:
+		return "len(r." + g.ColumnFieldName(column) + ") != 0"
+	case !column.NotNull:
+		return "!r." + g.ColumnFieldName(column) + ".IsNull()"
+	default:
+		// columns that are non-nullable are always considered present
+		return "true"
+	}
 }
 
 func (g RowCodeGenerator) generateColumnNamesFunctions(f *codegen.File) {

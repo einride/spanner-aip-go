@@ -87,6 +87,16 @@ func (r *UserAccessLogRow) MutateColumns(columns []string) (string, []string, []
 	return "UserAccessLog", columns, values
 }
 
+func (r *UserAccessLogRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"UserId",
+		"LastAccess",
+	)
+	return r.MutateColumns(columns)
+}
+
 func (r *UserAccessLogRow) Key() UserAccessLogKey {
 	return UserAccessLogKey{
 		UserId:     r.UserId,

@@ -117,6 +117,20 @@ func (r *ShippersRow) MutateColumns(columns []string) (string, []string, []inter
 	return "shippers", columns, values
 }
 
+func (r *ShippersRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"shipper_id",
+		"create_time",
+		"update_time",
+	)
+	if !r.DeleteTime.IsNull() {
+		columns = append(columns, "delete_time")
+	}
+	return r.MutateColumns(columns)
+}
+
 func (r *ShippersRow) Key() ShippersKey {
 	return ShippersKey{
 		ShipperId: r.ShipperId,
@@ -233,6 +247,21 @@ func (r *ShipmentsRow) MutateColumns(columns []string) (string, []string, []inte
 		}
 	}
 	return "shipments", columns, values
+}
+
+func (r *ShipmentsRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"shipper_id",
+		"shipment_id",
+		"create_time",
+		"update_time",
+	)
+	if !r.DeleteTime.IsNull() {
+		columns = append(columns, "delete_time")
+	}
+	return r.MutateColumns(columns)
 }
 
 func (r *ShipmentsRow) Key() ShipmentsKey {

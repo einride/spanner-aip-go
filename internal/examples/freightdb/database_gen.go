@@ -115,6 +115,20 @@ func (r *ShippersRow) MutateColumns(columns []string) (string, []string, []inter
 	return "shippers", columns, values
 }
 
+func (r *ShippersRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"shipper_id",
+		"create_time",
+		"update_time",
+	)
+	if !r.DeleteTime.IsNull() {
+		columns = append(columns, "delete_time")
+	}
+	return r.MutateColumns(columns)
+}
+
 func (r *ShippersRow) Key() ShippersKey {
 	return ShippersKey{
 		ShipperId: r.ShipperId,
@@ -267,6 +281,30 @@ func (r *SitesRow) MutateColumns(columns []string) (string, []string, []interfac
 		}
 	}
 	return "sites", columns, values
+}
+
+func (r *SitesRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"shipper_id",
+		"site_id",
+		"create_time",
+		"update_time",
+	)
+	if !r.DeleteTime.IsNull() {
+		columns = append(columns, "delete_time")
+	}
+	if !r.DisplayName.IsNull() {
+		columns = append(columns, "display_name")
+	}
+	if !r.Latitude.IsNull() {
+		columns = append(columns, "latitude")
+	}
+	if !r.Longitude.IsNull() {
+		columns = append(columns, "longitude")
+	}
+	return r.MutateColumns(columns)
 }
 
 func (r *SitesRow) Key() SitesKey {
@@ -465,6 +503,39 @@ func (r *ShipmentsRow) MutateColumns(columns []string) (string, []string, []inte
 	return "shipments", columns, values
 }
 
+func (r *ShipmentsRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"shipper_id",
+		"shipment_id",
+		"create_time",
+		"update_time",
+	)
+	if !r.DeleteTime.IsNull() {
+		columns = append(columns, "delete_time")
+	}
+	if !r.OriginSiteId.IsNull() {
+		columns = append(columns, "origin_site_id")
+	}
+	if !r.DestinationSiteId.IsNull() {
+		columns = append(columns, "destination_site_id")
+	}
+	if !r.PickupEarliestTime.IsNull() {
+		columns = append(columns, "pickup_earliest_time")
+	}
+	if !r.PickupLatestTime.IsNull() {
+		columns = append(columns, "pickup_latest_time")
+	}
+	if !r.DeliveryEarliestTime.IsNull() {
+		columns = append(columns, "delivery_earliest_time")
+	}
+	if !r.DeliveryLatestTime.IsNull() {
+		columns = append(columns, "delivery_latest_time")
+	}
+	return r.MutateColumns(columns)
+}
+
 func (r *ShipmentsRow) Key() ShipmentsKey {
 	return ShipmentsKey{
 		ShipperId:  r.ShipperId,
@@ -607,6 +678,29 @@ func (r *LineItemsRow) MutateColumns(columns []string) (string, []string, []inte
 		}
 	}
 	return "line_items", columns, values
+}
+
+func (r *LineItemsRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"shipper_id",
+		"shipment_id",
+		"line_number",
+	)
+	if !r.Title.IsNull() {
+		columns = append(columns, "title")
+	}
+	if !r.Quantity.IsNull() {
+		columns = append(columns, "quantity")
+	}
+	if !r.WeightKg.IsNull() {
+		columns = append(columns, "weight_kg")
+	}
+	if !r.VolumeM3.IsNull() {
+		columns = append(columns, "volume_m3")
+	}
+	return r.MutateColumns(columns)
 }
 
 func (r *LineItemsRow) Key() LineItemsKey {
