@@ -68,6 +68,7 @@ func NewEmulatorFixture(t *testing.T) Fixture {
 			dockerRm(t, containerID)
 		})
 		emulatorHost = inspectPortAddress(t, containerID, "9010/tcp")
+		t.Log("using emulator from container config", emulatorHost)
 	} else {
 		t.Log("using emulator from environment")
 	}
@@ -131,7 +132,7 @@ func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, glob string) *s
 	return fx.NewDatabaseFromStatements(t, statements)
 }
 
-// NewDatabaseFromDDLFiles creates a new database with a random ID from the provided statements.
+// NewDatabaseFromStatements creates a new database with a random ID from the provided statements.
 func (fx *EmulatorFixture) NewDatabaseFromStatements(t *testing.T, statements []string) *spanner.Client {
 	t.Helper()
 	databaseID := fmt.Sprintf("db%d", rand.Uint64()) // nolint: gosec
@@ -200,6 +201,7 @@ func inspectPortAddress(t *testing.T, containerID string, containerPort string) 
 			if portID == containerPort {
 				for _, hostPort := range hostPorts {
 					host, port = hostPort.HostIP, hostPort.HostPort
+					break // prefer first option
 				}
 			}
 		}

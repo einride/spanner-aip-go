@@ -51,7 +51,11 @@ func LoadFilesFromGoPackage(goPackage string) (*protoregistry.Files, error) {
 	if err := proto.Unmarshal(data, &fileSet); err != nil {
 		return nil, fmt.Errorf("load proto files from Go package %s: %w", goPackage, err)
 	}
-	return protodesc.NewFiles(&fileSet)
+	files, err := protodesc.NewFiles(&fileSet)
+	if err != nil {
+		return nil, fmt.Errorf("load proto files from Go package %s: %w", goPackage, err)
+	}
+	return files, nil
 }
 
 // nolint: gochecknoglobals
