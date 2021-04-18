@@ -19,3 +19,5 @@ linters:
     - cyclop # allow complex functions
     - nlreturn # allow return/break without whitespace
     - exhaustivestruct # don't require exhaustive fields in struct initializers
+    - exhaustive # don't require exhaustive enums
+    - wrapcheck # disabled due to false positives for gRPC errors
