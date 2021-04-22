@@ -19,7 +19,7 @@ const generatedBy = "spanner-aip-go"
 
 func main() {
 	log.SetFlags(0)
-	configFilePath := flag.String("config", "spanner-aip-go.yaml", "config file")
+	configFilePath := flag.String("config", "spanner.yaml", "config file")
 	flag.Parse()
 	if flag.Arg(0) != "generate" {
 		log.Fatal("usage: spanner-aip-go generate [-config <config>]")
