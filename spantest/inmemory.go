@@ -35,10 +35,14 @@ func NewInMemoryFixture(t *testing.T) Fixture {
 }
 
 // NewDatabaseFromDDLFiles implements Fixture.
-func (fx *InMemoryFixture) NewDatabaseFromDDLFiles(t *testing.T, glob string) *spanner.Client {
+func (fx *InMemoryFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string) *spanner.Client {
 	t.Helper()
-	files, err := filepath.Glob(glob)
-	assert.NilError(t, err)
+	var files []string
+	for _, glob := range globs {
+		globFiles, err := filepath.Glob(glob)
+		assert.NilError(t, err)
+		files = append(files, globFiles...)
+	}
 	var statements []string
 	for _, file := range files {
 		content, err := ioutil.ReadFile(file)
