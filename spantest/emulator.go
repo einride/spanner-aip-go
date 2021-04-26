@@ -114,10 +114,14 @@ func (fx *EmulatorFixture) Context() context.Context {
 }
 
 // NewDatabaseFromDDLFiles creates a new database with a random ID from the provided DDL file path glob.
-func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, glob string) *spanner.Client {
+func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string) *spanner.Client {
 	t.Helper()
-	files, err := filepath.Glob(glob)
-	assert.NilError(t, err)
+	var files []string
+	for _, glob := range globs {
+		globFiles, err := filepath.Glob(glob)
+		assert.NilError(t, err)
+		files = append(files, globFiles...)
+	}
 	var statements []string
 	for _, file := range files {
 		content, err := ioutil.ReadFile(file)
