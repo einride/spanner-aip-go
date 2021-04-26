@@ -74,7 +74,7 @@ func NewEmulatorFixture(t *testing.T) Fixture {
 	}
 	t.Log("emulator host:", emulatorHost)
 	awaitReachable(t, emulatorHost, 1*time.Second, 10*time.Second)
-	conn, err := grpc.Dial(emulatorHost, grpc.WithInsecure())
+	conn, err := grpc.DialContext(ctx, emulatorHost, grpc.WithInsecure(), grpc.WithBlock())
 	assert.NilError(t, err)
 	t.Cleanup(func() {
 		assert.NilError(t, conn.Close())
