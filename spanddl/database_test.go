@@ -216,6 +216,41 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "drop index",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  SingerId   INT64 NOT NULL,
+				  FirstName  STRING(1024),
+				  LastName   STRING(1024),
+				  SingerInfo BYTES(MAX),
+				  BirthDate  DATE,
+				) PRIMARY KEY(SingerId);`,
+
+				`CREATE INDEX SingersByFirstLastName ON Singers(FirstName, LastName)`,
+
+				`DROP INDEX SingersByFirstLastName`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+							{Name: "FirstName", Type: spansql.Type{Base: spansql.String, Len: 1024}},
+							{Name: "LastName", Type: spansql.Type{Base: spansql.String, Len: 1024}},
+							{Name: "SingerInfo", Type: spansql.Type{Base: spansql.Bytes, Len: spansql.MaxLen}},
+							{Name: "BirthDate", Type: spansql.Type{Base: spansql.Date}},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+					},
+				},
+
+				Indexes: []*Index{},
+			},
+		},
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
