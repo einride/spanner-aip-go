@@ -152,7 +152,7 @@ func (d *Database) applyDropIndex(stmt *spansql.DropIndex) (err error) {
 		}
 	}()
 	i := d.indexOfIndex(stmt.Name)
-	if i != -1 {
+	if i == -1 {
 		return fmt.Errorf("index %s does not exist", stmt.Name)
 	}
 	d.Indexes = append(d.Indexes[:i], d.Indexes[i+1:]...)
