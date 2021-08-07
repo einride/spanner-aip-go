@@ -405,11 +405,6 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 			f.P("r.", childName, " = make(map[", key.Type(), "][]*", row.Type(), ")")
 		}
 		f.P("if err := t.", g.ReadMethod(child), "(ctx, query.KeySet).Do(func(row *", row.Type(), ") error {")
-		if g.hasSoftDelete(child) {
-			f.P("if row.", g.softDeleteTimestampFieldName(table), ".Valid {")
-			f.P("return nil")
-			f.P("}")
-		}
 		f.P("k := ", parentKey.Type(), "{")
 		for _, part := range parent.PrimaryKey {
 			f.P(key.FieldName(part), ": row.", key.FieldName(part), ",")
@@ -501,10 +496,6 @@ func (g ReadTransactionCodeGenerator) hasSoftDelete(table *spanddl.Table) bool {
 
 func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName(table *spanddl.Table) spansql.ID {
 	return "delete_time"
-}
-
-func (g ReadTransactionCodeGenerator) softDeleteTimestampFieldName(table *spanddl.Table) spansql.ID {
-	return "DeleteTime"
 }
 
 func rangeInterleavedTables(table *spanddl.Table, f func(parent, child *spanddl.Table)) {

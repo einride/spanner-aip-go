@@ -1391,9 +1391,6 @@ func (t ReadTransaction) readInterleavedShippersRows(
 	if query.Shipments {
 		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
 		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
-			if row.DeleteTime.Valid {
-				return nil
-			}
 			k := ShippersKey{
 				ShipperId: row.ShipperId,
 			}
