@@ -8,7 +8,7 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/stoewer/go-strcase v1.2.0
 	go.einride.tech/aip v0.49.0
-	google.golang.org/api v0.53.0
+	google.golang.org/api v0.54.0
 	google.golang.org/genproto v0.0.0-20210811021853-ddbe55d93216
 	google.golang.org/grpc v1.40.0
 	google.golang.org/protobuf v1.27.1
