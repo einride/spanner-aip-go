@@ -13,6 +13,7 @@ type Table struct {
 	InterleavedTables []*Table
 	PrimaryKey        []spansql.KeyPart
 	Interleave        *spansql.Interleave
+	RowDeletionPolicy *spansql.RowDeletionPolicy
 }
 
 func (t *Table) applyAlterTable(stmt *spansql.AlterTable) error {
@@ -29,6 +30,10 @@ func (t *Table) applyAlterTable(stmt *spansql.AlterTable) error {
 		return t.applyDropConstraintAlteration(alteration)
 	case spansql.SetOnDelete:
 		return t.applySetOnDeleteAlteration(alteration)
+	case spansql.AddRowDeletionPolicy:
+		return t.applyAddRowDeletionPolicy(alteration)
+	case spansql.ReplaceRowDeletionPolicy:
+		return t.applyReplaceRowDeletionPolicy(alteration)
 	default:
 		return fmt.Errorf("unhandled alteration (%s)", alteration.SQL())
 	}
@@ -118,6 +123,32 @@ func (t *Table) applySetOnDeleteAlteration(alteration spansql.SetOnDelete) (err 
 		return fmt.Errorf("table is not interleaved")
 	}
 	t.Interleave.OnDelete = alteration.Action
+	return nil
+}
+
+func (t *Table) applyAddRowDeletionPolicy(alteration spansql.AddRowDeletionPolicy) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("apply ADD ROW DELETION POLICY: %w", err)
+		}
+	}()
+	if _, ok := t.Column(alteration.RowDeletionPolicy.Column); !ok {
+		return fmt.Errorf("column %s does not exist", alteration.RowDeletionPolicy.Column)
+	}
+	t.RowDeletionPolicy = &alteration.RowDeletionPolicy
+	return nil
+}
+
+func (t *Table) applyReplaceRowDeletionPolicy(alteration spansql.ReplaceRowDeletionPolicy) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("apply REPLACE ROW DELETION POLICY: %w", err)
+		}
+	}()
+	if _, ok := t.Column(alteration.RowDeletionPolicy.Column); !ok {
+		return fmt.Errorf("column %s does not exist", alteration.RowDeletionPolicy.Column)
+	}
+	t.RowDeletionPolicy = &alteration.RowDeletionPolicy
 	return nil
 }
 

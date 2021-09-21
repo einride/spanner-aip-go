@@ -71,10 +71,11 @@ func (d *Database) applyCreateTable(stmt *spansql.CreateTable) (err error) {
 		return fmt.Errorf("table %s already exists", stmt.Name)
 	}
 	table := &Table{
-		Name:       stmt.Name,
-		Columns:    make([]*Column, 0, len(stmt.Columns)),
-		Interleave: stmt.Interleave,
-		PrimaryKey: stmt.PrimaryKey,
+		Name:              stmt.Name,
+		Columns:           make([]*Column, 0, len(stmt.Columns)),
+		Interleave:        stmt.Interleave,
+		PrimaryKey:        stmt.PrimaryKey,
+		RowDeletionPolicy: stmt.RowDeletionPolicy,
 	}
 	for _, columnDef := range stmt.Columns {
 		var column Column
