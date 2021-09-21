@@ -46,6 +46,43 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 		},
 
 		{
+			name: "create table with row deletion policy",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  CreatedAt TIMESTAMP NOT NULL,
+				  SingerId   INT64 NOT NULL,
+				  FirstName  STRING(1024),
+				  LastName   STRING(1024),
+				  SingerInfo BYTES(MAX),
+				  BirthDate  DATE,
+				) PRIMARY KEY(SingerId)
+				, ROW DELETION POLICY (OLDER_THAN(CreatedAt, INTERVAL 30 DAY));`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "CreatedAt", Type: spansql.Type{Base: spansql.Timestamp}, NotNull: true},
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+							{Name: "FirstName", Type: spansql.Type{Base: spansql.String, Len: 1024}},
+							{Name: "LastName", Type: spansql.Type{Base: spansql.String, Len: 1024}},
+							{Name: "SingerInfo", Type: spansql.Type{Base: spansql.Bytes, Len: spansql.MaxLen}},
+							{Name: "BirthDate", Type: spansql.Type{Base: spansql.Date}},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+						RowDeletionPolicy: &spansql.RowDeletionPolicy{
+							Column:  "CreatedAt",
+							NumDays: 30,
+						},
+					},
+				},
+			},
+		},
+
+		{
 			name: "add column",
 			ddls: []string{
 				`CREATE TABLE Singers (
@@ -64,6 +101,69 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 						},
 						PrimaryKey: []spansql.KeyPart{
 							{Column: "SingerId"},
+						},
+					},
+				},
+			},
+		},
+
+		{
+			name: "add row deletion policy",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  CreatedAt TIMESTAMP NOT NULL,
+				  SingerId   INT64 NOT NULL,
+				) PRIMARY KEY(SingerId);`,
+
+				`ALTER TABLE Singers ADD ROW DELETION POLICY (OLDER_THAN(CreatedAt, INTERVAL 1 DAY));`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "CreatedAt", Type: spansql.Type{Base: spansql.Timestamp}, NotNull: true},
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+						RowDeletionPolicy: &spansql.RowDeletionPolicy{
+							Column:  "CreatedAt",
+							NumDays: 1,
+						},
+					},
+				},
+			},
+		},
+
+		{
+			name: "replace row deletion policy",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  CreatedAt TIMESTAMP NOT NULL,
+				  ModifiedAt TIMESTAMP NOT NULL,
+				  SingerId   INT64 NOT NULL,
+				) PRIMARY KEY(SingerId)
+				, ROW DELETION POLICY (OLDER_THAN(CreatedAt, INTERVAL 30 DAY));`,
+
+				`ALTER TABLE Singers REPLACE ROW DELETION POLICY (OLDER_THAN(ModifiedAt, INTERVAL 7 DAY));`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "CreatedAt", Type: spansql.Type{Base: spansql.Timestamp}, NotNull: true},
+							{Name: "ModifiedAt", Type: spansql.Type{Base: spansql.Timestamp}, NotNull: true},
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+						RowDeletionPolicy: &spansql.RowDeletionPolicy{
+							Column:  "ModifiedAt",
+							NumDays: 7,
 						},
 					},
 				},
