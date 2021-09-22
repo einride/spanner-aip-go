@@ -77,7 +77,30 @@ func (fx *InMemoryFixture) NewDatabaseFromStatements(t *testing.T, statements []
 	for i, statement := range statements {
 		ddl, err := spansql.ParseDDL(fmt.Sprintf("statement%d", i), statement)
 		assert.NilError(t, err)
+		removeUnsupportedStatements(ddl)
 		assert.NilError(t, server.UpdateDDL(ddl))
 	}
 	return client
+}
+
+// removeUnsupportedStatements removes any statements which are not yet supported by
+// the spannertest package for the purpose of not preventing new spanner
+// features from breaking existing tests.
+func removeUnsupportedStatements(ddl *spansql.DDL) {
+	stmts := make([]spansql.DDLStmt, 0, len(ddl.List))
+	for _, stmt := range ddl.List {
+		if s, ok := stmt.(*spansql.AlterTable); ok {
+			switch s.Alteration.(type) {
+			// TODO: Remove once support for Row Deletion Policy has been added in spannertest
+			// See https://github.com/googleapis/google-cloud-go/issues/4782 for more details
+			case spansql.AddRowDeletionPolicy:
+				continue
+			case spansql.ReplaceRowDeletionPolicy:
+				continue
+			}
+		}
+		stmts = append(stmts, stmt)
+	}
+
+	ddl.List = stmts
 }
