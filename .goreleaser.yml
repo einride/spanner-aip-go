@@ -5,7 +5,7 @@ before:
 builds:
   - id: spanner-aip-go
     binary: spanner-aip-go
-    main: ./cmd/spanner-aip-go/main.go
+    main: .
     env:
       - CGO_ENABLED=0
     goos:

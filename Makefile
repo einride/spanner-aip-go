@@ -37,4 +37,4 @@ go-test:
 .PHONY: go-generate
 go-generate:
 	$(info [$@] generating example code...)
-	@go run ./cmd/spanner-aip-go generate
+	@go run . generate
