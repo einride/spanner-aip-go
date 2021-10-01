@@ -38,7 +38,7 @@ See [https://aip.dev][google-aip] for the full AIP documentation and the
 $ go get -u go.einride.tech/spanner-aip
 ```
 
-### Code generation
+### Code generation config
 
 Use a YAML config file to specify the schema to generate code from:
 
@@ -50,6 +50,12 @@ databases:
     package:
       name: musicdb
       path: ./internal/examples/musicdb
+```
+
+### Code generation
+
+```bash
+$ go run go.einride.tech/spanner-aip generate
 ```
 
 ### Reading data
