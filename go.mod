@@ -4,12 +4,12 @@ go 1.15
 
 require (
 	cloud.google.com/go v0.97.0
-	cloud.google.com/go/spanner v1.26.0
+	cloud.google.com/go/spanner v1.27.0
 	github.com/google/go-cmp v0.5.6
 	github.com/stoewer/go-strcase v1.2.0
 	go.einride.tech/aip v0.52.0
 	google.golang.org/api v0.58.0
-	google.golang.org/genproto v0.0.0-20210924002016-3dee208752a0
+	google.golang.org/genproto v0.0.0-20211019152133-63b7e35f4404
 	google.golang.org/grpc v1.41.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
