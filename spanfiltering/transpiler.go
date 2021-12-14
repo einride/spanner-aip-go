@@ -87,6 +87,8 @@ func (t *Transpiler) transpileCallExpr(e *expr.Expr) (spansql.Expr, error) {
 		return t.transpileHasCallExpr(e)
 	case filtering.FunctionEquals:
 		return t.transpileComparisonCallExpr(e, spansql.Eq)
+	case filtering.FunctionNotEquals:
+		return t.transpileComparisonCallExpr(e, spansql.Ne)
 	case filtering.FunctionLessThan:
 		return t.transpileComparisonCallExpr(e, spansql.Lt)
 	case filtering.FunctionLessEquals:

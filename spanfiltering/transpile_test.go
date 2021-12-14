@@ -53,6 +53,19 @@ func TestTranspileFilter(t *testing.T) {
 		},
 
 		{
+			name:   "string negated equality",
+			filter: `author != "Karin Boye"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+			},
+			expectedSQL: `(author != @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": "Karin Boye",
+			},
+		},
+
+		{
 			name:   "timestamp",
 			filter: `create_time > timestamp("2021-02-14T14:49:34+01:00")`,
 			declarations: []filtering.DeclarationOption{
@@ -72,6 +85,18 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
 			},
 			expectedSQL: `(example_enum = @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": int64(1),
+			},
+		},
+
+		{
+			name:   "enum negated equality",
+			filter: `example_enum != ENUM_ONE`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
+			},
+			expectedSQL: `(example_enum != @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": int64(1),
 			},
