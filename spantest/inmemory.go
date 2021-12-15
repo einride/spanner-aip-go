@@ -14,6 +14,7 @@ import (
 	"cloud.google.com/go/spanner/spansql"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"gotest.tools/v3/assert"
 )
 
@@ -69,7 +70,7 @@ func (fx *InMemoryFixture) NewDatabaseFromStatements(t *testing.T, statements []
 	server, err := spannertest.NewServer("localhost:0")
 	assert.NilError(t, err)
 	t.Cleanup(server.Close)
-	conn, err := grpc.Dial(server.Addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(server.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NilError(t, err)
 	client, err := spanner.NewClient(fx.ctx, databaseName, option.WithGRPCConn(conn))
 	assert.NilError(t, err)
