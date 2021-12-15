@@ -23,6 +23,7 @@ import (
 	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	instancepb "google.golang.org/genproto/googleapis/spanner/admin/instance/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"gotest.tools/v3/assert"
 )
 
@@ -74,7 +75,12 @@ func NewEmulatorFixture(t *testing.T) Fixture {
 	}
 	t.Log("emulator host:", emulatorHost)
 	awaitReachable(t, emulatorHost, 1*time.Second, 10*time.Second)
-	conn, err := grpc.DialContext(ctx, emulatorHost, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.DialContext(
+		ctx,
+		emulatorHost,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
 	assert.NilError(t, err)
 	t.Cleanup(func() {
 		assert.NilError(t, conn.Close())
@@ -149,7 +155,7 @@ func (fx *EmulatorFixture) NewDatabaseFromStatements(t *testing.T, statements []
 	createdDatabase, err := createDatabaseOp.Wait(fx.ctx)
 	assert.NilError(t, err)
 	t.Log("database:", createdDatabase.String())
-	conn, err := grpc.Dial(fx.emulatorHost, grpc.WithInsecure())
+	conn, err := grpc.Dial(fx.emulatorHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NilError(t, err)
 	client, err := spanner.NewClient(fx.ctx, createdDatabase.Name, option.WithGRPCConn(conn))
 	assert.NilError(t, err)
