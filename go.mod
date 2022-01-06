@@ -3,7 +3,7 @@ module go.einride.tech/spanner-aip
 go 1.15
 
 require (
-	cloud.google.com/go v0.100.1
+	cloud.google.com/go v0.100.2
 	cloud.google.com/go/spanner v1.28.0
 	github.com/google/go-cmp v0.5.6
 	github.com/stoewer/go-strcase v1.2.0
