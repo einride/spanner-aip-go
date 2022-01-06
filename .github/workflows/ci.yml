@@ -1,29 +1,21 @@
-name: CI
+name: ci
 
 on:
-  push:
-    branches:
-      - master
   pull_request:
-    branches:
-      - "*"
+    types: [opened, reopened, synchronize]
 
 jobs:
-  make:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2.4.0
-
-      - name: Setup Go
-        uses: actions/setup-go@v2
+      - uses: actions/checkout@v2.4.0
         with:
-          go-version: ~1.16
+          fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v2.5.1
+      - name: Set up Go
+        uses: actions/setup-go@v2.1.5
         with:
-          node-version: 12
+          go-version: ^1.17
 
       - name: Make
         run: make
@@ -31,36 +23,5 @@ jobs:
       - name: Report Code Coverage
         uses: codecov/codecov-action@v2.1.0
         with:
-          file: ./build/coverage/go-test.txt
+          file: .mage/tools/go/coverage/go-test.txt
           fail_ci_if_error: true
-
-  release:
-    needs: [ make ]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2.4.0
-
-      - name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ~1.16
-
-      - name: Setup Node
-        uses: actions/setup-node@v2.5.1
-        with:
-          node-version: 12
-
-      - name: Run semantic-release
-        run: make semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run goreleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          version: latest
-          args: release --rm-dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

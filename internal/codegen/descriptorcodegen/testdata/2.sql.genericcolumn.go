@@ -1,3 +1,4 @@
+//go:build testdata.2.sql.genericcolumn
 // +build testdata.2.sql.genericcolumn
 
 package testdata
