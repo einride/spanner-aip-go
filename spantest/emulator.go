@@ -189,7 +189,7 @@ func dockerKill(t *testing.T, containerID string) {
 	execCommand(t, "docker", "kill", containerID)
 }
 
-func inspectPortAddress(t *testing.T, containerID string, containerPort string) string {
+func inspectPortAddress(t *testing.T, containerID, containerPort string) string {
 	t.Helper()
 	var containers []struct {
 		NetworkSettings struct {

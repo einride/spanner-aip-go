@@ -1,3 +1,4 @@
+//go:build testdata.4.sql.database
 // +build testdata.4.sql.database
 
 package testdata

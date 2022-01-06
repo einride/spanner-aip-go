@@ -1,3 +1,4 @@
+//go:build testdata.2.sql.table
 // +build testdata.2.sql.table
 
 package testdata
