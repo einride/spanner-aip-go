@@ -10,6 +10,9 @@ import (
 	"go.einride.tech/mage-tools/mgpath"
 
 	// mage:import
+	"go.einride.tech/mage-tools/targets/mgyamlfmt"
+
+	// mage:import
 	"go.einride.tech/mage-tools/targets/mgconvco"
 
 	// mage:import
@@ -39,10 +42,11 @@ func All() {
 		mg.F(mgconvco.ConvcoCheck, "origin/master..HEAD"),
 		mggolangcilint.GolangciLint,
 		mgmarkdownfmt.FormatMarkdown,
+		mgyamlfmt.FormatYaml,
+		SpannerGenerate,
 	)
 	mg.SerialDeps(
 		mggo.GoTest,
-		SpannerGenerate,
 		mggo.GoModTidy,
 		mggitverifynodiff.GitVerifyNoDiff,
 	)
