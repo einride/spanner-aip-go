@@ -5,6 +5,7 @@ package musicdb
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
@@ -919,7 +920,7 @@ func (t ReadTransaction) readInterleavedSingersRows(
 ) (*readInterleavedSingersRowsResult, error) {
 	var r readInterleavedSingersRowsResult
 	interleavedAlbums := make(map[AlbumsKey]*AlbumsRow)
-	if query.Albums {
+	if query.Albums && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Albums = make(map[SingersKey][]*AlbumsRow)
 		if err := t.ReadAlbumsRows(ctx, query.KeySet).Do(func(row *AlbumsRow) error {
 			k := SingersKey{
@@ -932,7 +933,7 @@ func (t ReadTransaction) readInterleavedSingersRows(
 			return nil, err
 		}
 	}
-	if query.Songs {
+	if query.Songs && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		if err := t.ReadSongsRows(ctx, query.KeySet).Do(func(row *SongsRow) error {
 			k := AlbumsKey{
 				SingerId: row.SingerId,
@@ -1143,7 +1144,7 @@ func (t ReadTransaction) readInterleavedAlbumsRows(
 	query readInterleavedAlbumsRowsQuery,
 ) (*readInterleavedAlbumsRowsResult, error) {
 	var r readInterleavedAlbumsRowsResult
-	if query.Songs {
+	if query.Songs && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Songs = make(map[AlbumsKey][]*SongsRow)
 		if err := t.ReadSongsRows(ctx, query.KeySet).Do(func(row *SongsRow) error {
 			k := AlbumsKey{

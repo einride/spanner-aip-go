@@ -8,6 +8,7 @@ package testdata
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -700,7 +701,7 @@ func (t ReadTransaction) readInterleavedShippersRows(
 	query readInterleavedShippersRowsQuery,
 ) (*readInterleavedShippersRowsResult, error) {
 	var r readInterleavedShippersRowsResult
-	if query.Shipments {
+	if query.Shipments && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
 		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
 			k := ShippersKey{
