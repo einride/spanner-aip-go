@@ -8,6 +8,7 @@ package testdata
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
@@ -665,7 +666,7 @@ func (t ReadTransaction) readInterleavedSingersRows(
 	query readInterleavedSingersRowsQuery,
 ) (*readInterleavedSingersRowsResult, error) {
 	var r readInterleavedSingersRowsResult
-	if query.Albums {
+	if query.Albums && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Albums = make(map[SingersKey][]*AlbumsRow)
 		if err := t.ReadAlbumsRows(ctx, query.KeySet).Do(func(row *AlbumsRow) error {
 			k := SingersKey{

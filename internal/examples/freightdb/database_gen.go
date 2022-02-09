@@ -5,6 +5,7 @@ package freightdb
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -1388,7 +1389,7 @@ func (t ReadTransaction) readInterleavedShippersRows(
 ) (*readInterleavedShippersRowsResult, error) {
 	var r readInterleavedShippersRowsResult
 	interleavedShipments := make(map[ShipmentsKey]*ShipmentsRow)
-	if query.Shipments {
+	if query.Shipments && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
 		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
 			k := ShippersKey{
@@ -1401,7 +1402,7 @@ func (t ReadTransaction) readInterleavedShippersRows(
 			return nil, err
 		}
 	}
-	if query.LineItems {
+	if query.LineItems && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		if err := t.ReadLineItemsRows(ctx, query.KeySet).Do(func(row *LineItemsRow) error {
 			k := ShipmentsKey{
 				ShipperId:  row.ShipperId,
@@ -1744,7 +1745,7 @@ func (t ReadTransaction) readInterleavedShipmentsRows(
 	query readInterleavedShipmentsRowsQuery,
 ) (*readInterleavedShipmentsRowsResult, error) {
 	var r readInterleavedShipmentsRowsResult
-	if query.LineItems {
+	if query.LineItems && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.LineItems = make(map[ShipmentsKey][]*LineItemsRow)
 		if err := t.ReadLineItemsRows(ctx, query.KeySet).Do(func(row *LineItemsRow) error {
 			k := ShipmentsKey{

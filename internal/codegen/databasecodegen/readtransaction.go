@@ -379,6 +379,8 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsResult(f *codeg
 
 func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codegen.File, table *spanddl.Table) {
 	ctxPkg := f.Import("context")
+	reflectPkg := f.Import("reflect")
+	spannerPkg := f.Import("cloud.google.com/go/spanner")
 	key := KeyCodeGenerator{Table: table}
 	f.P("func (t ", g.Type(), ") ", g.ReadInterleavedMethod(table), "(")
 	f.P("ctx ", ctxPkg, ".Context,")
@@ -400,7 +402,11 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 		parentName := strcase.UpperCamelCase(string(parent.Name))
 		row := RowCodeGenerator{Table: child}
 		childName := strcase.UpperCamelCase(string(child.Name))
-		f.P("if query.", childName, " {")
+		// If the parent query does not return any data, we need to avoid querying the interleaved table because
+		// spanner does not support querying with no keys.
+		// Since the KeySet interface contains no public methods to get the list of keys, we use the reflect package
+		// to compare the given key with a set of empty keys.
+		f.P("if query.", childName, " && !", reflectPkg, ".DeepEqual(query.KeySet, ", spannerPkg, ".KeySets()) {")
 		if isTopLevel {
 			f.P("r.", childName, " = make(map[", key.Type(), "][]*", row.Type(), ")")
 		}
