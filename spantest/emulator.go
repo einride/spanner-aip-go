@@ -74,7 +74,7 @@ func NewEmulatorFixture(t *testing.T) Fixture {
 		t.Log("using emulator from environment")
 	}
 	t.Log("emulator host:", emulatorHost)
-	awaitReachable(t, emulatorHost, 1*time.Second, 10*time.Second)
+	awaitReachable(t, emulatorHost, 100*time.Millisecond, 10*time.Second)
 	conn, err := grpc.DialContext(
 		ctx,
 		emulatorHost,
