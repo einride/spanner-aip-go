@@ -97,6 +97,15 @@ func GoType(column *spanddl.Column) reflect.Type {
 		default:
 			return reflect.TypeOf(spanner.NullTime{})
 		}
+	case spansql.JSON:
+		switch {
+		case column.Type.Array:
+			return reflect.TypeOf([]spanner.NullJSON(nil))
+		case column.NotNull:
+			return reflect.TypeOf(spanner.NullJSON{})
+		default:
+			return reflect.TypeOf(spanner.NullJSON{})
+		}
 	case spansql.Numeric:
 		panic("TODO: implement support for NUMERIC")
 	default:

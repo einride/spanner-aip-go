@@ -7,4 +7,5 @@ CREATE TABLE sites (
     display_name STRING(63),
     latitude FLOAT64,
     longitude FLOAT64,
+    config JSON,
 ) PRIMARY KEY(shipper_id, site_id);
