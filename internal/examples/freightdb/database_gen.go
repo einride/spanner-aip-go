@@ -145,6 +145,7 @@ type SitesRow struct {
 	DisplayName spanner.NullString  `spanner:"display_name"`
 	Latitude    spanner.NullFloat64 `spanner:"latitude"`
 	Longitude   spanner.NullFloat64 `spanner:"longitude"`
+	Config      spanner.NullJSON    `spanner:"config"`
 }
 
 func (*SitesRow) ColumnNames() []string {
@@ -157,6 +158,7 @@ func (*SitesRow) ColumnNames() []string {
 		"display_name",
 		"latitude",
 		"longitude",
+		"config",
 	}
 }
 
@@ -170,6 +172,7 @@ func (*SitesRow) ColumnIDs() []spansql.ID {
 		"display_name",
 		"latitude",
 		"longitude",
+		"config",
 	}
 }
 
@@ -183,6 +186,7 @@ func (*SitesRow) ColumnExprs() []spansql.Expr {
 		spansql.ID("display_name"),
 		spansql.ID("latitude"),
 		spansql.ID("longitude"),
+		spansql.ID("config"),
 	}
 }
 
@@ -234,6 +238,10 @@ func (r *SitesRow) UnmarshalSpannerRow(row *spanner.Row) error {
 			if err := row.Column(i, &r.Longitude); err != nil {
 				return fmt.Errorf("unmarshal sites row: longitude column: %w", err)
 			}
+		case "config":
+			if err := row.Column(i, &r.Config); err != nil {
+				return fmt.Errorf("unmarshal sites row: config column: %w", err)
+			}
 		default:
 			return fmt.Errorf("unmarshal sites row: unhandled column: %s", row.ColumnName(i))
 		}
@@ -251,6 +259,7 @@ func (r *SitesRow) Mutate() (string, []string, []interface{}) {
 		r.DisplayName,
 		r.Latitude,
 		r.Longitude,
+		r.Config,
 	}
 }
 
@@ -277,6 +286,8 @@ func (r *SitesRow) MutateColumns(columns []string) (string, []string, []interfac
 			values = append(values, r.Latitude)
 		case "longitude":
 			values = append(values, r.Longitude)
+		case "config":
+			values = append(values, r.Config)
 		default:
 			panic(fmt.Errorf("table sites does not have column %s", column))
 		}
@@ -304,6 +315,9 @@ func (r *SitesRow) MutatePresentColumns() (string, []string, []interface{}) {
 	}
 	if !r.Longitude.IsNull() {
 		columns = append(columns, "longitude")
+	}
+	if !r.Config.IsNull() {
+		columns = append(columns, "config")
 	}
 	return r.MutateColumns(columns)
 }

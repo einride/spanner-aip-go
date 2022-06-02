@@ -88,6 +88,12 @@ var descriptor = databaseDescriptor{
 			notNull:              false,
 			allowCommitTimestamp: false,
 		},
+		config: columnDescriptor{
+			columnID:             "config",
+			columnType:           spansql.Type{Array: false, Base: 8, Len: 0},
+			notNull:              false,
+			allowCommitTimestamp: false,
+		},
 	},
 	shipments: shipmentsTableDescriptor{
 		tableID: "shipments",
@@ -320,6 +326,7 @@ type SitesTableDescriptor interface {
 	DisplayName() ColumnDescriptor
 	Latitude() ColumnDescriptor
 	Longitude() ColumnDescriptor
+	Config() ColumnDescriptor
 }
 
 type sitesTableDescriptor struct {
@@ -332,6 +339,7 @@ type sitesTableDescriptor struct {
 	displayName columnDescriptor
 	latitude    columnDescriptor
 	longitude   columnDescriptor
+	config      columnDescriptor
 }
 
 func (d *sitesTableDescriptor) TableName() string {
@@ -352,6 +360,7 @@ func (d *sitesTableDescriptor) ColumnNames() []string {
 		"display_name",
 		"latitude",
 		"longitude",
+		"config",
 	}
 }
 
@@ -365,6 +374,7 @@ func (d *sitesTableDescriptor) ColumnIDs() []spansql.ID {
 		"display_name",
 		"latitude",
 		"longitude",
+		"config",
 	}
 }
 
@@ -378,6 +388,7 @@ func (d *sitesTableDescriptor) ColumnExprs() []spansql.Expr {
 		spansql.ID("display_name"),
 		spansql.ID("latitude"),
 		spansql.ID("longitude"),
+		spansql.ID("config"),
 	}
 }
 
@@ -411,6 +422,10 @@ func (d *sitesTableDescriptor) Latitude() ColumnDescriptor {
 
 func (d *sitesTableDescriptor) Longitude() ColumnDescriptor {
 	return &d.longitude
+}
+
+func (d *sitesTableDescriptor) Config() ColumnDescriptor {
+	return &d.config
 }
 
 type ShipmentsTableDescriptor interface {
