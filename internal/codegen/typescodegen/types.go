@@ -27,6 +27,8 @@ func SpanSQLType(column *spanddl.Column) reflect.Type {
 		return reflect.TypeOf(spansql.DateLiteral{})
 	case spansql.Timestamp:
 		return reflect.TypeOf(spansql.TimestampLiteral{})
+	case spansql.JSON:
+		return reflect.TypeOf(spansql.JSONLiteral{})
 	case spansql.Numeric:
 		panic("TODO: implement support for NUMERIC")
 	default:
