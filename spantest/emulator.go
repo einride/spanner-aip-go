@@ -58,7 +58,9 @@ func NewEmulatorFixture(t testing.TB) Fixture {
 			t.Fatal("Docker is available, but the daemon does not seem to be running.")
 		}
 		const cloudSpannerEmulatorImage = "gcr.io/cloud-spanner-emulator/emulator:latest"
-		dockerPull(t, cloudSpannerEmulatorImage)
+		if _, ok := os.LookupEnv("SPANNER_EMULATOR_SKIP_PULL"); !ok {
+			dockerPull(t, cloudSpannerEmulatorImage)
+		}
 		var containerID string
 		if isRunningOnCloudBuild(t) {
 			containerID = dockerRunDetached(t, "--network", "cloudbuild", "--publish-all", cloudSpannerEmulatorImage)
