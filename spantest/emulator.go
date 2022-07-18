@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"os"
 	"os/exec"
@@ -89,7 +88,7 @@ func NewEmulatorFixture(t *testing.T) Fixture {
 	assert.NilError(t, err)
 	t.Log("creating instance...")
 	const projectID = "spanner-aip-go"
-	instanceID := fmt.Sprintf("emulator-%d", rand.Uint64()) // nolint: gosec
+	instanceID := fmt.Sprintf("emulator-%d", time.Now().UnixNano())
 	createInstanceOp, err := instanceAdminClient.CreateInstance(ctx, &instancepb.CreateInstanceRequest{
 		Parent:     fmt.Sprintf("projects/%s", projectID),
 		InstanceId: instanceID,
@@ -145,7 +144,7 @@ func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string
 // NewDatabaseFromStatements creates a new database with a random ID from the provided statements.
 func (fx *EmulatorFixture) NewDatabaseFromStatements(t *testing.T, statements []string) *spanner.Client {
 	t.Helper()
-	databaseID := fmt.Sprintf("db%d", rand.Uint64()) // nolint: gosec
+	databaseID := fmt.Sprintf("db%d", time.Now().UnixNano())
 	createDatabaseOp, err := fx.databaseAdminClient.CreateDatabase(fx.ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", fx.projectID, fx.instanceID),
 		CreateStatement: fmt.Sprintf("CREATE DATABASE %s", databaseID),
