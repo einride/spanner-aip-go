@@ -3,6 +3,8 @@ package spantest
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base32"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -88,7 +90,7 @@ func NewEmulatorFixture(t *testing.T) Fixture {
 	assert.NilError(t, err)
 	t.Log("creating instance...")
 	const projectID = "spanner-aip-go"
-	instanceID := fmt.Sprintf("emulator-%d", time.Now().UnixNano())
+	instanceID := fmt.Sprintf("emulator-%s", randomSuffix(t))
 	createInstanceOp, err := instanceAdminClient.CreateInstance(ctx, &instancepb.CreateInstanceRequest{
 		Parent:     fmt.Sprintf("projects/%s", projectID),
 		InstanceId: instanceID,
@@ -144,7 +146,7 @@ func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string
 // NewDatabaseFromStatements creates a new database with a random ID from the provided statements.
 func (fx *EmulatorFixture) NewDatabaseFromStatements(t *testing.T, statements []string) *spanner.Client {
 	t.Helper()
-	databaseID := fmt.Sprintf("db%d", time.Now().UnixNano())
+	databaseID := fmt.Sprintf("db%s", randomSuffix(t))
 	createDatabaseOp, err := fx.databaseAdminClient.CreateDatabase(fx.ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", fx.projectID, fx.instanceID),
 		CreateStatement: fmt.Sprintf("CREATE DATABASE %s", databaseID),
@@ -280,4 +282,12 @@ func isRunningOnCloudBuild(t *testing.T) bool {
 		t.Log(stdout.String())
 	}
 	return result
+}
+
+func randomSuffix(t *testing.T) string {
+	data := make([]byte, 10)
+	if _, err := rand.Read(data); err != nil {
+		t.Fatal(err)
+	}
+	return strings.ToLower(base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString(data))
 }
