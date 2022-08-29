@@ -42,7 +42,7 @@ func runGoldenFileTest(t *testing.T, name string, fn func(*spanddl.Database, *co
 			assert.NilError(t, err)
 			golden.Assert(t, string(actual), filepath.Base(goldenFile))
 			var stderr strings.Builder
-			goBuildCommand := exec.Command("go", "build", "-tags="+buildTag, goldenFile) // nolint: gosec
+			goBuildCommand := exec.Command("go", "build", "-tags="+buildTag, goldenFile) //nolint: gosec
 			goBuildCommand.Stderr = &stderr
 			assert.NilError(t, goBuildCommand.Run(), stderr.String())
 		})
