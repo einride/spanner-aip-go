@@ -58,7 +58,7 @@ func LoadFilesFromGoPackage(goPackage string) (*protoregistry.Files, error) {
 	return files, nil
 }
 
-// nolint: gochecknoglobals
+//nolint: gochecknoglobals
 var mainTemplate = template.Must(template.New("main").Parse(`
 package main
 

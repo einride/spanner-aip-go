@@ -65,7 +65,7 @@ func (fx *InMemoryFixture) NewDatabaseFromStatements(t *testing.T, statements []
 		projectID  = "spanner-aip-go"
 		instanceID = "in-memory"
 	)
-	databaseID := "db" + strconv.Itoa(rand.Int()) // nolint: gosec
+	databaseID := "db" + strconv.Itoa(rand.Int()) //nolint: gosec
 	databaseName := fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectID, instanceID, databaseID)
 	server, err := spannertest.NewServer("localhost:0")
 	assert.NilError(t, err)

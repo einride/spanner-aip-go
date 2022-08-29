@@ -67,7 +67,7 @@ func (f *File) Write(p []byte) (int, error) {
 	if err != nil {
 		f.err = fmt.Errorf("write: %w", err)
 	}
-	return n, err // nolint: wrapcheck // false positive
+	return n, err //nolint: wrapcheck // false positive
 }
 
 // Content returns the formatted Go source of the file.
