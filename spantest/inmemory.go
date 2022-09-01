@@ -24,19 +24,21 @@ type InMemoryFixture struct {
 }
 
 // NewInMemoryFixture creates a test fixture for the in-memory Spanner emulator.
-func NewInMemoryFixture(t *testing.T) Fixture {
+func NewInMemoryFixture(t testing.TB) Fixture {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	if deadline, ok := t.Deadline(); ok {
-		ctx, cancel = context.WithDeadline(ctx, deadline)
-		t.Cleanup(cancel)
+	if tt, ok := t.(*testing.T); ok {
+		if deadline, ok := tt.Deadline(); ok {
+			ctx, cancel = context.WithDeadline(ctx, deadline)
+			t.Cleanup(cancel)
+		}
 	}
 	return &InMemoryFixture{ctx: ctx}
 }
 
 // NewDatabaseFromDDLFiles implements Fixture.
-func (fx *InMemoryFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string) *spanner.Client {
+func (fx *InMemoryFixture) NewDatabaseFromDDLFiles(t testing.TB, globs ...string) *spanner.Client {
 	t.Helper()
 	var files []string
 	for _, glob := range globs {
@@ -59,7 +61,7 @@ func (fx *InMemoryFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string
 }
 
 // NewDatabaseFromDDLFiles implements Fixture.
-func (fx *InMemoryFixture) NewDatabaseFromStatements(t *testing.T, statements []string) *spanner.Client {
+func (fx *InMemoryFixture) NewDatabaseFromStatements(t testing.TB, statements []string) *spanner.Client {
 	t.Helper()
 	const (
 		projectID  = "spanner-aip-go"

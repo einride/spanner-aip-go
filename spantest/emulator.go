@@ -39,13 +39,15 @@ type EmulatorFixture struct {
 }
 
 // NewEmulatorFixture creates a test fixture for a containerized Spanner emulator.
-func NewEmulatorFixture(t *testing.T) Fixture {
+func NewEmulatorFixture(t testing.TB) Fixture {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	if deadline, ok := t.Deadline(); ok {
-		ctx, cancel = context.WithDeadline(ctx, deadline)
-		t.Cleanup(cancel)
+	if tt, ok := t.(*testing.T); ok {
+		if deadline, ok := tt.Deadline(); ok {
+			ctx, cancel = context.WithDeadline(ctx, deadline)
+			t.Cleanup(cancel)
+		}
 	}
 	emulatorHost, ok := os.LookupEnv("SPANNER_EMULATOR_HOST")
 	if !ok {
@@ -120,7 +122,7 @@ func (fx *EmulatorFixture) Context() context.Context {
 }
 
 // NewDatabaseFromDDLFiles creates a new database with a random ID from the provided DDL file path glob.
-func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string) *spanner.Client {
+func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t testing.TB, globs ...string) *spanner.Client {
 	t.Helper()
 	var files []string
 	for _, glob := range globs {
@@ -143,7 +145,7 @@ func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string
 }
 
 // NewDatabaseFromStatements creates a new database with a random ID from the provided statements.
-func (fx *EmulatorFixture) NewDatabaseFromStatements(t *testing.T, statements []string) *spanner.Client {
+func (fx *EmulatorFixture) NewDatabaseFromStatements(t testing.TB, statements []string) *spanner.Client {
 	t.Helper()
 	databaseID := fmt.Sprintf("db%s", randomSuffix(t))
 	createDatabaseOp, err := fx.databaseAdminClient.CreateDatabase(fx.ctx, &databasepb.CreateDatabaseRequest{
@@ -174,22 +176,22 @@ func IsDockerDaemonRunning() bool {
 	return exec.Command("docker", "info").Run() == nil
 }
 
-func dockerPull(t *testing.T, image string) {
+func dockerPull(t testing.TB, image string) {
 	t.Helper()
 	execCommand(t, "docker", "pull", image)
 }
 
-func dockerRm(t *testing.T, containerID string) {
+func dockerRm(t testing.TB, containerID string) {
 	t.Helper()
 	execCommand(t, "docker", "rm", "-v", containerID)
 }
 
-func dockerKill(t *testing.T, containerID string) {
+func dockerKill(t testing.TB, containerID string) {
 	t.Helper()
 	execCommand(t, "docker", "kill", containerID)
 }
 
-func inspectPortAddress(t *testing.T, containerID, containerPort string) string {
+func inspectPortAddress(t testing.TB, containerID, containerPort string) string {
 	t.Helper()
 	var containers []struct {
 		NetworkSettings struct {
@@ -227,7 +229,7 @@ func inspectPortAddress(t *testing.T, containerID, containerPort string) string 
 	return fmt.Sprintf("%s:%s", host, port)
 }
 
-func execCommand(t *testing.T, name string, args ...string) string {
+func execCommand(t testing.TB, name string, args ...string) string {
 	t.Helper()
 	t.Log("exec:", name, strings.Join(args, " "))
 	cmd := exec.Command(name, args...)
@@ -237,7 +239,7 @@ func execCommand(t *testing.T, name string, args ...string) string {
 	return strings.TrimSpace(stdout.String())
 }
 
-func dockerRunDetached(t *testing.T, args ...string) string {
+func dockerRunDetached(t testing.TB, args ...string) string {
 	t.Helper()
 	stdout := execCommand(t, "docker", append([]string{"run", "-d"}, args...)...)
 	containerID := strings.TrimSpace(stdout)
@@ -246,7 +248,7 @@ func dockerRunDetached(t *testing.T, args ...string) string {
 	return containerID
 }
 
-func awaitReachable(t *testing.T, addr string, wait, maxWait time.Duration) {
+func awaitReachable(t testing.TB, addr string, wait, maxWait time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(maxWait)
 	for time.Now().Before(deadline) {
@@ -260,7 +262,7 @@ func awaitReachable(t *testing.T, addr string, wait, maxWait time.Duration) {
 	t.Fatalf("%v unreachable for %v", addr, maxWait)
 }
 
-func dockerLogs(t *testing.T, containerID string) string {
+func dockerLogs(t testing.TB, containerID string) string {
 	t.Helper()
 	t.Log("exec:", "docker", "logs", containerID)
 	cmd := exec.Command("docker", "logs", containerID)
@@ -270,7 +272,7 @@ func dockerLogs(t *testing.T, containerID string) string {
 	return strings.TrimSpace(stderr.String())
 }
 
-func isRunningOnCloudBuild(t *testing.T) bool {
+func isRunningOnCloudBuild(t testing.TB) bool {
 	t.Helper()
 	t.Log("exec:", "docker", "network", "inspect", "cloudbuild")
 	cmd := exec.Command("docker", "network", "inspect", "cloudbuild")
@@ -283,7 +285,7 @@ func isRunningOnCloudBuild(t *testing.T) bool {
 	return result
 }
 
-func randomSuffix(t *testing.T) string {
+func randomSuffix(t testing.TB) string {
 	data := make([]byte, 10)
 	if _, err := rand.Read(data); err != nil {
 		t.Fatal(err)
