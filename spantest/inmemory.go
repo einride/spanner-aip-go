@@ -3,8 +3,8 @@ package spantest
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -46,7 +46,7 @@ func (fx *InMemoryFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string
 	}
 	var statements []string
 	for _, file := range files {
-		content, err := ioutil.ReadFile(file)
+		content, err := os.ReadFile(file)
 		assert.NilError(t, err)
 		ddl, err := spansql.ParseDDL(file, string(content))
 		assert.NilError(t, err)

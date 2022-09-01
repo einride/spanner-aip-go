@@ -7,7 +7,6 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -131,7 +130,7 @@ func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t *testing.T, globs ...string
 	}
 	var statements []string
 	for _, file := range files {
-		content, err := ioutil.ReadFile(file)
+		content, err := os.ReadFile(file)
 		assert.NilError(t, err)
 		ddl, err := spansql.ParseDDL(file, string(content))
 		assert.NilError(t, err)

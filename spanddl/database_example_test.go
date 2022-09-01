@@ -2,7 +2,7 @@ package spanddl_test
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"cloud.google.com/go/spanner/spansql"
@@ -16,7 +16,7 @@ func ExampleDatabase() {
 		panic(err) // TODO: Handle error.
 	}
 	for _, file := range files {
-		fileContent, err := ioutil.ReadFile(file)
+		fileContent, err := os.ReadFile(file)
 		if err != nil {
 			panic(err) // TODO: Handle error.
 		}

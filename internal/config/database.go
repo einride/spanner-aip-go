@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"cloud.google.com/go/spanner/spansql"
@@ -30,7 +30,7 @@ func (c *DatabaseConfig) LoadDatabase() (*spanddl.Database, error) {
 			return nil, fmt.Errorf("load database %s: %w", c.Name, err)
 		}
 		for _, schemaFile := range schemaFiles {
-			schema, err := ioutil.ReadFile(schemaFile)
+			schema, err := os.ReadFile(schemaFile)
 			if err != nil {
 				return nil, fmt.Errorf("load database %s: %w", c.Name, err)
 			}
