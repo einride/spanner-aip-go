@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +16,7 @@ import (
 )
 
 func LoadFilesFromGoPackage(goPackage string) (*protoregistry.Files, error) {
-	tmpDir, err := ioutil.TempDir(".", "protoloader*")
+	tmpDir, err := os.MkdirTemp(".", "protoloader*")
 	if err != nil {
 		return nil, fmt.Errorf("load proto files from Go package %s: %w", goPackage, err)
 	}

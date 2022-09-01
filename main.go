@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -70,7 +69,7 @@ func main() {
 		if err != nil {
 			log.Panic(err)
 		}
-		if err := ioutil.WriteFile(filename, content, 0o600); err != nil {
+		if err := os.WriteFile(filename, content, 0o600); err != nil {
 			log.Panic(err)
 		}
 		log.Println("wrote:", filename)
@@ -86,7 +85,7 @@ func main() {
 			if err != nil {
 				log.Panic(err)
 			}
-			if err := ioutil.WriteFile(filename, content, 0o600); err != nil {
+			if err := os.WriteFile(filename, content, 0o600); err != nil {
 				log.Panic(err)
 			}
 			log.Println("wrote:", filename)

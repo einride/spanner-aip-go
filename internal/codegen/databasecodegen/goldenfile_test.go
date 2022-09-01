@@ -2,7 +2,7 @@ package databasecodegen
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -23,7 +23,7 @@ func runGoldenFileTest(t *testing.T, name string, fn func(*spanddl.Database, *co
 		testdataFile := testdataFile
 		t.Run(fmt.Sprintf("%s/%s", name, testdataFile), func(t *testing.T) {
 			t.Parallel()
-			testdata, err := ioutil.ReadFile(testdataFile)
+			testdata, err := os.ReadFile(testdataFile)
 			assert.NilError(t, err)
 			ddl, err := spansql.ParseDDL(testdataFile, string(testdata))
 			assert.NilError(t, err)
