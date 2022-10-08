@@ -11,7 +11,7 @@ import (
 	"go.einride.tech/spanner-aip/internal/codegen/databasecodegen"
 	"go.einride.tech/spanner-aip/internal/codegen/descriptorcodegen"
 	"go.einride.tech/spanner-aip/internal/config"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 const generatedBy = "spanner-aip-go"
