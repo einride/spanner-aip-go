@@ -919,7 +919,8 @@ func (t ReadTransaction) readInterleavedSingersRows(
 	query readInterleavedSingersRowsQuery,
 ) (*readInterleavedSingersRowsResult, error) {
 	var r readInterleavedSingersRowsResult
-	interleavedAlbums := make(map[AlbumsKey]*AlbumsRow)
+	interleavedAlbumsLookup := make(map[AlbumsKey]*AlbumsRow)
+	interleavedSongs := make([]*SongsRow, 0)
 	if query.Albums && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Albums = make(map[SingersKey][]*AlbumsRow)
 		if err := t.ReadAlbumsRows(ctx, query.KeySet).Do(func(row *AlbumsRow) error {
@@ -927,7 +928,7 @@ func (t ReadTransaction) readInterleavedSingersRows(
 				SingerId: row.SingerId,
 			}
 			r.Albums[k] = append(r.Albums[k], row)
-			interleavedAlbums[row.Key()] = row
+			interleavedAlbumsLookup[row.Key()] = row
 			return nil
 		}); err != nil {
 			return nil, err
@@ -935,16 +936,19 @@ func (t ReadTransaction) readInterleavedSingersRows(
 	}
 	if query.Songs && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		if err := t.ReadSongsRows(ctx, query.KeySet).Do(func(row *SongsRow) error {
-			k := AlbumsKey{
-				SingerId: row.SingerId,
-				AlbumId:  row.AlbumId,
-			}
-			if p, ok := interleavedAlbums[k]; ok {
-				p.Songs = append(p.Songs, row)
-			}
+			interleavedSongs = append(interleavedSongs, row)
 			return nil
 		}); err != nil {
 			return nil, err
+		}
+	}
+	for _, row := range interleavedSongs {
+		k := AlbumsKey{
+			SingerId: row.SingerId,
+			AlbumId:  row.AlbumId,
+		}
+		if p, ok := interleavedAlbumsLookup[k]; ok {
+			p.Songs = append(p.Songs, row)
 		}
 	}
 	return &r, nil

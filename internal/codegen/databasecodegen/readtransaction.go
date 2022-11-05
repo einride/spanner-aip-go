@@ -387,19 +387,24 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 	f.P("query ", g.ReadInterleavedQuery(table), ",")
 	f.P(") (*", g.ReadInterleavedResult(table), ", error) {")
 	f.P("var r ", g.ReadInterleavedResult(table))
-	rangeInterleavedTables(table, func(_, child *spanddl.Table) {
-		if len(child.InterleavedTables) == 0 {
-			return
-		}
+	rangeInterleavedTables(table, func(parent, child *spanddl.Table) {
+		isTopLevel := parent.Name == table.Name
 		key := KeyCodeGenerator{Table: child}
 		name := strcase.UpperCamelCase(string(child.Name))
 		row := RowCodeGenerator{Table: child}
-		f.P("interleaved", name, ":=make(map[", key.Type(), "]*", row.Type(), ")")
+		if len(child.InterleavedTables) > 0 {
+			// lookup for tables interleaved in this one.
+			f.P("interleaved", name, "Lookup:=make(map[", key.Type(), "]*", row.Type(), ")")
+		}
+		if !isTopLevel {
+			// read order of rows in this table.
+			// top level tables are inserted directly in response.
+			f.P("interleaved", name, ":=make([]*", row.Type(), ", 0)")
+		}
 	})
 	rangeInterleavedTables(table, func(parent, child *spanddl.Table) {
 		isTopLevel := parent.Name == table.Name
 		parentKey := KeyCodeGenerator{Table: parent}
-		parentName := strcase.UpperCamelCase(string(parent.Name))
 		row := RowCodeGenerator{Table: child}
 		childName := strcase.UpperCamelCase(string(child.Name))
 		// If the parent query does not return any data, we need to avoid querying the interleaved table because
@@ -411,24 +416,41 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 			f.P("r.", childName, " = make(map[", key.Type(), "][]*", row.Type(), ")")
 		}
 		f.P("if err := t.", g.ReadMethod(child), "(ctx, query.KeySet).Do(func(row *", row.Type(), ") error {")
+		if isTopLevel {
+			f.P("k := ", parentKey.Type(), "{")
+			for _, part := range parent.PrimaryKey {
+				f.P(key.FieldName(part), ": row.", key.FieldName(part), ",")
+			}
+			f.P("}")
+			f.P("r.", childName, "[k] = append(r.", childName, "[k], row)")
+		} else {
+			f.P("interleaved", childName, " = append(interleaved", childName, ", row)")
+		}
+		if len(child.InterleavedTables) > 0 {
+			f.P("interleaved", childName, "Lookup[row.Key()] = row")
+		}
+		f.P("return nil")
+		f.P("}); err != nil {")
+		f.P("return nil, err")
+		f.P("}")
+		f.P("}")
+	})
+	rangeInterleavedTables(table, func(parent, child *spanddl.Table) {
+		isTopLevel := parent.Name == table.Name
+		if isTopLevel {
+			return
+		}
+		parentName := strcase.UpperCamelCase(string(parent.Name))
+		childName := strcase.UpperCamelCase(string(child.Name))
+		parentKey := KeyCodeGenerator{Table: parent}
+		f.P("for _, row := range interleaved", childName, "{")
 		f.P("k := ", parentKey.Type(), "{")
 		for _, part := range parent.PrimaryKey {
 			f.P(key.FieldName(part), ": row.", key.FieldName(part), ",")
 		}
 		f.P("}")
-		if isTopLevel {
-			f.P("r.", childName, "[k] = append(r.", childName, "[k], row)")
-		} else {
-			f.P("if p, ok := interleaved", parentName, "[k]; ok {")
-			f.P("p.", childName, " = append(p.", childName, ", row)")
-			f.P("}")
-		}
-		if len(child.InterleavedTables) > 0 {
-			f.P("interleaved", childName, "[row.Key()] = row")
-		}
-		f.P("return nil")
-		f.P("}); err != nil {")
-		f.P("return nil, err")
+		f.P("if p, ok := interleaved", parentName, "Lookup[k]; ok {")
+		f.P("p.", childName, " = append(p.", childName, ", row)")
 		f.P("}")
 		f.P("}")
 	})
