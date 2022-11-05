@@ -1402,7 +1402,8 @@ func (t ReadTransaction) readInterleavedShippersRows(
 	query readInterleavedShippersRowsQuery,
 ) (*readInterleavedShippersRowsResult, error) {
 	var r readInterleavedShippersRowsResult
-	interleavedShipments := make(map[ShipmentsKey]*ShipmentsRow)
+	interleavedShipmentsLookup := make(map[ShipmentsKey]*ShipmentsRow)
+	interleavedLineItems := make([]*LineItemsRow, 0)
 	if query.Shipments && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
 		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
@@ -1410,7 +1411,7 @@ func (t ReadTransaction) readInterleavedShippersRows(
 				ShipperId: row.ShipperId,
 			}
 			r.Shipments[k] = append(r.Shipments[k], row)
-			interleavedShipments[row.Key()] = row
+			interleavedShipmentsLookup[row.Key()] = row
 			return nil
 		}); err != nil {
 			return nil, err
@@ -1418,16 +1419,19 @@ func (t ReadTransaction) readInterleavedShippersRows(
 	}
 	if query.LineItems && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		if err := t.ReadLineItemsRows(ctx, query.KeySet).Do(func(row *LineItemsRow) error {
-			k := ShipmentsKey{
-				ShipperId:  row.ShipperId,
-				ShipmentId: row.ShipmentId,
-			}
-			if p, ok := interleavedShipments[k]; ok {
-				p.LineItems = append(p.LineItems, row)
-			}
+			interleavedLineItems = append(interleavedLineItems, row)
 			return nil
 		}); err != nil {
 			return nil, err
+		}
+	}
+	for _, row := range interleavedLineItems {
+		k := ShipmentsKey{
+			ShipperId:  row.ShipperId,
+			ShipmentId: row.ShipmentId,
+		}
+		if p, ok := interleavedShipmentsLookup[k]; ok {
+			p.LineItems = append(p.LineItems, row)
 		}
 	}
 	return &r, nil
