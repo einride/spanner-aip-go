@@ -17,8 +17,6 @@ type DatabaseConfig struct {
 	SchemaGlobs []string `yaml:"schema"`
 	// Package is the config for database's generated Go package.
 	Package GoPackageConfig `yaml:"package"`
-	// Resources are the config for the databases generated resource APIs.
-	Resources []ResourceConfig `yaml:"resources"`
 }
 
 // LoadDatabase loads the configured database.

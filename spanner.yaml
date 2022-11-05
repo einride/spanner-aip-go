@@ -12,13 +12,3 @@ databases:
     package:
       name: freightdb
       path: ./internal/examples/freightdb
-
-    resources:
-      - message: go.einride.tech/aip/proto/gen/einride/example/freight/v1.Shipper
-        table: shippers
-
-      - message: go.einride.tech/aip/proto/gen/einride/example/freight/v1.Site
-        table: sites
-
-      - message: go.einride.tech/aip/proto/gen/einride/example/freight/v1.Shipment
-        table: shipments
