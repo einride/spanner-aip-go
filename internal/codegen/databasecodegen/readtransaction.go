@@ -381,6 +381,7 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 	ctxPkg := f.Import("context")
 	reflectPkg := f.Import("reflect")
 	spannerPkg := f.Import("cloud.google.com/go/spanner")
+	errgroupPkg := f.Import("golang.org/x/sync/errgroup")
 	key := KeyCodeGenerator{Table: table}
 	f.P("func (t ", g.Type(), ") ", g.ReadInterleavedMethod(table), "(")
 	f.P("ctx ", ctxPkg, ".Context,")
@@ -402,6 +403,7 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 			f.P("interleaved", name, ":=make([]*", row.Type(), ", 0)")
 		}
 	})
+	f.P("group, groupCtx := ", errgroupPkg, ".WithContext(ctx)")
 	rangeInterleavedTables(table, func(parent, child *spanddl.Table) {
 		isTopLevel := parent.Name == table.Name
 		parentKey := KeyCodeGenerator{Table: parent}
@@ -415,7 +417,8 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 		if isTopLevel {
 			f.P("r.", childName, " = make(map[", key.Type(), "][]*", row.Type(), ")")
 		}
-		f.P("if err := t.", g.ReadMethod(child), "(ctx, query.KeySet).Do(func(row *", row.Type(), ") error {")
+		f.P("group.Go(func() error {")
+		f.P("if err := t.", g.ReadMethod(child), "(groupCtx, query.KeySet).Do(func(row *", row.Type(), ") error {")
 		if isTopLevel {
 			f.P("k := ", parentKey.Type(), "{")
 			for _, part := range parent.PrimaryKey {
@@ -431,10 +434,15 @@ func (g ReadTransactionCodeGenerator) generateReadInterleavedRowsMethod(f *codeg
 		}
 		f.P("return nil")
 		f.P("}); err != nil {")
-		f.P("return nil, err")
+		f.P("return err")
 		f.P("}")
+		f.P("return nil")
+		f.P("})")
 		f.P("}")
 	})
+	f.P("if err := group.Wait(); err != nil {")
+	f.P("return nil, err")
+	f.P("}")
 	rangeInterleavedTables(table, func(parent, child *spanddl.Table) {
 		isTopLevel := parent.Name == table.Name
 		if isTopLevel {

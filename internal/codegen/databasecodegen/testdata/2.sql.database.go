@@ -12,6 +12,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -666,17 +667,24 @@ func (t ReadTransaction) readInterleavedSingersRows(
 	query readInterleavedSingersRowsQuery,
 ) (*readInterleavedSingersRowsResult, error) {
 	var r readInterleavedSingersRowsResult
+	group, groupCtx := errgroup.WithContext(ctx)
 	if query.Albums && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Albums = make(map[SingersKey][]*AlbumsRow)
-		if err := t.ReadAlbumsRows(ctx, query.KeySet).Do(func(row *AlbumsRow) error {
-			k := SingersKey{
-				SingerId: row.SingerId,
+		group.Go(func() error {
+			if err := t.ReadAlbumsRows(groupCtx, query.KeySet).Do(func(row *AlbumsRow) error {
+				k := SingersKey{
+					SingerId: row.SingerId,
+				}
+				r.Albums[k] = append(r.Albums[k], row)
+				return nil
+			}); err != nil {
+				return err
 			}
-			r.Albums[k] = append(r.Albums[k], row)
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	return &r, nil
 }

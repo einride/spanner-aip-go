@@ -13,6 +13,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -701,17 +702,24 @@ func (t ReadTransaction) readInterleavedShippersRows(
 	query readInterleavedShippersRowsQuery,
 ) (*readInterleavedShippersRowsResult, error) {
 	var r readInterleavedShippersRowsResult
+	group, groupCtx := errgroup.WithContext(ctx)
 	if query.Shipments && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
-		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
-			k := ShippersKey{
-				ShipperId: row.ShipperId,
+		group.Go(func() error {
+			if err := t.ReadShipmentsRows(groupCtx, query.KeySet).Do(func(row *ShipmentsRow) error {
+				k := ShippersKey{
+					ShipperId: row.ShipperId,
+				}
+				r.Shipments[k] = append(r.Shipments[k], row)
+				return nil
+			}); err != nil {
+				return err
 			}
-			r.Shipments[k] = append(r.Shipments[k], row)
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	return &r, nil
 }

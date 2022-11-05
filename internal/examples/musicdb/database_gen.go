@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -921,26 +922,36 @@ func (t ReadTransaction) readInterleavedSingersRows(
 	var r readInterleavedSingersRowsResult
 	interleavedAlbumsLookup := make(map[AlbumsKey]*AlbumsRow)
 	interleavedSongs := make([]*SongsRow, 0)
+	group, groupCtx := errgroup.WithContext(ctx)
 	if query.Albums && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Albums = make(map[SingersKey][]*AlbumsRow)
-		if err := t.ReadAlbumsRows(ctx, query.KeySet).Do(func(row *AlbumsRow) error {
-			k := SingersKey{
-				SingerId: row.SingerId,
+		group.Go(func() error {
+			if err := t.ReadAlbumsRows(groupCtx, query.KeySet).Do(func(row *AlbumsRow) error {
+				k := SingersKey{
+					SingerId: row.SingerId,
+				}
+				r.Albums[k] = append(r.Albums[k], row)
+				interleavedAlbumsLookup[row.Key()] = row
+				return nil
+			}); err != nil {
+				return err
 			}
-			r.Albums[k] = append(r.Albums[k], row)
-			interleavedAlbumsLookup[row.Key()] = row
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
 	}
 	if query.Songs && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
-		if err := t.ReadSongsRows(ctx, query.KeySet).Do(func(row *SongsRow) error {
-			interleavedSongs = append(interleavedSongs, row)
+		group.Go(func() error {
+			if err := t.ReadSongsRows(groupCtx, query.KeySet).Do(func(row *SongsRow) error {
+				interleavedSongs = append(interleavedSongs, row)
+				return nil
+			}); err != nil {
+				return err
+			}
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	for _, row := range interleavedSongs {
 		k := AlbumsKey{
@@ -1148,18 +1159,25 @@ func (t ReadTransaction) readInterleavedAlbumsRows(
 	query readInterleavedAlbumsRowsQuery,
 ) (*readInterleavedAlbumsRowsResult, error) {
 	var r readInterleavedAlbumsRowsResult
+	group, groupCtx := errgroup.WithContext(ctx)
 	if query.Songs && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Songs = make(map[AlbumsKey][]*SongsRow)
-		if err := t.ReadSongsRows(ctx, query.KeySet).Do(func(row *SongsRow) error {
-			k := AlbumsKey{
-				SingerId: row.SingerId,
-				AlbumId:  row.AlbumId,
+		group.Go(func() error {
+			if err := t.ReadSongsRows(groupCtx, query.KeySet).Do(func(row *SongsRow) error {
+				k := AlbumsKey{
+					SingerId: row.SingerId,
+					AlbumId:  row.AlbumId,
+				}
+				r.Songs[k] = append(r.Songs[k], row)
+				return nil
+			}); err != nil {
+				return err
 			}
-			r.Songs[k] = append(r.Songs[k], row)
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	return &r, nil
 }

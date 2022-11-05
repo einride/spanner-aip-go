@@ -10,6 +10,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/spansql"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 )
 
@@ -1404,26 +1405,36 @@ func (t ReadTransaction) readInterleavedShippersRows(
 	var r readInterleavedShippersRowsResult
 	interleavedShipmentsLookup := make(map[ShipmentsKey]*ShipmentsRow)
 	interleavedLineItems := make([]*LineItemsRow, 0)
+	group, groupCtx := errgroup.WithContext(ctx)
 	if query.Shipments && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.Shipments = make(map[ShippersKey][]*ShipmentsRow)
-		if err := t.ReadShipmentsRows(ctx, query.KeySet).Do(func(row *ShipmentsRow) error {
-			k := ShippersKey{
-				ShipperId: row.ShipperId,
+		group.Go(func() error {
+			if err := t.ReadShipmentsRows(groupCtx, query.KeySet).Do(func(row *ShipmentsRow) error {
+				k := ShippersKey{
+					ShipperId: row.ShipperId,
+				}
+				r.Shipments[k] = append(r.Shipments[k], row)
+				interleavedShipmentsLookup[row.Key()] = row
+				return nil
+			}); err != nil {
+				return err
 			}
-			r.Shipments[k] = append(r.Shipments[k], row)
-			interleavedShipmentsLookup[row.Key()] = row
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
 	}
 	if query.LineItems && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
-		if err := t.ReadLineItemsRows(ctx, query.KeySet).Do(func(row *LineItemsRow) error {
-			interleavedLineItems = append(interleavedLineItems, row)
+		group.Go(func() error {
+			if err := t.ReadLineItemsRows(groupCtx, query.KeySet).Do(func(row *LineItemsRow) error {
+				interleavedLineItems = append(interleavedLineItems, row)
+				return nil
+			}); err != nil {
+				return err
+			}
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	for _, row := range interleavedLineItems {
 		k := ShipmentsKey{
@@ -1763,18 +1774,25 @@ func (t ReadTransaction) readInterleavedShipmentsRows(
 	query readInterleavedShipmentsRowsQuery,
 ) (*readInterleavedShipmentsRowsResult, error) {
 	var r readInterleavedShipmentsRowsResult
+	group, groupCtx := errgroup.WithContext(ctx)
 	if query.LineItems && !reflect.DeepEqual(query.KeySet, spanner.KeySets()) {
 		r.LineItems = make(map[ShipmentsKey][]*LineItemsRow)
-		if err := t.ReadLineItemsRows(ctx, query.KeySet).Do(func(row *LineItemsRow) error {
-			k := ShipmentsKey{
-				ShipperId:  row.ShipperId,
-				ShipmentId: row.ShipmentId,
+		group.Go(func() error {
+			if err := t.ReadLineItemsRows(groupCtx, query.KeySet).Do(func(row *LineItemsRow) error {
+				k := ShipmentsKey{
+					ShipperId:  row.ShipperId,
+					ShipmentId: row.ShipmentId,
+				}
+				r.LineItems[k] = append(r.LineItems[k], row)
+				return nil
+			}); err != nil {
+				return err
 			}
-			r.LineItems[k] = append(r.LineItems[k], row)
 			return nil
-		}); err != nil {
-			return nil, err
-		}
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	return &r, nil
 }
