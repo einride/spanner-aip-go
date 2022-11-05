@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"cloud.google.com/go/spanner/spansql"
 	"go.einride.tech/spanner-aip/internal/codegen"
 	"go.einride.tech/spanner-aip/internal/codegen/databasecodegen"
 	"go.einride.tech/spanner-aip/internal/codegen/descriptorcodegen"
@@ -40,18 +39,6 @@ func main() {
 		db, err := databaseConfig.LoadDatabase()
 		if err != nil {
 			log.Panic(err)
-		}
-		for _, resourceConfig := range databaseConfig.Resources {
-			table, ok := db.Table(spansql.ID(resourceConfig.Table))
-			if !ok {
-				log.Panicf("unknown table %s in database %s", resourceConfig.Table, databaseConfig.Name)
-			}
-			messageDescriptor, err := resourceConfig.LoadMessageDescriptor()
-			if err != nil {
-				log.Panic(err)
-			}
-			// TODO: Use table and message descriptor for code generation.
-			_, _ = table, messageDescriptor
 		}
 		if err := os.MkdirAll(databaseConfig.Package.Path, 0o775); err != nil {
 			log.Panic(err)
