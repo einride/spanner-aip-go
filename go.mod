@@ -9,7 +9,7 @@ require (
 	github.com/stoewer/go-strcase v1.2.0
 	go.einride.tech/aip v0.59.1
 	golang.org/x/sync v0.1.0
-	google.golang.org/api v0.101.0
+	google.golang.org/api v0.102.0
 	google.golang.org/genproto v0.0.0-20221024183307-1bc688fe9f3e
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
@@ -18,7 +18,8 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.10.0 // indirect
+	cloud.google.com/go/compute v1.12.1 // indirect
+	cloud.google.com/go/compute/metadata v0.2.1 // indirect
 	cloud.google.com/go/longrunning v0.2.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
