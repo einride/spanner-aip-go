@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base32"
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -195,40 +194,16 @@ func dockerKill(t testing.TB, containerID string) {
 
 func inspectPortAddress(t testing.TB, containerID, containerPort string) string {
 	t.Helper()
-	var containers []struct {
-		NetworkSettings struct {
-			Ports map[string][]struct {
-				HostIP   string
-				HostPort string
-			}
-			Networks map[string]struct {
-				Gateway string
-			}
+	output := execCommand(t, "docker", "port", containerID, containerPort)
+	lines := strings.Split(output, "\n")
+	// docker port can return ipv6 mapping as well, take the first non ipv6 mapping.
+	for _, line := range lines {
+		mapping := strings.TrimSpace(line)
+		if _, err := net.ResolveTCPAddr("tcp4", mapping); err == nil {
+			return mapping
 		}
 	}
-	stdout := execCommand(t, "docker", "inspect", containerID)
-	assert.NilError(t, json.NewDecoder(strings.NewReader(stdout)).Decode(&containers))
-	var host string
-	var port string
-	for _, container := range containers {
-		for portID, hostPorts := range container.NetworkSettings.Ports {
-			if portID == containerPort {
-				for _, hostPort := range hostPorts {
-					host, port = hostPort.HostIP, hostPort.HostPort
-					break // prefer first option
-				}
-			}
-		}
-		for networkID, network := range container.NetworkSettings.Networks {
-			if networkID == "cloudbuild" {
-				host = network.Gateway
-			}
-		}
-	}
-	if host == "" || port == "" {
-		t.Fatalf("failed to inspect container %s for port %s", containerID, containerPort)
-	}
-	return fmt.Sprintf("%s:%s", host, port)
+	return ""
 }
 
 func execCommand(t testing.TB, name string, args ...string) string {
