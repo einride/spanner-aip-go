@@ -26,6 +26,14 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+// Cloud Spanner Emulator versions can be found here,
+// https://console.cloud.google.com/gcr/images/cloud-spanner-emulator/global/emulator
+const (
+	url     = "gcr.io/cloud-spanner-emulator/emulator"
+	version = "sha256:5469945589399bd79ead8bed929f5eb4d1c5ee98d095df5b0ebe35f0b7160a84" // 1.4.8
+	image   = url + "@" + version
+)
+
 // EmulatorFixture is a test fixture running the Spanner emulator.
 type EmulatorFixture struct {
 	ctx                 context.Context
@@ -56,15 +64,11 @@ func NewEmulatorFixture(t testing.TB) Fixture {
 		if !IsDockerDaemonRunning() {
 			t.Fatal("Docker is available, but the daemon does not seem to be running.")
 		}
-		const cloudSpannerEmulatorImage = "gcr.io/cloud-spanner-emulator/emulator:latest"
-		if _, ok := os.LookupEnv("SPANNER_EMULATOR_SKIP_PULL"); !ok {
-			dockerPull(t, cloudSpannerEmulatorImage)
-		}
 		var containerID string
 		if isRunningOnCloudBuild(t) {
-			containerID = dockerRunDetached(t, "--network", "cloudbuild", "--publish-all", cloudSpannerEmulatorImage)
+			containerID = dockerRunDetached(t, "--network", "cloudbuild", "--publish-all", image)
 		} else {
-			containerID = dockerRunDetached(t, "--publish-all", cloudSpannerEmulatorImage)
+			containerID = dockerRunDetached(t, "--publish-all", image)
 		}
 		t.Cleanup(func() {
 			t.Log(dockerLogs(t, containerID))
@@ -175,11 +179,6 @@ func HasDocker() bool {
 // IsDockerDaemonRunning reports if the Docker daemon is running.
 func IsDockerDaemonRunning() bool {
 	return exec.Command("docker", "info").Run() == nil
-}
-
-func dockerPull(t testing.TB, image string) {
-	t.Helper()
-	execCommand(t, "docker", "pull", image)
 }
 
 func dockerRm(t testing.TB, containerID string) {
