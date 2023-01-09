@@ -3,14 +3,14 @@ module go.einride.tech/spanner-aip
 go 1.19
 
 require (
-	cloud.google.com/go v0.107.0
+	cloud.google.com/go v0.108.0
 	cloud.google.com/go/spanner v1.39.0
 	github.com/google/go-cmp v0.5.9
 	github.com/stoewer/go-strcase v1.2.0
 	go.einride.tech/aip v0.60.0
 	golang.org/x/sync v0.1.0
-	google.golang.org/api v0.102.0
-	google.golang.org/genproto v0.0.0-20221027153422-115e99e71e1c
+	google.golang.org/api v0.103.0
+	google.golang.org/genproto v0.0.0-20221201204527-e3fa12d562f3
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -19,8 +19,8 @@ require (
 
 require (
 	cloud.google.com/go/compute v1.12.1 // indirect
-	cloud.google.com/go/compute/metadata v0.2.1 // indirect
-	cloud.google.com/go/longrunning v0.2.1 // indirect
+	cloud.google.com/go/compute/metadata v0.2.2 // indirect
+	cloud.google.com/go/longrunning v0.3.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/cncf/udpa/go v0.0.0-20210930031921-04548b0d99d4 // indirect
