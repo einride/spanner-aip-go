@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	cloud.google.com/go v0.109.0
-	cloud.google.com/go/spanner v1.41.0
+	cloud.google.com/go/spanner v1.44.0
 	github.com/google/go-cmp v0.5.9
 	github.com/stoewer/go-strcase v1.2.1
 	go.einride.tech/aip v0.60.0
