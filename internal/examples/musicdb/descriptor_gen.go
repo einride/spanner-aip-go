@@ -11,12 +11,33 @@ func Descriptor() DatabaseDescriptor {
 }
 
 var descriptor = databaseDescriptor{
+	labels: labelsTableDescriptor{
+		tableID: "Labels",
+		labelId: columnDescriptor{
+			columnID:             "LabelId",
+			columnType:           spansql.Type{Array: false, Base: 1, Len: 0},
+			notNull:              true,
+			allowCommitTimestamp: false,
+		},
+		labelName: columnDescriptor{
+			columnID:             "LabelName",
+			columnType:           spansql.Type{Array: false, Base: 4, Len: 9223372036854775807},
+			notNull:              false,
+			allowCommitTimestamp: false,
+		},
+	},
 	singers: singersTableDescriptor{
 		tableID: "Singers",
 		singerId: columnDescriptor{
 			columnID:             "SingerId",
 			columnType:           spansql.Type{Array: false, Base: 1, Len: 0},
 			notNull:              true,
+			allowCommitTimestamp: false,
+		},
+		labelId: columnDescriptor{
+			columnID:             "LabelId",
+			columnType:           spansql.Type{Array: false, Base: 1, Len: 0},
+			notNull:              false,
 			allowCommitTimestamp: false,
 		},
 		firstName: columnDescriptor{
@@ -89,15 +110,21 @@ var descriptor = databaseDescriptor{
 }
 
 type DatabaseDescriptor interface {
+	Labels() LabelsTableDescriptor
 	Singers() SingersTableDescriptor
 	Albums() AlbumsTableDescriptor
 	Songs() SongsTableDescriptor
 }
 
 type databaseDescriptor struct {
+	labels  labelsTableDescriptor
 	singers singersTableDescriptor
 	albums  albumsTableDescriptor
 	songs   songsTableDescriptor
+}
+
+func (d *databaseDescriptor) Labels() LabelsTableDescriptor {
+	return &d.labels
 }
 
 func (d *databaseDescriptor) Singers() SingersTableDescriptor {
@@ -112,6 +139,59 @@ func (d *databaseDescriptor) Songs() SongsTableDescriptor {
 	return &d.songs
 }
 
+type LabelsTableDescriptor interface {
+	TableName() string
+	TableID() spansql.ID
+	ColumnNames() []string
+	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
+	LabelId() ColumnDescriptor
+	LabelName() ColumnDescriptor
+}
+
+type labelsTableDescriptor struct {
+	tableID   spansql.ID
+	labelId   columnDescriptor
+	labelName columnDescriptor
+}
+
+func (d *labelsTableDescriptor) TableName() string {
+	return string(d.tableID)
+}
+
+func (d *labelsTableDescriptor) TableID() spansql.ID {
+	return d.tableID
+}
+
+func (d *labelsTableDescriptor) ColumnNames() []string {
+	return []string{
+		"LabelId",
+		"LabelName",
+	}
+}
+
+func (d *labelsTableDescriptor) ColumnIDs() []spansql.ID {
+	return []spansql.ID{
+		"LabelId",
+		"LabelName",
+	}
+}
+
+func (d *labelsTableDescriptor) ColumnExprs() []spansql.Expr {
+	return []spansql.Expr{
+		spansql.ID("LabelId"),
+		spansql.ID("LabelName"),
+	}
+}
+
+func (d *labelsTableDescriptor) LabelId() ColumnDescriptor {
+	return &d.labelId
+}
+
+func (d *labelsTableDescriptor) LabelName() ColumnDescriptor {
+	return &d.labelName
+}
+
 type SingersTableDescriptor interface {
 	TableName() string
 	TableID() spansql.ID
@@ -119,6 +199,7 @@ type SingersTableDescriptor interface {
 	ColumnIDs() []spansql.ID
 	ColumnExprs() []spansql.Expr
 	SingerId() ColumnDescriptor
+	LabelId() ColumnDescriptor
 	FirstName() ColumnDescriptor
 	LastName() ColumnDescriptor
 	SingerInfo() ColumnDescriptor
@@ -127,6 +208,7 @@ type SingersTableDescriptor interface {
 type singersTableDescriptor struct {
 	tableID    spansql.ID
 	singerId   columnDescriptor
+	labelId    columnDescriptor
 	firstName  columnDescriptor
 	lastName   columnDescriptor
 	singerInfo columnDescriptor
@@ -143,6 +225,7 @@ func (d *singersTableDescriptor) TableID() spansql.ID {
 func (d *singersTableDescriptor) ColumnNames() []string {
 	return []string{
 		"SingerId",
+		"LabelId",
 		"FirstName",
 		"LastName",
 		"SingerInfo",
@@ -152,6 +235,7 @@ func (d *singersTableDescriptor) ColumnNames() []string {
 func (d *singersTableDescriptor) ColumnIDs() []spansql.ID {
 	return []spansql.ID{
 		"SingerId",
+		"LabelId",
 		"FirstName",
 		"LastName",
 		"SingerInfo",
@@ -161,6 +245,7 @@ func (d *singersTableDescriptor) ColumnIDs() []spansql.ID {
 func (d *singersTableDescriptor) ColumnExprs() []spansql.Expr {
 	return []spansql.Expr{
 		spansql.ID("SingerId"),
+		spansql.ID("LabelId"),
 		spansql.ID("FirstName"),
 		spansql.ID("LastName"),
 		spansql.ID("SingerInfo"),
@@ -169,6 +254,10 @@ func (d *singersTableDescriptor) ColumnExprs() []spansql.Expr {
 
 func (d *singersTableDescriptor) SingerId() ColumnDescriptor {
 	return &d.singerId
+}
+
+func (d *singersTableDescriptor) LabelId() ColumnDescriptor {
+	return &d.labelId
 }
 
 func (d *singersTableDescriptor) FirstName() ColumnDescriptor {

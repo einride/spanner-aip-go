@@ -101,7 +101,8 @@ func (t *Table) applyAddConstraintAlteration(_ spansql.AddConstraint) (err error
 			err = fmt.Errorf("apply ADD CONSTRAINT: %w", err)
 		}
 	}()
-	return fmt.Errorf("TDOO: implement me")
+	// constraints are not implemented
+	return nil
 }
 
 func (t *Table) applyDropConstraintAlteration(_ spansql.DropConstraint) (err error) {
@@ -110,7 +111,8 @@ func (t *Table) applyDropConstraintAlteration(_ spansql.DropConstraint) (err err
 			err = fmt.Errorf("apply DROP CONSTRAINT: %w", err)
 		}
 	}()
-	return fmt.Errorf("TDOO: implement me")
+	// constraints are not implemented
+	return nil
 }
 
 func (t *Table) applySetOnDeleteAlteration(alteration spansql.SetOnDelete) (err error) {

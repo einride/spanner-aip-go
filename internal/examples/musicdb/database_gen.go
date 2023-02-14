@@ -13,8 +13,100 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+type LabelsRow struct {
+	LabelId   int64              `spanner:"LabelId"`
+	LabelName spanner.NullString `spanner:"LabelName"`
+}
+
+func (*LabelsRow) ColumnNames() []string {
+	return []string{
+		"LabelId",
+		"LabelName",
+	}
+}
+
+func (*LabelsRow) ColumnIDs() []spansql.ID {
+	return []spansql.ID{
+		"LabelId",
+		"LabelName",
+	}
+}
+
+func (*LabelsRow) ColumnExprs() []spansql.Expr {
+	return []spansql.Expr{
+		spansql.ID("LabelId"),
+		spansql.ID("LabelName"),
+	}
+}
+
+func (r *LabelsRow) Validate() error {
+	return nil
+}
+
+func (r *LabelsRow) UnmarshalSpannerRow(row *spanner.Row) error {
+	for i := 0; i < row.Size(); i++ {
+		switch row.ColumnName(i) {
+		case "LabelId":
+			if err := row.Column(i, &r.LabelId); err != nil {
+				return fmt.Errorf("unmarshal Labels row: LabelId column: %w", err)
+			}
+		case "LabelName":
+			if err := row.Column(i, &r.LabelName); err != nil {
+				return fmt.Errorf("unmarshal Labels row: LabelName column: %w", err)
+			}
+		default:
+			return fmt.Errorf("unmarshal Labels row: unhandled column: %s", row.ColumnName(i))
+		}
+	}
+	return nil
+}
+
+func (r *LabelsRow) Mutate() (string, []string, []interface{}) {
+	return "Labels", r.ColumnNames(), []interface{}{
+		r.LabelId,
+		r.LabelName,
+	}
+}
+
+func (r *LabelsRow) MutateColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "LabelId":
+			values = append(values, r.LabelId)
+		case "LabelName":
+			values = append(values, r.LabelName)
+		default:
+			panic(fmt.Errorf("table Labels does not have column %s", column))
+		}
+	}
+	return "Labels", columns, values
+}
+
+func (r *LabelsRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"LabelId",
+	)
+	if !r.LabelName.IsNull() {
+		columns = append(columns, "LabelName")
+	}
+	return r.MutateColumns(columns)
+}
+
+func (r *LabelsRow) Key() LabelsKey {
+	return LabelsKey{
+		LabelId: r.LabelId,
+	}
+}
+
 type SingersRow struct {
 	SingerId   int64              `spanner:"SingerId"`
+	LabelId    spanner.NullInt64  `spanner:"LabelId"`
 	FirstName  spanner.NullString `spanner:"FirstName"`
 	LastName   spanner.NullString `spanner:"LastName"`
 	SingerInfo []uint8            `spanner:"SingerInfo"`
@@ -24,6 +116,7 @@ type SingersRow struct {
 func (*SingersRow) ColumnNames() []string {
 	return []string{
 		"SingerId",
+		"LabelId",
 		"FirstName",
 		"LastName",
 		"SingerInfo",
@@ -33,6 +126,7 @@ func (*SingersRow) ColumnNames() []string {
 func (*SingersRow) ColumnIDs() []spansql.ID {
 	return []spansql.ID{
 		"SingerId",
+		"LabelId",
 		"FirstName",
 		"LastName",
 		"SingerInfo",
@@ -42,6 +136,7 @@ func (*SingersRow) ColumnIDs() []spansql.ID {
 func (*SingersRow) ColumnExprs() []spansql.Expr {
 	return []spansql.Expr{
 		spansql.ID("SingerId"),
+		spansql.ID("LabelId"),
 		spansql.ID("FirstName"),
 		spansql.ID("LastName"),
 		spansql.ID("SingerInfo"),
@@ -64,6 +159,10 @@ func (r *SingersRow) UnmarshalSpannerRow(row *spanner.Row) error {
 		case "SingerId":
 			if err := row.Column(i, &r.SingerId); err != nil {
 				return fmt.Errorf("unmarshal Singers row: SingerId column: %w", err)
+			}
+		case "LabelId":
+			if err := row.Column(i, &r.LabelId); err != nil {
+				return fmt.Errorf("unmarshal Singers row: LabelId column: %w", err)
 			}
 		case "FirstName":
 			if err := row.Column(i, &r.FirstName); err != nil {
@@ -91,6 +190,7 @@ func (r *SingersRow) UnmarshalSpannerRow(row *spanner.Row) error {
 func (r *SingersRow) Mutate() (string, []string, []interface{}) {
 	return "Singers", r.ColumnNames(), []interface{}{
 		r.SingerId,
+		r.LabelId,
 		r.FirstName,
 		r.LastName,
 		r.SingerInfo,
@@ -106,6 +206,8 @@ func (r *SingersRow) MutateColumns(columns []string) (string, []string, []interf
 		switch column {
 		case "SingerId":
 			values = append(values, r.SingerId)
+		case "LabelId":
+			values = append(values, r.LabelId)
 		case "FirstName":
 			values = append(values, r.FirstName)
 		case "LastName":
@@ -125,6 +227,9 @@ func (r *SingersRow) MutatePresentColumns() (string, []string, []interface{}) {
 		columns,
 		"SingerId",
 	)
+	if !r.LabelId.IsNull() {
+		columns = append(columns, "LabelId")
+	}
 	if !r.FirstName.IsNull() {
 		columns = append(columns, "FirstName")
 	}
@@ -369,6 +474,40 @@ func (r *SongsRow) Key() SongsKey {
 	}
 }
 
+type LabelsKey struct {
+	LabelId int64
+}
+
+func (k LabelsKey) SpannerKey() spanner.Key {
+	return spanner.Key{
+		k.LabelId,
+	}
+}
+
+func (k LabelsKey) SpannerKeySet() spanner.KeySet {
+	return k.SpannerKey()
+}
+
+func (k LabelsKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Labels", k.SpannerKey())
+}
+
+func (LabelsKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("LabelId"), Desc: false},
+	}
+}
+
+func (k LabelsKey) BoolExpr() spansql.BoolExpr {
+	cmp0 := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("LabelId"),
+		RHS: spansql.IntegerLiteral(k.LabelId),
+	})
+	b := cmp0
+	return spansql.Paren{Expr: b}
+}
+
 type SingersKey struct {
 	SingerId int64
 }
@@ -509,6 +648,73 @@ func (k SongsKey) BoolExpr() spansql.BoolExpr {
 	}
 	return spansql.Paren{Expr: b}
 }
+
+type LabelsRowIterator interface {
+	Next() (*LabelsRow, error)
+	Do(f func(row *LabelsRow) error) error
+	Stop()
+}
+
+type streamingLabelsRowIterator struct {
+	*spanner.RowIterator
+}
+
+func (i *streamingLabelsRowIterator) Next() (*LabelsRow, error) {
+	spannerRow, err := i.RowIterator.Next()
+	if err != nil {
+		return nil, err
+	}
+	var row LabelsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (i *streamingLabelsRowIterator) Do(f func(row *LabelsRow) error) error {
+	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
+		var row LabelsRow
+		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+			return err
+		}
+		return f(&row)
+	})
+}
+
+type bufferedLabelsRowIterator struct {
+	rows []*LabelsRow
+	err  error
+}
+
+func (i *bufferedLabelsRowIterator) Next() (*LabelsRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedLabelsRowIterator) Do(f func(row *LabelsRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedLabelsRowIterator) Stop() {}
 
 type SingersRowIterator interface {
 	Next() (*SingersRow, error)
@@ -717,6 +923,116 @@ type ReadTransaction struct {
 
 func Query(tx SpannerReadTransaction) ReadTransaction {
 	return ReadTransaction{Tx: tx}
+}
+
+func (t ReadTransaction) ReadLabelsRows(
+	ctx context.Context,
+	keySet spanner.KeySet,
+) LabelsRowIterator {
+	return &streamingLabelsRowIterator{
+		RowIterator: t.Tx.Read(
+			ctx,
+			"Labels",
+			keySet,
+			((*LabelsRow)(nil)).ColumnNames(),
+		),
+	}
+}
+
+type GetLabelsRowQuery struct {
+	Key LabelsKey
+}
+
+func (t ReadTransaction) GetLabelsRow(
+	ctx context.Context,
+	query GetLabelsRowQuery,
+) (*LabelsRow, error) {
+	spannerRow, err := t.Tx.ReadRow(
+		ctx,
+		"Labels",
+		query.Key.SpannerKey(),
+		((*LabelsRow)(nil)).ColumnNames(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	var row LabelsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+type BatchGetLabelsRowsQuery struct {
+	Keys []LabelsKey
+}
+
+func (t ReadTransaction) BatchGetLabelsRows(
+	ctx context.Context,
+	query BatchGetLabelsRowsQuery,
+) (map[LabelsKey]*LabelsRow, error) {
+	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	for _, key := range query.Keys {
+		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
+	}
+	foundRows := make(map[LabelsKey]*LabelsRow, len(query.Keys))
+	if err := t.ReadLabelsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *LabelsRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+type ListLabelsRowsQuery struct {
+	Where  spansql.BoolExpr
+	Order  []spansql.Order
+	Limit  int32
+	Offset int64
+	Params map[string]interface{}
+}
+
+func (t ReadTransaction) ListLabelsRows(
+	ctx context.Context,
+	query ListLabelsRowsQuery,
+) LabelsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = LabelsKey{}.Order()
+	}
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
+	}
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
+	stmt := spanner.Statement{
+		SQL: spansql.Query{
+			Select: spansql.Select{
+				List: ((*LabelsRow)(nil)).ColumnExprs(),
+				From: []spansql.SelectFrom{
+					spansql.SelectFromTable{Table: "Labels"},
+				},
+				Where: query.Where,
+			},
+			Order:  query.Order,
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
+		}.SQL(),
+		Params: params,
+	}
+	iter := &streamingLabelsRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+	return iter
 }
 
 func (t ReadTransaction) ReadSingersRows(
