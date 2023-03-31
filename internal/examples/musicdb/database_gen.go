@@ -1610,6 +1610,8 @@ func (t ReadTransaction) ListSongsRows(
 
 type SpannerReadTransaction interface {
 	Read(ctx context.Context, table string, keys spanner.KeySet, columns []string) *spanner.RowIterator
+	ReadUsingIndex(ctx context.Context, table, index string, keys spanner.KeySet, columns []string) *spanner.RowIterator
 	ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error)
+	ReadRowUsingIndex(ctx context.Context, table string, index string, key spanner.Key, columns []string) (*spanner.Row, error)
 	Query(ctx context.Context, statement spanner.Statement) *spanner.RowIterator
 }
