@@ -295,7 +295,7 @@ func (g ReadTransactionCodeGenerator) generateListMethod(f *codegen.File, table 
 		f.P("Op: ", spansqlPkg, ".And,")
 		f.P("LHS: ", spansqlPkg, ".Paren{Expr: query.Where},")
 		f.P("RHS: ", spansqlPkg, ".IsOp{")
-		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(g.softDeleteTimestampColumnName(table))), "),")
+		f.P("LHS: ", spansqlPkg, ".ID(", strconv.Quote(string(g.softDeleteTimestampColumnName())), "),")
 		f.P("RHS: ", spansqlPkg, ".Null,")
 		f.P("},")
 		f.P("}")
@@ -521,7 +521,7 @@ func (g ReadTransactionCodeGenerator) forwardInterleavedTablesStructFields(
 
 func (g ReadTransactionCodeGenerator) hasSoftDelete(table *spanddl.Table) bool {
 	for _, column := range table.Columns {
-		if column.Name == g.softDeleteTimestampColumnName(table) &&
+		if column.Name == g.softDeleteTimestampColumnName() &&
 			!column.NotNull &&
 			column.Type == (spansql.Type{Base: spansql.Timestamp}) {
 			return true
@@ -530,7 +530,7 @@ func (g ReadTransactionCodeGenerator) hasSoftDelete(table *spanddl.Table) bool {
 	return false
 }
 
-func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName(table *spanddl.Table) spansql.ID {
+func (g ReadTransactionCodeGenerator) softDeleteTimestampColumnName() spansql.ID {
 	return "delete_time"
 }
 
