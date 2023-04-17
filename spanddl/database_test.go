@@ -363,9 +363,8 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 				if tt.errorContains != "" {
 					assert.ErrorContains(t, err, tt.errorContains)
 					break
-				} else {
-					assert.NilError(t, err)
 				}
+				assert.NilError(t, err)
 			}
 			assert.DeepEqual(t, tt.expected, &db)
 		})
