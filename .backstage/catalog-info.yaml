@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: spanner-aip-go
+  annotations:
+    backstage.io/source-location: url:https://github.com/einride/spanner-aip-go/tree/master
+    github.com/project-slug: einride/spanner-aip-go
+    github.com/team-slug: einride/team-transportation
+spec:
+  type: library
+  lifecycle: production
+  owner: team-transportation
