@@ -25,12 +25,3 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           allow-initial-development-versions: true
 
-      - name: Run goreleaser
-        uses: goreleaser/goreleaser-action@v4.2.0
-        # Only run if a new version was tagged.
-        if: ${{ steps.semantic-release.outputs.version != '' }}
-        with:
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
