@@ -9,7 +9,7 @@ require (
 	github.com/stoewer/go-strcase v1.3.0
 	go.einride.tech/aip v0.61.0
 	golang.org/x/sync v0.3.0
-	google.golang.org/api v0.133.0
+	google.golang.org/api v0.134.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230725213213-b022f6e96895
 	google.golang.org/grpc v1.56.2
 	google.golang.org/protobuf v1.31.0
