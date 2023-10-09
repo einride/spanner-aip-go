@@ -30,7 +30,7 @@ import (
 // https://console.cloud.google.com/gcr/images/cloud-spanner-emulator/global/emulator
 const (
 	url     = "gcr.io/cloud-spanner-emulator/emulator"
-	version = "sha256:ab53ffefbcb53cea3b893e07c6796ba5df3bc67d1561eeb8efecaec466134f2f" // 1.5.9
+	version = "sha256:07e8839e7fa1851ac9113295bc6534ead5c151f68bf7d47bd7e00af0c5948931" // 1.5.11
 	image   = url + "@" + version
 )
 
