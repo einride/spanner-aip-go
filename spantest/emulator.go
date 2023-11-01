@@ -29,7 +29,8 @@ import (
 // Cloud Spanner Emulator versions can be found here,
 // https://console.cloud.google.com/gcr/images/cloud-spanner-emulator/global/emulator
 const (
-	url     = "gcr.io/cloud-spanner-emulator/emulator"
+	url = "gcr.io/cloud-spanner-emulator/emulator"
+	//nolint:gosec
 	version = "sha256:ab53ffefbcb53cea3b893e07c6796ba5df3bc67d1561eeb8efecaec466134f2f" // 1.5.9
 	image   = url + "@" + version
 )
