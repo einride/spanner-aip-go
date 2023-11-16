@@ -5,7 +5,7 @@ go 1.20
 require (
 	cloud.google.com/go v0.110.8
 	cloud.google.com/go/spanner v1.51.0
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/stoewer/go-strcase v1.3.0
 	go.einride.tech/aip v0.62.0
 	golang.org/x/sync v0.4.0
