@@ -3,7 +3,7 @@ module go.einride.tech/spanner-aip
 go 1.20
 
 require (
-	cloud.google.com/go v0.110.8
+	cloud.google.com/go v0.110.10
 	cloud.google.com/go/spanner v1.51.0
 	github.com/google/go-cmp v0.6.0
 	github.com/stoewer/go-strcase v1.3.0
@@ -11,7 +11,7 @@ require (
 	golang.org/x/sync v0.4.0
 	google.golang.org/api v0.147.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20231002182017-d307bd883b97
-	google.golang.org/grpc v1.58.3
+	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.1
