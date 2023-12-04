@@ -10,8 +10,22 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"  # Include all dependencies in one PR
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: gomod
     directory: .sage
     schedule:
       interval: monthly
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"  # Include all dependencies in one PR
+        update-types:
+          - "minor"
+          - "patch"
