@@ -1,19 +1,22 @@
-Spanner AIP Go
-==============
+# Spanner AIP Go
 
-[![PkgGoDev](https://pkg.go.dev/badge/go.einride.tech/spanner-aip)](https://pkg.go.dev/go.einride.tech/spanner-aip) [![GoReportCard](https://goreportcard.com/badge/go.einride.tech/spanner-aip)](https://goreportcard.com/report/go.einride.tech/spanner-aip) [![Codecov](https://codecov.io/gh/einride/spanner-aip-go/branch/master/graph/badge.svg)](https://codecov.io/gh/einride/spanner-aip-go)
+[![PkgGoDev](https://pkg.go.dev/badge/go.einride.tech/spanner-aip)](https://pkg.go.dev/go.einride.tech/spanner-aip)
+[![GoReportCard](https://goreportcard.com/badge/go.einride.tech/spanner-aip)](https://goreportcard.com/report/go.einride.tech/spanner-aip)
+[![Codecov](https://codecov.io/gh/einride/spanner-aip-go/branch/master/graph/badge.svg)](https://codecov.io/gh/einride/spanner-aip-go)
 
-Add-on to the [AIP Go SDK](https://github.com/einride/aip-go) for implementing [Cloud Spanner](https://cloud.google.com/spanner) persistance for [resource-oriented APIs](https://aip.dev).
+Add-on to the [AIP Go SDK](https://github.com/einride/aip-go) for implementing
+[Cloud Spanner](https://cloud.google.com/spanner) persistance for
+[resource-oriented APIs](https://aip.dev).
 
-**Experimental**: This library is under active development and breaking changes to config files, APIs and generated code are expected between releases.
+**Experimental**: This library is under active development and breaking changes
+to config files, APIs and generated code are expected between releases.
 
-Documentation
--------------
+## Documentation
 
-See [https://aip.dev](https://aip.dev) for the full AIP documentation and the [Cloud Spanner documentation](https://cloud.google.com/spanner/docs).
+See [https://aip.dev](https://aip.dev) for the full AIP documentation and the
+[Cloud Spanner documentation](https://cloud.google.com/spanner/docs).
 
-Usage
------
+## Usage
 
 ### Installing
 
