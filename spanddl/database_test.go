@@ -13,6 +13,7 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 		name          string
 		ddls          []string
 		expected      *Database
+		errorDdlIndex int
 		errorContains string
 	}{
 		{
@@ -43,6 +44,23 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 					},
 				},
 			},
+		},
+
+		{
+			name: "drop missing table",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  SingerId   INT64 NOT NULL,
+				  FirstName  STRING(1024),
+				  LastName   STRING(1024),
+				  SingerInfo BYTES(MAX),
+				  BirthDate  DATE,
+				) PRIMARY KEY(SingerId);`,
+
+				`DROP TABLE Albums`,
+			},
+			errorDdlIndex: 1,
+			errorContains: "DROP TABLE: table Albums does not exist",
 		},
 
 		{
@@ -356,13 +374,13 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var db Database
-			for _, ddl := range tt.ddls {
+			for i, ddl := range tt.ddls {
 				ddl, err := spansql.ParseDDL(tt.name, ddl)
 				assert.NilError(t, err)
 				err = db.ApplyDDL(ddl)
-				if tt.errorContains != "" {
+				if tt.errorDdlIndex == i && tt.errorContains != "" {
 					assert.ErrorContains(t, err, tt.errorContains)
-					break
+					return
 				}
 				assert.NilError(t, err)
 			}
