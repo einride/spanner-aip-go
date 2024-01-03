@@ -293,6 +293,37 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 		},
 
 		{
+			name: "drop table with interleaved tables",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  SingerId   INT64 NOT NULL,
+				  FirstName  STRING(1024),
+				  LastName   STRING(1024),
+				  SingerInfo BYTES(MAX),
+				  BirthDate  DATE,
+				) PRIMARY KEY(SingerId);`,
+
+				`CREATE TABLE Albums (
+				  SingerId     INT64 NOT NULL,
+				  AlbumId      INT64 NOT NULL,
+				  AlbumTitle   STRING(MAX),
+				) PRIMARY KEY (SingerId, AlbumId),
+				  INTERLEAVE IN PARENT Singers ON DELETE CASCADE;`,
+
+				`CREATE TABLE Genres (
+				  SingerId     INT64 NOT NULL,
+				  GenreId      INT64 NOT NULL,
+				  GenreTitle   STRING(MAX),
+				) PRIMARY KEY (SingerId, AlbumId),
+				  INTERLEAVE IN PARENT Singers ON DELETE CASCADE;`,
+
+				`DROP TABLE Singers;`,
+			},
+			errorDdlIndex: 3,
+			errorContains: "DROP TABLE: table Singers has interleaved tables Albums, Genres",
+		},
+
+		{
 			name: "create index",
 			ddls: []string{
 				`CREATE TABLE Singers (
