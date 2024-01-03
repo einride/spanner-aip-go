@@ -127,6 +127,7 @@ func (d *Database) applyDropTable(stmt *spansql.DropTable) (err error) {
 		return fmt.Errorf("table %s has interleaved tables %s", stmt.Name, strings.Join(names, ", "))
 	}
 	d.Tables = append(d.Tables[:i], d.Tables[i+1:]...)
+	d.removeInterleavedReferenceFromParentTable(stmt.Name)
 	return nil
 }
 
@@ -184,4 +185,21 @@ func (d *Database) indexOfIndex(name spansql.ID) int {
 		}
 	}
 	return -1
+}
+
+func (d *Database) removeInterleavedReferenceFromParentTable(name spansql.ID) {
+	for _, table := range d.Tables {
+		index := -1
+		for i, it := range table.InterleavedTables {
+			if it.Name == name {
+				index = i
+				break
+			}
+		}
+		if index >= 0 {
+			// Parent table found
+			table.InterleavedTables = append(table.InterleavedTables[:index], table.InterleavedTables[index+1:]...)
+			return
+		}
+	}
 }
