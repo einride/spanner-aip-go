@@ -2,6 +2,7 @@ package spanddl
 
 import (
 	"fmt"
+	"strings"
 
 	"cloud.google.com/go/spanner/spansql"
 )
@@ -117,6 +118,13 @@ func (d *Database) applyDropTable(stmt *spansql.DropTable) (err error) {
 	i := d.indexOfTable(stmt.Name)
 	if i == -1 {
 		return fmt.Errorf("table %s does not exist", stmt.Name)
+	}
+	if table, ok := d.Table(stmt.Name); ok && len(table.InterleavedTables) > 0 {
+		names := make([]string, 0, len(table.InterleavedTables))
+		for _, t := range table.InterleavedTables {
+			names = append(names, string(t.Name))
+		}
+		return fmt.Errorf("table %s has interleaved tables %s", stmt.Name, strings.Join(names, ", "))
 	}
 	d.Tables = append(d.Tables[:i], d.Tables[i+1:]...)
 	return nil
