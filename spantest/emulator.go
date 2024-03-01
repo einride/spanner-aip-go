@@ -29,8 +29,7 @@ import (
 // Cloud Spanner Emulator versions can be found here,
 // https://console.cloud.google.com/gcr/images/cloud-spanner-emulator/global/emulator
 const (
-	url = "gcr.io/cloud-spanner-emulator/emulator"
-	//nolint:gosec
+	url     = "gcr.io/cloud-spanner-emulator/emulator"
 	version = "sha256:5d905e581977bd3d543742e74ddb75c0ba65517cf19742089ae1be45b7b8aa49" // 1.5.13
 	image   = url + "@" + version
 )
@@ -165,7 +164,7 @@ func (fx *EmulatorFixture) NewDatabaseFromStatements(t testing.TB, statements []
 	t.Log("database:", createdDatabase.String())
 	conn, err := grpc.Dial(fx.emulatorHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NilError(t, err)
-	client, err := spanner.NewClient(fx.ctx, createdDatabase.Name, option.WithGRPCConn(conn))
+	client, err := spanner.NewClient(fx.ctx, createdDatabase.GetName(), option.WithGRPCConn(conn))
 	assert.NilError(t, err)
 	t.Cleanup(client.Close)
 	return client

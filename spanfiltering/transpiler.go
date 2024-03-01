@@ -29,7 +29,7 @@ func (t *Transpiler) Transpile() (spansql.BoolExpr, map[string]interface{}, erro
 	if t.filter.CheckedExpr == nil {
 		return spansql.True, nil, nil
 	}
-	resultExpr, err := t.transpileExpr(t.filter.CheckedExpr.Expr)
+	resultExpr, err := t.transpileExpr(t.filter.CheckedExpr.GetExpr())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -45,7 +45,7 @@ func (t *Transpiler) Transpile() (spansql.BoolExpr, map[string]interface{}, erro
 }
 
 func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
-	switch e.ExprKind.(type) {
+	switch e.GetExprKind().(type) {
 	case *expr.Expr_CallExpr:
 		result, err := t.transpileCallExpr(e)
 		if err != nil {
@@ -64,7 +64,7 @@ func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
 }
 
 func (t *Transpiler) transpileConstExpr(e *expr.Expr) (spansql.Expr, error) {
-	switch kind := e.GetConstExpr().ConstantKind.(type) {
+	switch kind := e.GetConstExpr().GetConstantKind().(type) {
 	case *expr.Constant_BoolValue:
 		return t.param(kind.BoolValue), nil
 	case *expr.Constant_DoubleValue:
@@ -82,7 +82,7 @@ func (t *Transpiler) transpileConstExpr(e *expr.Expr) (spansql.Expr, error) {
 }
 
 func (t *Transpiler) transpileCallExpr(e *expr.Expr) (spansql.Expr, error) {
-	switch e.GetCallExpr().Function {
+	switch e.GetCallExpr().GetFunction() {
 	case filtering.FunctionHas:
 		return t.transpileHasCallExpr(e)
 	case filtering.FunctionEquals:
@@ -106,39 +106,39 @@ func (t *Transpiler) transpileCallExpr(e *expr.Expr) (spansql.Expr, error) {
 	case filtering.FunctionTimestamp:
 		return t.transpileTimestampCallExpr(e)
 	default:
-		return nil, fmt.Errorf("unsupported function call: %s", e.GetCallExpr().Function)
+		return nil, fmt.Errorf("unsupported function call: %s", e.GetCallExpr().GetFunction())
 	}
 }
 
 func (t *Transpiler) transpileIdentExpr(e *expr.Expr) (spansql.Expr, error) {
 	identExpr := e.GetIdentExpr()
-	identType, ok := t.filter.CheckedExpr.TypeMap[e.Id]
+	identType, ok := t.filter.CheckedExpr.GetTypeMap()[e.GetId()]
 	if !ok {
-		return nil, fmt.Errorf("unknown type of ident expr %d", e.Id)
+		return nil, fmt.Errorf("unknown type of ident expr %d", e.GetId())
 	}
 	if messageType := identType.GetMessageType(); messageType != "" {
 		if enumType, err := protoregistry.GlobalTypes.FindEnumByName(protoreflect.FullName(messageType)); err == nil {
-			if enumValue := enumType.Descriptor().Values().ByName(protoreflect.Name(identExpr.Name)); enumValue != nil {
+			if enumValue := enumType.Descriptor().Values().ByName(protoreflect.Name(identExpr.GetName())); enumValue != nil {
 				// TODO: Configurable support for string literals.
 				// spanner does not support int32
 				return t.param(int64(enumValue.Number())), nil
 			}
 		}
 	}
-	return spansql.ID(identExpr.Name), nil
+	return spansql.ID(identExpr.GetName()), nil
 }
 
 func (t *Transpiler) transpileSelectExpr(e *expr.Expr) (spansql.Expr, error) {
 	selectExpr := e.GetSelectExpr()
-	operand, err := t.transpileExpr(selectExpr.Operand)
+	operand, err := t.transpileExpr(selectExpr.GetOperand())
 	if err != nil {
 		return nil, err
 	}
 	switch operand := operand.(type) {
 	case spansql.PathExp:
-		return append(operand, spansql.ID(selectExpr.Field)), nil
+		return append(operand, spansql.ID(selectExpr.GetField())), nil
 	case spansql.ID:
-		return spansql.PathExp{operand, spansql.ID(selectExpr.Field)}, nil
+		return spansql.PathExp{operand, spansql.ID(selectExpr.GetField())}, nil
 	default:
 		return nil, fmt.Errorf("unsupported select expr operand")
 	}
@@ -146,14 +146,14 @@ func (t *Transpiler) transpileSelectExpr(e *expr.Expr) (spansql.Expr, error) {
 
 func (t *Transpiler) transpileNotCallExpr(e *expr.Expr) (spansql.BoolExpr, error) {
 	callExpr := e.GetCallExpr()
-	if len(callExpr.Args) != 1 {
+	if len(callExpr.GetArgs()) != 1 {
 		return nil, fmt.Errorf(
 			"unexpected number of arguments to `%s` expression: %d",
 			filtering.FunctionNot,
-			len(callExpr.Args),
+			len(callExpr.GetArgs()),
 		)
 	}
-	rhsExpr, err := t.transpileExpr(callExpr.Args[0])
+	rhsExpr, err := t.transpileExpr(callExpr.GetArgs()[0])
 	if err != nil {
 		return nil, err
 	}
@@ -172,18 +172,18 @@ func (t *Transpiler) transpileComparisonCallExpr(
 	op spansql.ComparisonOperator,
 ) (spansql.BoolExpr, error) {
 	callExpr := e.GetCallExpr()
-	if len(callExpr.Args) != 2 {
+	if len(callExpr.GetArgs()) != 2 {
 		return nil, fmt.Errorf(
 			"unexpected number of arguments to `%s`: %d",
 			callExpr.GetFunction(),
-			len(callExpr.Args),
+			len(callExpr.GetArgs()),
 		)
 	}
-	lhsExpr, err := t.transpileExpr(callExpr.Args[0])
+	lhsExpr, err := t.transpileExpr(callExpr.GetArgs()[0])
 	if err != nil {
 		return nil, err
 	}
-	rhsExpr, err := t.transpileExpr(callExpr.Args[1])
+	rhsExpr, err := t.transpileExpr(callExpr.GetArgs()[1])
 	if err != nil {
 		return nil, err
 	}
@@ -199,18 +199,18 @@ func (t *Transpiler) transpileBinaryLogicalCallExpr(
 	op spansql.LogicalOperator,
 ) (spansql.BoolExpr, error) {
 	callExpr := e.GetCallExpr()
-	if len(callExpr.Args) != 2 {
+	if len(callExpr.GetArgs()) != 2 {
 		return nil, fmt.Errorf(
 			"unexpected number of arguments to `%s`: %d",
 			callExpr.GetFunction(),
-			len(callExpr.Args),
+			len(callExpr.GetArgs()),
 		)
 	}
-	lhsExpr, err := t.transpileExpr(callExpr.Args[0])
+	lhsExpr, err := t.transpileExpr(callExpr.GetArgs()[0])
 	if err != nil {
 		return nil, err
 	}
-	rhsExpr, err := t.transpileExpr(callExpr.Args[1])
+	rhsExpr, err := t.transpileExpr(callExpr.GetArgs()[1])
 	if err != nil {
 		return nil, err
 	}
@@ -231,20 +231,20 @@ func (t *Transpiler) transpileBinaryLogicalCallExpr(
 
 func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error) {
 	callExpr := e.GetCallExpr()
-	if len(callExpr.Args) != 2 {
-		return nil, fmt.Errorf("unexpected number of arguments to `in` expression: %d", len(callExpr.Args))
+	if len(callExpr.GetArgs()) != 2 {
+		return nil, fmt.Errorf("unexpected number of arguments to `in` expression: %d", len(callExpr.GetArgs()))
 	}
-	identExpr := callExpr.Args[0]
-	constExpr := callExpr.Args[1]
+	identExpr := callExpr.GetArgs()[0]
+	constExpr := callExpr.GetArgs()[1]
 	if identExpr.GetIdentExpr() == nil {
 		return nil, fmt.Errorf("TODO: add support for transpiling `:` where LHS is other than Ident")
 	}
 	if constExpr.GetConstExpr() == nil {
 		return nil, fmt.Errorf("TODO: add support for transpiling `:` where RHS is other than Const")
 	}
-	identType, ok := t.filter.CheckedExpr.TypeMap[callExpr.Args[0].Id]
+	identType, ok := t.filter.CheckedExpr.GetTypeMap()[callExpr.GetArgs()[0].GetId()]
 	if !ok {
-		return nil, fmt.Errorf("unknown type of ident expr %d", e.Id)
+		return nil, fmt.Errorf("unknown type of ident expr %d", e.GetId())
 	}
 	switch {
 	// Repeated primitives:
@@ -270,22 +270,22 @@ func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 
 func (t *Transpiler) transpileTimestampCallExpr(e *expr.Expr) (spansql.Expr, error) {
 	callExpr := e.GetCallExpr()
-	if len(callExpr.Args) != 1 {
+	if len(callExpr.GetArgs()) != 1 {
 		return nil, fmt.Errorf(
-			"unexpected number of arguments to `%s`: %d", callExpr.Function, len(callExpr.Args),
+			"unexpected number of arguments to `%s`: %d", callExpr.GetFunction(), len(callExpr.GetArgs()),
 		)
 	}
-	constArg, ok := callExpr.Args[0].ExprKind.(*expr.Expr_ConstExpr)
+	constArg, ok := callExpr.GetArgs()[0].GetExprKind().(*expr.Expr_ConstExpr)
 	if !ok {
-		return nil, fmt.Errorf("expected constant string arg to %s", callExpr.Function)
+		return nil, fmt.Errorf("expected constant string arg to %s", callExpr.GetFunction())
 	}
-	stringArg, ok := constArg.ConstExpr.ConstantKind.(*expr.Constant_StringValue)
+	stringArg, ok := constArg.ConstExpr.GetConstantKind().(*expr.Constant_StringValue)
 	if !ok {
-		return nil, fmt.Errorf("expected constant string arg to %s", callExpr.Function)
+		return nil, fmt.Errorf("expected constant string arg to %s", callExpr.GetFunction())
 	}
 	timeArg, err := time.Parse(time.RFC3339, stringArg.StringValue)
 	if err != nil {
-		return nil, fmt.Errorf("invalid string arg to %s: %w", callExpr.Function, err)
+		return nil, fmt.Errorf("invalid string arg to %s: %w", callExpr.GetFunction(), err)
 	}
 	return t.param(timeArg), nil
 }
