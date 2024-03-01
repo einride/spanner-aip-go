@@ -9,7 +9,7 @@ import (
 
 func TestGenericColumnDescriptorCodeGenerator_GenerateCode(t *testing.T) {
 	t.Parallel()
-	runGoldenFileTest(t, "genericcolumn", func(db *spanddl.Database, f *codegen.File) {
+	runGoldenFileTest(t, "genericcolumn", func(_ *spanddl.Database, f *codegen.File) {
 		GenericColumnDescriptorCodeGenerator{}.GenerateCode(f)
 	})
 }
