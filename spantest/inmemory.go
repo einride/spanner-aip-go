@@ -72,7 +72,7 @@ func (fx *InMemoryFixture) NewDatabaseFromStatements(t testing.TB, statements []
 	server, err := spannertest.NewServer("localhost:0")
 	assert.NilError(t, err)
 	t.Cleanup(server.Close)
-	conn, err := grpc.Dial(server.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(server.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NilError(t, err)
 	client, err := spanner.NewClient(fx.ctx, databaseName, option.WithGRPCConn(conn))
 	assert.NilError(t, err)
