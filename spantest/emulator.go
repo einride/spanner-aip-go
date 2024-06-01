@@ -82,11 +82,9 @@ func NewEmulatorFixture(t testing.TB) Fixture {
 	}
 	t.Log("emulator host:", emulatorHost)
 	awaitReachable(t, emulatorHost, 100*time.Millisecond, 10*time.Second)
-	conn, err := grpc.DialContext(
-		ctx,
+	conn, err := grpc.NewClient(
 		emulatorHost,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	assert.NilError(t, err)
 	t.Cleanup(func() {
@@ -162,7 +160,7 @@ func (fx *EmulatorFixture) NewDatabaseFromStatements(t testing.TB, statements []
 	createdDatabase, err := createDatabaseOp.Wait(fx.ctx)
 	assert.NilError(t, err)
 	t.Log("database:", createdDatabase.String())
-	conn, err := grpc.Dial(fx.emulatorHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(fx.emulatorHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NilError(t, err)
 	client, err := spanner.NewClient(fx.ctx, createdDatabase.GetName(), option.WithGRPCConn(conn))
 	assert.NilError(t, err)
