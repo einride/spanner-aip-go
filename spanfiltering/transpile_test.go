@@ -123,6 +123,29 @@ func TestTranspileFilter(t *testing.T) {
 			},
 			expectedSQL: `TRUE`,
 		},
+
+		{
+			name:   "substring matching",
+			filter: `author = "*Boye*"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+			},
+			expectedSQL: `(author LIKE @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": "%Boye%",
+			},
+		},
+
+		{
+			name:   "substring matching with '*'",
+			filter: `author = "*Bo*ye*"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+			},
+			errorContains: "wildcard only supported in leading or trailing positions",
+		},
 	} {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
