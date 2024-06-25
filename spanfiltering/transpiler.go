@@ -3,6 +3,7 @@ package spanfiltering
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/spanner/spansql"
@@ -86,6 +87,9 @@ func (t *Transpiler) transpileCallExpr(e *expr.Expr) (spansql.Expr, error) {
 	case filtering.FunctionHas:
 		return t.transpileHasCallExpr(e)
 	case filtering.FunctionEquals:
+		if t.isSubstringMatchExpr(e) {
+			return t.transpileSubstringMatchExpr(e)
+		}
 		return t.transpileComparisonCallExpr(e, spansql.Eq)
 	case filtering.FunctionNotEquals:
 		return t.transpileComparisonCallExpr(e, spansql.Ne)
@@ -191,6 +195,44 @@ func (t *Transpiler) transpileComparisonCallExpr(
 		Op:  op,
 		LHS: lhsExpr,
 		RHS: rhsExpr,
+	}, nil
+}
+
+func (t *Transpiler) isSubstringMatchExpr(
+	e *expr.Expr,
+) bool {
+	if len(e.GetCallExpr().GetArgs()) != 2 {
+		return false
+	}
+	lhs := e.GetCallExpr().GetArgs()[0]
+	if lhs.GetIdentExpr() == nil {
+		return false
+	}
+	rhs := e.GetCallExpr().GetArgs()[1]
+	if rhs.GetConstExpr() == nil {
+		return false
+	}
+	rhsStringExpr, ok := rhs.GetConstExpr().GetConstantKind().(*expr.Constant_StringValue)
+	if !ok {
+		return false
+	}
+	return strings.HasPrefix(rhsStringExpr.StringValue, "*") || strings.HasSuffix(rhsStringExpr.StringValue, "*")
+}
+
+func (t *Transpiler) transpileSubstringMatchExpr(e *expr.Expr) (spansql.BoolExpr, error) {
+	lhs := e.GetCallExpr().GetArgs()[0]
+	rhs := e.GetCallExpr().GetArgs()[1]
+	rhsString := rhs.GetConstExpr().GetConstantKind().(*expr.Constant_StringValue).StringValue
+	if strings.Contains(strings.TrimSuffix(strings.TrimPrefix(rhsString, "*"), "*"), "*") {
+		return nil, fmt.Errorf(
+			"unsupported argument to `%s`: wildcard only supported in leading or trailing positions",
+			e.GetCallExpr().GetFunction(),
+		)
+	}
+	return spansql.ComparisonOp{
+		Op:  spansql.Like,
+		LHS: spansql.ID(lhs.GetIdentExpr().GetName()),
+		RHS: t.param(strings.ReplaceAll(rhsString, "*", "%")),
 	}, nil
 }
 
