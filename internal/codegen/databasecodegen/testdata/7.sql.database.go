@@ -208,6 +208,7 @@ type ShippersRowIterator interface {
 	Next() (*ShippersRow, error)
 	Do(f func(row *ShippersRow) error) error
 	Stop()
+	Count() int64
 }
 
 type streamingShippersRowIterator struct {
@@ -236,6 +237,10 @@ func (i *streamingShippersRowIterator) Do(f func(row *ShippersRow) error) error 
 	})
 }
 
+func (i *streamingShippersRowIterator) Count() int64 {
+	return i.RowCount
+}
+
 type bufferedShippersRowIterator struct {
 	rows []*ShippersRow
 	err  error
@@ -251,6 +256,10 @@ func (i *bufferedShippersRowIterator) Next() (*ShippersRow, error) {
 	next := i.rows[0]
 	i.rows = i.rows[1:]
 	return next, nil
+}
+
+func (i *bufferedShippersRowIterator) Count() int64 {
+	return int64(len(i.rows))
 }
 
 func (i *bufferedShippersRowIterator) Do(f func(row *ShippersRow) error) error {

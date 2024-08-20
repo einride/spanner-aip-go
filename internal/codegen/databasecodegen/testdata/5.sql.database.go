@@ -156,6 +156,7 @@ type UserAccessLogRowIterator interface {
 	Next() (*UserAccessLogRow, error)
 	Do(f func(row *UserAccessLogRow) error) error
 	Stop()
+	Count() int64
 }
 
 type streamingUserAccessLogRowIterator struct {
@@ -184,6 +185,10 @@ func (i *streamingUserAccessLogRowIterator) Do(f func(row *UserAccessLogRow) err
 	})
 }
 
+func (i *streamingUserAccessLogRowIterator) Count() int64 {
+	return i.RowCount
+}
+
 type bufferedUserAccessLogRowIterator struct {
 	rows []*UserAccessLogRow
 	err  error
@@ -199,6 +204,10 @@ func (i *bufferedUserAccessLogRowIterator) Next() (*UserAccessLogRow, error) {
 	next := i.rows[0]
 	i.rows = i.rows[1:]
 	return next, nil
+}
+
+func (i *bufferedUserAccessLogRowIterator) Count() int64 {
+	return int64(len(i.rows))
 }
 
 func (i *bufferedUserAccessLogRowIterator) Do(f func(row *UserAccessLogRow) error) error {

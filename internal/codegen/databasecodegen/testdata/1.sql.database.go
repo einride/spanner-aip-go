@@ -177,6 +177,7 @@ type SingersRowIterator interface {
 	Next() (*SingersRow, error)
 	Do(f func(row *SingersRow) error) error
 	Stop()
+	Count() int64
 }
 
 type streamingSingersRowIterator struct {
@@ -205,6 +206,10 @@ func (i *streamingSingersRowIterator) Do(f func(row *SingersRow) error) error {
 	})
 }
 
+func (i *streamingSingersRowIterator) Count() int64 {
+	return i.RowCount
+}
+
 type bufferedSingersRowIterator struct {
 	rows []*SingersRow
 	err  error
@@ -220,6 +225,10 @@ func (i *bufferedSingersRowIterator) Next() (*SingersRow, error) {
 	next := i.rows[0]
 	i.rows = i.rows[1:]
 	return next, nil
+}
+
+func (i *bufferedSingersRowIterator) Count() int64 {
+	return int64(len(i.rows))
 }
 
 func (i *bufferedSingersRowIterator) Do(f func(row *SingersRow) error) error {
