@@ -653,6 +653,7 @@ type LabelsRowIterator interface {
 	Next() (*LabelsRow, error)
 	Do(f func(row *LabelsRow) error) error
 	Stop()
+	Count() int64
 }
 
 type streamingLabelsRowIterator struct {
@@ -681,6 +682,10 @@ func (i *streamingLabelsRowIterator) Do(f func(row *LabelsRow) error) error {
 	})
 }
 
+func (i *streamingLabelsRowIterator) Count() int64 {
+	return i.RowCount
+}
+
 type bufferedLabelsRowIterator struct {
 	rows []*LabelsRow
 	err  error
@@ -696,6 +701,10 @@ func (i *bufferedLabelsRowIterator) Next() (*LabelsRow, error) {
 	next := i.rows[0]
 	i.rows = i.rows[1:]
 	return next, nil
+}
+
+func (i *bufferedLabelsRowIterator) Count() int64 {
+	return int64(len(i.rows))
 }
 
 func (i *bufferedLabelsRowIterator) Do(f func(row *LabelsRow) error) error {
@@ -720,6 +729,7 @@ type SingersRowIterator interface {
 	Next() (*SingersRow, error)
 	Do(f func(row *SingersRow) error) error
 	Stop()
+	Count() int64
 }
 
 type streamingSingersRowIterator struct {
@@ -748,6 +758,10 @@ func (i *streamingSingersRowIterator) Do(f func(row *SingersRow) error) error {
 	})
 }
 
+func (i *streamingSingersRowIterator) Count() int64 {
+	return i.RowCount
+}
+
 type bufferedSingersRowIterator struct {
 	rows []*SingersRow
 	err  error
@@ -763,6 +777,10 @@ func (i *bufferedSingersRowIterator) Next() (*SingersRow, error) {
 	next := i.rows[0]
 	i.rows = i.rows[1:]
 	return next, nil
+}
+
+func (i *bufferedSingersRowIterator) Count() int64 {
+	return int64(len(i.rows))
 }
 
 func (i *bufferedSingersRowIterator) Do(f func(row *SingersRow) error) error {
@@ -787,6 +805,7 @@ type AlbumsRowIterator interface {
 	Next() (*AlbumsRow, error)
 	Do(f func(row *AlbumsRow) error) error
 	Stop()
+	Count() int64
 }
 
 type streamingAlbumsRowIterator struct {
@@ -815,6 +834,10 @@ func (i *streamingAlbumsRowIterator) Do(f func(row *AlbumsRow) error) error {
 	})
 }
 
+func (i *streamingAlbumsRowIterator) Count() int64 {
+	return i.RowCount
+}
+
 type bufferedAlbumsRowIterator struct {
 	rows []*AlbumsRow
 	err  error
@@ -830,6 +853,10 @@ func (i *bufferedAlbumsRowIterator) Next() (*AlbumsRow, error) {
 	next := i.rows[0]
 	i.rows = i.rows[1:]
 	return next, nil
+}
+
+func (i *bufferedAlbumsRowIterator) Count() int64 {
+	return int64(len(i.rows))
 }
 
 func (i *bufferedAlbumsRowIterator) Do(f func(row *AlbumsRow) error) error {
@@ -854,6 +881,7 @@ type SongsRowIterator interface {
 	Next() (*SongsRow, error)
 	Do(f func(row *SongsRow) error) error
 	Stop()
+	Count() int64
 }
 
 type streamingSongsRowIterator struct {
@@ -882,6 +910,10 @@ func (i *streamingSongsRowIterator) Do(f func(row *SongsRow) error) error {
 	})
 }
 
+func (i *streamingSongsRowIterator) Count() int64 {
+	return i.RowCount
+}
+
 type bufferedSongsRowIterator struct {
 	rows []*SongsRow
 	err  error
@@ -897,6 +929,10 @@ func (i *bufferedSongsRowIterator) Next() (*SongsRow, error) {
 	next := i.rows[0]
 	i.rows = i.rows[1:]
 	return next, nil
+}
+
+func (i *bufferedSongsRowIterator) Count() int64 {
+	return int64(len(i.rows))
 }
 
 func (i *bufferedSongsRowIterator) Do(f func(row *SongsRow) error) error {
