@@ -30,8 +30,8 @@ import (
 // https://console.cloud.google.com/gcr/images/cloud-spanner-emulator/global/emulator
 const (
 	url     = "gcr.io/cloud-spanner-emulator/emulator"
-	version = "sha256:5d905e581977bd3d543742e74ddb75c0ba65517cf19742089ae1be45b7b8aa49" // 1.5.13
-	image   = url + "@" + version
+	version = "1.5.22"
+	image   = url + ":" + version
 )
 
 // EmulatorFixture is a test fixture running the Spanner emulator.
