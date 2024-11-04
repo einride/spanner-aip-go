@@ -20,7 +20,6 @@ func runGoldenFileTest(t *testing.T, name string, fn func(*spanddl.Database, *co
 	testdataFiles, err := filepath.Glob("testdata/*.sql")
 	assert.NilError(t, err)
 	for _, testdataFile := range testdataFiles {
-		testdataFile := testdataFile
 		t.Run(fmt.Sprintf("%s/%s", name, testdataFile), func(t *testing.T) {
 			t.Parallel()
 			testdata, err := os.ReadFile(testdataFile)

@@ -147,7 +147,6 @@ func TestTranspileFilter(t *testing.T) {
 			errorContains: "wildcard only supported in leading or trailing positions",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			declarations, err := filtering.NewDeclarations(tt.declarations...)
