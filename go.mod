@@ -1,6 +1,6 @@
 module go.einride.tech/spanner-aip
 
-go 1.20
+go 1.23.2
 
 require (
 	cloud.google.com/go v0.115.1
