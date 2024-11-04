@@ -441,7 +441,6 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var db Database
