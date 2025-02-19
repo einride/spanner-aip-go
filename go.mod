@@ -3,8 +3,8 @@ module go.einride.tech/spanner-aip
 go 1.23.2
 
 require (
-	cloud.google.com/go v0.118.1
-	cloud.google.com/go/spanner v1.73.0
+	cloud.google.com/go v0.116.0
+	cloud.google.com/go/spanner v1.70.0
 	github.com/google/go-cmp v0.6.0
 	github.com/stoewer/go-strcase v1.3.0
 	go.einride.tech/aip v0.68.1
@@ -22,9 +22,9 @@ require (
 	cloud.google.com/go/auth v0.14.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.7 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
-	cloud.google.com/go/iam v1.3.1 // indirect
-	cloud.google.com/go/longrunning v0.6.4 // indirect
-	cloud.google.com/go/monitoring v1.23.0 // indirect
+	cloud.google.com/go/iam v1.3.0 // indirect
+	cloud.google.com/go/longrunning v0.6.3 // indirect
+	cloud.google.com/go/monitoring v1.22.0 // indirect
 	github.com/GoogleCloudPlatform/grpc-gcp-go/grpcgcp v1.5.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
@@ -57,6 +57,6 @@ require (
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	google.golang.org/genproto v0.0.0-20250122153221-138b5a5a4fd4 // indirect
+	google.golang.org/genproto v0.0.0-20241015192408-796eee8c2d53 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47 // indirect
 )
