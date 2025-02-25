@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -39,30 +37,21 @@ func NewInMemoryFixture(t testing.TB) Fixture {
 
 // NewDatabaseFromDDLFiles implements Fixture.
 func (fx *InMemoryFixture) NewDatabaseFromDDLFiles(t testing.TB, globs ...string) *spanner.Client {
-	t.Helper()
-	var files []string
-	for _, glob := range globs {
-		globFiles, err := filepath.Glob(glob)
-		assert.NilError(t, err)
-		files = append(files, globFiles...)
-	}
-	var statements []string
-	for _, file := range files {
-		content, err := os.ReadFile(file)
-		assert.NilError(t, err)
-		ddl, err := spansql.ParseDDL(file, string(content))
-		assert.NilError(t, err)
-		for _, ddlStmt := range ddl.List {
-			statements = append(statements, ddlStmt.SQL())
-		}
-	}
-	assert.Assert(t, len(statements) > 0)
-	return fx.NewDatabaseFromStatements(t, statements)
+	return fx.NewDatabase(t, FromGlobs(globs...))
 }
 
 // NewDatabaseFromDDLFiles implements Fixture.
 func (fx *InMemoryFixture) NewDatabaseFromStatements(t testing.TB, statements []string) *spanner.Client {
+	return fx.NewDatabase(t, FromStatements(statements))
+}
+
+// NewDatabase creates a new database with a random ID based on the passed options.
+func (fx *InMemoryFixture) NewDatabase(t testing.TB, options ...DatabaseCreationOption) *spanner.Client {
 	t.Helper()
+	cfg := getDatabaseCreationConfig(t, options...)
+	if cfg.protoDescriptorReader != nil {
+		t.Fatal("in memory spanner server does not support passing proto descriptors")
+	}
 	const (
 		projectID  = "spanner-aip-go"
 		instanceID = "in-memory"
@@ -77,7 +66,7 @@ func (fx *InMemoryFixture) NewDatabaseFromStatements(t testing.TB, statements []
 	client, err := spanner.NewClient(fx.ctx, databaseName, option.WithGRPCConn(conn))
 	assert.NilError(t, err)
 	t.Cleanup(client.Close)
-	for i, statement := range statements {
+	for i, statement := range cfg.statements {
 		ddl, err := spansql.ParseDDL(fmt.Sprintf("statement%d", i), statement)
 		assert.NilError(t, err)
 		removeUnsupportedStatements(ddl)

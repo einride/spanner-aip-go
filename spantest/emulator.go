@@ -6,10 +6,10 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +19,6 @@ import (
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
-	"cloud.google.com/go/spanner/spansql"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -124,37 +123,22 @@ func (fx *EmulatorFixture) Context() context.Context {
 	return fx.ctx
 }
 
-// NewDatabaseFromDDLFiles creates a new database with a random ID from the provided DDL file path glob.
-func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t testing.TB, globs ...string) *spanner.Client {
+// NewDatabase creates a new database with a random ID based on the passed options.
+func (fx *EmulatorFixture) NewDatabase(t testing.TB, options ...DatabaseCreationOption) *spanner.Client {
 	t.Helper()
-	var files []string
-	for _, glob := range globs {
-		globFiles, err := filepath.Glob(glob)
+	cfg := getDatabaseCreationConfig(t, options...)
+	var protoDescriptors []byte
+	if cfg.protoDescriptorReader != nil {
+		var err error
+		protoDescriptors, err = io.ReadAll(cfg.protoDescriptorReader)
 		assert.NilError(t, err)
-		files = append(files, globFiles...)
 	}
-	var statements []string
-	for _, file := range files {
-		content, err := os.ReadFile(file)
-		assert.NilError(t, err)
-		ddl, err := spansql.ParseDDL(file, string(content))
-		assert.NilError(t, err)
-		for _, ddlStmt := range ddl.List {
-			statements = append(statements, ddlStmt.SQL())
-		}
-	}
-	assert.Assert(t, len(statements) > 0)
-	return fx.NewDatabaseFromStatements(t, statements)
-}
-
-// NewDatabaseFromStatements creates a new database with a random ID from the provided statements.
-func (fx *EmulatorFixture) NewDatabaseFromStatements(t testing.TB, statements []string) *spanner.Client {
-	t.Helper()
 	databaseID := fmt.Sprintf("db%s", randomSuffix(t))
 	createDatabaseOp, err := fx.databaseAdminClient.CreateDatabase(fx.ctx, &databasepb.CreateDatabaseRequest{
-		Parent:          fmt.Sprintf("projects/%s/instances/%s", fx.projectID, fx.instanceID),
-		CreateStatement: fmt.Sprintf("CREATE DATABASE %s", databaseID),
-		ExtraStatements: statements,
+		Parent:           fmt.Sprintf("projects/%s/instances/%s", fx.projectID, fx.instanceID),
+		CreateStatement:  fmt.Sprintf("CREATE DATABASE %s", databaseID),
+		ExtraStatements:  cfg.statements,
+		ProtoDescriptors: protoDescriptors,
 	})
 	assert.NilError(t, err)
 	createdDatabase, err := createDatabaseOp.Wait(fx.ctx)
@@ -166,6 +150,16 @@ func (fx *EmulatorFixture) NewDatabaseFromStatements(t testing.TB, statements []
 	assert.NilError(t, err)
 	t.Cleanup(client.Close)
 	return client
+}
+
+// NewDatabaseFromDDLFiles creates a new database with a random ID from the provided DDL file path glob.
+func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t testing.TB, globs ...string) *spanner.Client {
+	return fx.NewDatabase(t, FromGlobs(globs...))
+}
+
+// NewDatabaseFromStatements creates a new database with a random ID from the provided statements.
+func (fx *EmulatorFixture) NewDatabaseFromStatements(t testing.TB, statements []string) *spanner.Client {
+	return fx.NewDatabase(t, FromStatements(statements))
 }
 
 // HasDocker returns true if Docker is available on the local host.
