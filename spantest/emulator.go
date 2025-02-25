@@ -46,7 +46,7 @@ type EmulatorFixture struct {
 }
 
 // NewEmulatorFixture creates a test fixture for a containerized Spanner emulator.
-func NewEmulatorFixture(t testing.TB) Fixture {
+func NewEmulatorFixture(t testing.TB) FixtureWithProtoDescriptorSupport {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -126,6 +126,22 @@ func (fx *EmulatorFixture) Context() context.Context {
 
 // NewDatabaseFromDDLFiles creates a new database with a random ID from the provided DDL file path glob.
 func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t testing.TB, globs ...string) *spanner.Client {
+	return fx.newDatabaseFromStatements(t, getStatementsFromGlobs(t, globs...), []byte{})
+}
+
+// NewDatabaseFromDDLFiles creates a new database with a random ID from the provided proto descriptor file
+// and DDL file path glob.
+func (fx *EmulatorFixture) NewDatabaseFromProtoDescFileAndDDLFiles(
+	t testing.TB,
+	protoDescFile string,
+	globs ...string,
+) *spanner.Client {
+	protoDesc, err := os.ReadFile(protoDescFile)
+	assert.NilError(t, err)
+	return fx.newDatabaseFromStatements(t, getStatementsFromGlobs(t, globs...), protoDesc)
+}
+
+func getStatementsFromGlobs(t testing.TB, globs ...string) []string {
 	t.Helper()
 	var files []string
 	for _, glob := range globs {
@@ -144,17 +160,35 @@ func (fx *EmulatorFixture) NewDatabaseFromDDLFiles(t testing.TB, globs ...string
 		}
 	}
 	assert.Assert(t, len(statements) > 0)
-	return fx.NewDatabaseFromStatements(t, statements)
+	return statements
 }
 
 // NewDatabaseFromStatements creates a new database with a random ID from the provided statements.
 func (fx *EmulatorFixture) NewDatabaseFromStatements(t testing.TB, statements []string) *spanner.Client {
+	return fx.newDatabaseFromStatements(t, statements, []byte{})
+}
+
+// NewDatabaseFromStatements creates a new database with a random ID from the provided statements and proto descriptors.
+func (fx *EmulatorFixture) NewDatabaseFromStatementsAndProtoDesc(
+	t testing.TB,
+	statements []string,
+	protoDescriptors []byte,
+) *spanner.Client {
+	return fx.newDatabaseFromStatements(t, statements, protoDescriptors)
+}
+
+func (fx *EmulatorFixture) newDatabaseFromStatements(
+	t testing.TB,
+	statements []string,
+	protoDescriptors []byte,
+) *spanner.Client {
 	t.Helper()
 	databaseID := fmt.Sprintf("db%s", randomSuffix(t))
 	createDatabaseOp, err := fx.databaseAdminClient.CreateDatabase(fx.ctx, &databasepb.CreateDatabaseRequest{
-		Parent:          fmt.Sprintf("projects/%s/instances/%s", fx.projectID, fx.instanceID),
-		CreateStatement: fmt.Sprintf("CREATE DATABASE %s", databaseID),
-		ExtraStatements: statements,
+		Parent:           fmt.Sprintf("projects/%s/instances/%s", fx.projectID, fx.instanceID),
+		CreateStatement:  fmt.Sprintf("CREATE DATABASE %s", databaseID),
+		ExtraStatements:  statements,
+		ProtoDescriptors: protoDescriptors,
 	})
 	assert.NilError(t, err)
 	createdDatabase, err := createDatabaseOp.Wait(fx.ctx)

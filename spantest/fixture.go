@@ -13,3 +13,13 @@ type Fixture interface {
 	// NewDatabaseFromStatements creates a new database and applies the provided DLL statements.
 	NewDatabaseFromStatements(t testing.TB, statements []string) *spanner.Client
 }
+
+type FixtureWithProtoDescriptorSupport interface {
+	Fixture
+	// NewDatabaseFromDDLFiles creates a new database with a random ID from the provided proto descriptor file
+	// and DDL file path glob.
+	NewDatabaseFromProtoDescFileAndDDLFiles(t testing.TB, protoDescFile string, globs ...string) *spanner.Client
+	// NewDatabaseFromStatements creates a new database with a random ID from the provided statements
+	// and proto descriptors.
+	NewDatabaseFromStatementsAndProtoDesc(t testing.TB, statements []string, protoDescriptors []byte) *spanner.Client
+}
