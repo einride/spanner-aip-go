@@ -2,30 +2,20 @@ version: 2
 
 updates:
   - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: monthly
-
-  - package-ecosystem: gomod
-    directory: /
+    directories: ["/"]
     schedule:
       interval: monthly
     groups:
-      go-dependencies:
-        patterns:
-          - "*"  # Include all dependencies in one PR
-        update-types:
-          - "minor"
-          - "patch"
+      github-actions:
+        patterns: ["*"]
+    labels: ["dependencies"]
 
   - package-ecosystem: gomod
-    directory: .sage
+    directories: [".", "./.sage"]
     schedule:
       interval: monthly
     groups:
-      go-dependencies:
-        patterns:
-          - "*"  # Include all dependencies in one PR
-        update-types:
-          - "minor"
-          - "patch"
+      gomod-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    labels: ["dependencies"]
