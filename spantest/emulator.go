@@ -102,12 +102,12 @@ func NewEmulatorFixture(t testing.TB) Fixture {
 			NodeCount:   1,
 		},
 	})
-	assert.NilError(t, err)
+	assert.NilError(t, err, "failed to create instance")
 	createdInstance, err := createInstanceOp.Wait(ctx)
-	assert.NilError(t, err)
+	assert.NilError(t, err, "failed to prepare instance for serving")
 	t.Log("instance:", createdInstance.String())
 	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx, option.WithGRPCConn(conn))
-	assert.NilError(t, err)
+	assert.NilError(t, err, "failed to create database admin client")
 	return &EmulatorFixture{
 		ctx:                 ctx,
 		conn:                conn,
