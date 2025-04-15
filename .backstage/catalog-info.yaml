@@ -5,8 +5,8 @@ metadata:
   annotations:
     backstage.io/source-location: url:https://github.com/einride/spanner-aip-go/tree/master
     github.com/project-slug: einride/spanner-aip-go
-    github.com/team-slug: einride/transportation-platform
+    github.com/team-slug: einride/freight-control
 spec:
   type: library
   lifecycle: production
-  owner: transportation-platform
+  owner: freight-control
