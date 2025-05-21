@@ -150,6 +150,33 @@ func (r *ShippersRow) Key() ShippersKey {
 	}
 }
 
+func (r *ShippersRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "shippers",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("shipper_id"),
+				spansql.Param("revision_id"),
+				spansql.Param("create_time"),
+				spansql.Param("update_time"),
+				spansql.Param("delete_time"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"shipper_id":  r.ShipperId,
+		"revision_id": r.RevisionId,
+		"create_time": r.CreateTime,
+		"update_time": r.UpdateTime,
+		"delete_time": r.DeleteTime,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
+	}
+}
+
 type ShippersKey struct {
 	ShipperId  string
 	RevisionId spanner.NullString

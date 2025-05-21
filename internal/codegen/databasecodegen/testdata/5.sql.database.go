@@ -104,6 +104,27 @@ func (r *UserAccessLogRow) Key() UserAccessLogKey {
 	}
 }
 
+func (r *UserAccessLogRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "UserAccessLog",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("UserId"),
+				spansql.Param("LastAccess"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"UserId":     r.UserId,
+		"LastAccess": r.LastAccess,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
+	}
+}
+
 type UserAccessLogKey struct {
 	UserId     int64
 	LastAccess time.Time

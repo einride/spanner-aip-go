@@ -69,6 +69,7 @@ func (g RowCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateMutationForColumnsFunction(f)
 	g.generateMutationForPresentColumnsFunction(f)
 	g.generatePrimaryKeyMethod(f)
+	g.generateInsertDMLFunction(f)
 }
 
 func (g RowCodeGenerator) generateColumn(f *codegen.File, column *spanddl.Column) {
@@ -266,4 +267,34 @@ func (g RowCodeGenerator) columnType(f *codegen.File, column *spanddl.Column) re
 		_ = f.Import(t.PkgPath())
 	}
 	return t
+}
+
+func (g RowCodeGenerator) generateInsertDMLFunction(f *codegen.File) {
+	spansqlPkg := f.Import("cloud.google.com/go/spanner/spansql")
+	spannerPkg := f.Import("cloud.google.com/go/spanner")
+	f.P()
+	f.P("func (r *", g.Type(), ") InsertDML() "+spannerPkg+".Statement {")
+
+	f.P("insert := &", spansqlPkg, ".Insert{")
+	f.P("Table: ", strconv.Quote(string(g.Table.Name)), ",")
+	f.P("Columns: r.ColumnIDs(),")
+	f.P("Input: " + spansqlPkg + ".Values{")
+	f.P("[]" + spansqlPkg + ".Expr{")
+	for _, column := range g.Table.Columns {
+		f.P(spansqlPkg+".Param("+strconv.Quote(string(column.Name)), "),")
+	}
+	f.P("},")
+	f.P("},")
+	f.P("}")
+
+	f.P("params := map[string]interface{}{")
+	for _, column := range g.Table.Columns {
+		f.P(strconv.Quote(string(column.Name)), ": r.", g.ColumnFieldName(column), ",")
+	}
+	f.P("}")
+	f.P("return " + spannerPkg + ".Statement{")
+	f.P("SQL: insert.SQL(),")
+	f.P("Params: params,")
+	f.P("}")
+	f.P("}")
 }

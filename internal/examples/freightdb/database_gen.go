@@ -136,6 +136,31 @@ func (r *ShippersRow) Key() ShippersKey {
 	}
 }
 
+func (r *ShippersRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "shippers",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("shipper_id"),
+				spansql.Param("create_time"),
+				spansql.Param("update_time"),
+				spansql.Param("delete_time"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"shipper_id":  r.ShipperId,
+		"create_time": r.CreateTime,
+		"update_time": r.UpdateTime,
+		"delete_time": r.DeleteTime,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
+	}
+}
+
 type SitesRow struct {
 	ShipperId   string              `spanner:"shipper_id"`
 	SiteId      string              `spanner:"site_id"`
@@ -326,6 +351,41 @@ func (r *SitesRow) Key() SitesKey {
 	return SitesKey{
 		ShipperId: r.ShipperId,
 		SiteId:    r.SiteId,
+	}
+}
+
+func (r *SitesRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "sites",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("shipper_id"),
+				spansql.Param("site_id"),
+				spansql.Param("create_time"),
+				spansql.Param("update_time"),
+				spansql.Param("delete_time"),
+				spansql.Param("display_name"),
+				spansql.Param("latitude"),
+				spansql.Param("longitude"),
+				spansql.Param("config"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"shipper_id":   r.ShipperId,
+		"site_id":      r.SiteId,
+		"create_time":  r.CreateTime,
+		"update_time":  r.UpdateTime,
+		"delete_time":  r.DeleteTime,
+		"display_name": r.DisplayName,
+		"latitude":     r.Latitude,
+		"longitude":    r.Longitude,
+		"config":       r.Config,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
 	}
 }
 
@@ -558,6 +618,45 @@ func (r *ShipmentsRow) Key() ShipmentsKey {
 	}
 }
 
+func (r *ShipmentsRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "shipments",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("shipper_id"),
+				spansql.Param("shipment_id"),
+				spansql.Param("create_time"),
+				spansql.Param("update_time"),
+				spansql.Param("delete_time"),
+				spansql.Param("origin_site_id"),
+				spansql.Param("destination_site_id"),
+				spansql.Param("pickup_earliest_time"),
+				spansql.Param("pickup_latest_time"),
+				spansql.Param("delivery_earliest_time"),
+				spansql.Param("delivery_latest_time"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"shipper_id":             r.ShipperId,
+		"shipment_id":            r.ShipmentId,
+		"create_time":            r.CreateTime,
+		"update_time":            r.UpdateTime,
+		"delete_time":            r.DeleteTime,
+		"origin_site_id":         r.OriginSiteId,
+		"destination_site_id":    r.DestinationSiteId,
+		"pickup_earliest_time":   r.PickupEarliestTime,
+		"pickup_latest_time":     r.PickupLatestTime,
+		"delivery_earliest_time": r.DeliveryEarliestTime,
+		"delivery_latest_time":   r.DeliveryLatestTime,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
+	}
+}
+
 type LineItemsRow struct {
 	ShipperId  string              `spanner:"shipper_id"`
 	ShipmentId string              `spanner:"shipment_id"`
@@ -723,6 +822,37 @@ func (r *LineItemsRow) Key() LineItemsKey {
 		ShipperId:  r.ShipperId,
 		ShipmentId: r.ShipmentId,
 		LineNumber: r.LineNumber,
+	}
+}
+
+func (r *LineItemsRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "line_items",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("shipper_id"),
+				spansql.Param("shipment_id"),
+				spansql.Param("line_number"),
+				spansql.Param("title"),
+				spansql.Param("quantity"),
+				spansql.Param("weight_kg"),
+				spansql.Param("volume_m3"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"shipper_id":  r.ShipperId,
+		"shipment_id": r.ShipmentId,
+		"line_number": r.LineNumber,
+		"title":       r.Title,
+		"quantity":    r.Quantity,
+		"weight_kg":   r.WeightKg,
+		"volume_m3":   r.VolumeM3,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
 	}
 }
 

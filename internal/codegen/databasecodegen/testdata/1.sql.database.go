@@ -138,6 +138,31 @@ func (r *SingersRow) Key() SingersKey {
 	}
 }
 
+func (r *SingersRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "Singers",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("SingerId"),
+				spansql.Param("FirstName"),
+				spansql.Param("LastName"),
+				spansql.Param("SingerInfo"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"SingerId":   r.SingerId,
+		"FirstName":  r.FirstName,
+		"LastName":   r.LastName,
+		"SingerInfo": r.SingerInfo,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
+	}
+}
+
 type SingersKey struct {
 	SingerId int64
 }

@@ -36,6 +36,33 @@ func TestReadTransaction(t *testing.T) {
 		assert.DeepEqual(t, expected, actual)
 	})
 
+	t.Run("insert-dml and get", func(t *testing.T) {
+		t.Parallel()
+		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
+		expected := &musicdb.SingersRow{
+			SingerId:  1,
+			FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
+			LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
+		}
+		stmt := expected.InsertDML()
+		t.Log(stmt)
+		_, err := client.ReadWriteTransaction(
+			ctx,
+			func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+				_, err := tx.Update(ctx, stmt)
+				return err
+			},
+		)
+		assert.NilError(t, err)
+		tx := client.Single()
+		defer tx.Close()
+		actual, err := musicdb.Query(tx).GetSingersRow(ctx, musicdb.GetSingersRowQuery{
+			Key: expected.Key(),
+		})
+		assert.NilError(t, err)
+		assert.DeepEqual(t, expected, actual)
+	})
+
 	t.Run("insert and batch get", func(t *testing.T) {
 		t.Parallel()
 		client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
@@ -150,6 +177,64 @@ func TestReadTransaction(t *testing.T) {
 				mutations = append(mutations, spanner.Insert(album.Mutate()))
 			}
 			_, err := client.Apply(ctx, mutations)
+			assert.NilError(t, err)
+			tx := client.ReadOnlyTransaction()
+			actual, err := musicdb.Query(tx).GetSingersRow(ctx, musicdb.GetSingersRowQuery{
+				Key:    expected.Key(),
+				Albums: true,
+			})
+			assert.NilError(t, err)
+			assert.DeepEqual(t, expected, actual)
+		})
+
+		t.Run("insert-dml and get", func(t *testing.T) {
+			t.Parallel()
+			client := fx.NewDatabaseFromDDLFiles(t, "../../../testdata/migrations/music/*.up.sql")
+			expected := &musicdb.SingersRow{
+				SingerId:  1,
+				FirstName: spanner.NullString{StringVal: "Frank", Valid: true},
+				LastName:  spanner.NullString{StringVal: "Sinatra", Valid: true},
+				Albums: []*musicdb.AlbumsRow{
+					{
+						SingerId: 1,
+						AlbumId:  1,
+						AlbumTitle: spanner.NullString{
+							StringVal: "Test1",
+							Valid:     true,
+						},
+					},
+					{
+						SingerId: 1,
+						AlbumId:  2,
+						AlbumTitle: spanner.NullString{
+							StringVal: "Test2",
+							Valid:     true,
+						},
+					},
+					{
+						SingerId: 1,
+						AlbumId:  3,
+						AlbumTitle: spanner.NullString{
+							StringVal: "Test3",
+							Valid:     true,
+						},
+					},
+				},
+			}
+			_, err := client.ReadWriteTransaction(
+				ctx,
+				func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+					if _, err := tx.Update(ctx, expected.InsertDML()); err != nil {
+						return err
+					}
+					for _, album := range expected.Albums {
+						if _, err := tx.Update(ctx, album.InsertDML()); err != nil {
+							return err
+						}
+					}
+					return nil
+				},
+			)
 			assert.NilError(t, err)
 			tx := client.ReadOnlyTransaction()
 			actual, err := musicdb.Query(tx).GetSingersRow(ctx, musicdb.GetSingersRowQuery{

@@ -103,6 +103,27 @@ func (r *LabelsRow) Key() LabelsKey {
 	}
 }
 
+func (r *LabelsRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "Labels",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("LabelId"),
+				spansql.Param("LabelName"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"LabelId":   r.LabelId,
+		"LabelName": r.LabelName,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
+	}
+}
+
 type SingersRow struct {
 	SingerId   int64              `spanner:"SingerId"`
 	LabelId    spanner.NullInt64  `spanner:"LabelId"`
@@ -247,6 +268,33 @@ func (r *SingersRow) Key() SingersKey {
 	}
 }
 
+func (r *SingersRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "Singers",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("SingerId"),
+				spansql.Param("LabelId"),
+				spansql.Param("FirstName"),
+				spansql.Param("LastName"),
+				spansql.Param("SingerInfo"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"SingerId":   r.SingerId,
+		"LabelId":    r.LabelId,
+		"FirstName":  r.FirstName,
+		"LastName":   r.LastName,
+		"SingerInfo": r.SingerInfo,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
+	}
+}
+
 type AlbumsRow struct {
 	SingerId   int64              `spanner:"SingerId"`
 	AlbumId    int64              `spanner:"AlbumId"`
@@ -353,6 +401,29 @@ func (r *AlbumsRow) Key() AlbumsKey {
 	return AlbumsKey{
 		SingerId: r.SingerId,
 		AlbumId:  r.AlbumId,
+	}
+}
+
+func (r *AlbumsRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "Albums",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("SingerId"),
+				spansql.Param("AlbumId"),
+				spansql.Param("AlbumTitle"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"SingerId":   r.SingerId,
+		"AlbumId":    r.AlbumId,
+		"AlbumTitle": r.AlbumTitle,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
 	}
 }
 
@@ -470,6 +541,31 @@ func (r *SongsRow) Key() SongsKey {
 		SingerId: r.SingerId,
 		AlbumId:  r.AlbumId,
 		TrackId:  r.TrackId,
+	}
+}
+
+func (r *SongsRow) InsertDML() spanner.Statement {
+	insert := &spansql.Insert{
+		Table:   "Songs",
+		Columns: r.ColumnIDs(),
+		Input: spansql.Values{
+			[]spansql.Expr{
+				spansql.Param("SingerId"),
+				spansql.Param("AlbumId"),
+				spansql.Param("TrackId"),
+				spansql.Param("SongName"),
+			},
+		},
+	}
+	params := map[string]interface{}{
+		"SingerId": r.SingerId,
+		"AlbumId":  r.AlbumId,
+		"TrackId":  r.TrackId,
+		"SongName": r.SongName,
+	}
+	return spanner.Statement{
+		SQL:    insert.SQL(),
+		Params: params,
 	}
 }
 
