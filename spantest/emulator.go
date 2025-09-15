@@ -200,6 +200,8 @@ func inspectPortAddress(t testing.TB, containerID, containerPort string) string 
 func execCommand(t testing.TB, name string, args ...string) string {
 	t.Helper()
 	t.Log("exec:", name, strings.Join(args, " "))
+	// No external args are passed to this exec.Command other than the static strings defined in this file.
+	// nosemgrep: go.lang.security.audit.dangerous-exec-command
 	cmd := exec.Command(name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
