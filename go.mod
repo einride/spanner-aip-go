@@ -7,12 +7,12 @@ require (
 	cloud.google.com/go/spanner v1.86.1
 	github.com/google/go-cmp v0.7.0
 	github.com/stoewer/go-strcase v1.3.1
-	go.einride.tech/aip v0.75.0
-	golang.org/x/sync v0.18.0
-	google.golang.org/api v0.256.0
+	go.einride.tech/aip v0.76.0
+	golang.org/x/sync v0.19.0
+	google.golang.org/api v0.257.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba
 	google.golang.org/grpc v1.77.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
 )
@@ -59,5 +59,5 @@ require (
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20251111163417-95abcf5c77ba // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251124214823-79d6a2a48846 // indirect
 )
