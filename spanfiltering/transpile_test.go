@@ -18,6 +18,7 @@ func TestTranspileFilter(t *testing.T) {
 		expectedSQL    string
 		expectedParams map[string]interface{}
 		errorContains  string
+		options        []TranspileOption
 	}{
 		{
 			name:   "simple flag",
@@ -91,6 +92,19 @@ func TestTranspileFilter(t *testing.T) {
 		},
 
 		{
+			name:    "enum equality as strings",
+			options: []TranspileOption{WithEnumValuesAsStrings()},
+			filter:  `example_enum = ENUM_ONE`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
+			},
+			expectedSQL: `(example_enum = @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": "ENUM_ONE",
+			},
+		},
+
+		{
 			name:   "enum negated equality",
 			filter: `example_enum != ENUM_ONE`,
 			declarations: []filtering.DeclarationOption{
@@ -157,7 +171,7 @@ func TestTranspileFilter(t *testing.T) {
 				return
 			}
 			assert.NilError(t, err)
-			actual, params, err := TranspileFilter(filter)
+			actual, params, err := TranspileFilter(filter, tt.options...)
 			if err != nil && tt.errorContains != "" {
 				assert.ErrorContains(t, err, tt.errorContains)
 				return
