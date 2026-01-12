@@ -17,12 +17,28 @@ type Transpiler struct {
 	filter       filtering.Filter
 	params       map[string]interface{}
 	paramCounter int
+	options      transpileOptions
 }
 
-func (t *Transpiler) Init(filter filtering.Filter) {
+type TranspileOption func(options *transpileOptions)
+
+func WithEnumValuesAsStrings() TranspileOption {
+	return func(options *transpileOptions) {
+		options.enumValuesAsStrings = true
+	}
+}
+
+type transpileOptions struct {
+	enumValuesAsStrings bool
+}
+
+func (t *Transpiler) Init(filter filtering.Filter, options ...TranspileOption) {
 	*t = Transpiler{
 		filter: filter,
 		params: make(map[string]interface{}),
+	}
+	for _, option := range options {
+		option(&t.options)
 	}
 }
 
@@ -123,7 +139,9 @@ func (t *Transpiler) transpileIdentExpr(e *expr.Expr) (spansql.Expr, error) {
 	if messageType := identType.GetMessageType(); messageType != "" {
 		if enumType, err := protoregistry.GlobalTypes.FindEnumByName(protoreflect.FullName(messageType)); err == nil {
 			if enumValue := enumType.Descriptor().Values().ByName(protoreflect.Name(identExpr.GetName())); enumValue != nil {
-				// TODO: Configurable support for string literals.
+				if t.options.enumValuesAsStrings {
+					return t.param(string(enumValue.Name())), nil
+				}
 				// spanner does not support int32
 				return t.param(int64(enumValue.Number())), nil
 			}

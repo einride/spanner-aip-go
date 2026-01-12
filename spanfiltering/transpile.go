@@ -8,8 +8,11 @@ import (
 // TranspileFilter transpiles a parsed AIP filter expression to a spansql.BoolExpr, and
 // parameters used in the expression.
 // The parameter map is nil if the expression does not contain any parameters.
-func TranspileFilter(filter filtering.Filter) (spansql.BoolExpr, map[string]interface{}, error) {
+func TranspileFilter(
+	filter filtering.Filter,
+	options ...TranspileOption,
+) (spansql.BoolExpr, map[string]interface{}, error) {
 	var t Transpiler
-	t.Init(filter)
+	t.Init(filter, options...)
 	return t.Transpile()
 }
