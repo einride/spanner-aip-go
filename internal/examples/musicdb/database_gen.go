@@ -473,6 +473,83 @@ func (r *SongsRow) Key() SongsKey {
 	}
 }
 
+type PlaylistsRow struct {
+	Id int64 `spanner:"Id"`
+}
+
+func (*PlaylistsRow) ColumnNames() []string {
+	return []string{
+		"Id",
+	}
+}
+
+func (*PlaylistsRow) ColumnIDs() []spansql.ID {
+	return []spansql.ID{
+		"Id",
+	}
+}
+
+func (*PlaylistsRow) ColumnExprs() []spansql.Expr {
+	return []spansql.Expr{
+		spansql.ID("Id"),
+	}
+}
+
+func (r *PlaylistsRow) Validate() error {
+	return nil
+}
+
+func (r *PlaylistsRow) UnmarshalSpannerRow(row *spanner.Row) error {
+	for i := 0; i < row.Size(); i++ {
+		switch row.ColumnName(i) {
+		case "Id":
+			if err := row.Column(i, &r.Id); err != nil {
+				return fmt.Errorf("unmarshal Playlists row: Id column: %w", err)
+			}
+		default:
+			return fmt.Errorf("unmarshal Playlists row: unhandled column: %s", row.ColumnName(i))
+		}
+	}
+	return nil
+}
+
+func (r *PlaylistsRow) Mutate() (string, []string, []interface{}) {
+	return "Playlists", r.ColumnNames(), []interface{}{
+		r.Id,
+	}
+}
+
+func (r *PlaylistsRow) MutateColumns(columns []string) (string, []string, []interface{}) {
+	if len(columns) == 0 {
+		columns = r.ColumnNames()
+	}
+	values := make([]interface{}, 0, len(columns))
+	for _, column := range columns {
+		switch column {
+		case "Id":
+			values = append(values, r.Id)
+		default:
+			panic(fmt.Errorf("table Playlists does not have column %s", column))
+		}
+	}
+	return "Playlists", columns, values
+}
+
+func (r *PlaylistsRow) MutatePresentColumns() (string, []string, []interface{}) {
+	columns := make([]string, 0, len(r.ColumnNames()))
+	columns = append(
+		columns,
+		"Id",
+	)
+	return r.MutateColumns(columns)
+}
+
+func (r *PlaylistsRow) Key() PlaylistsKey {
+	return PlaylistsKey{
+		Id: r.Id,
+	}
+}
+
 type LabelsKey struct {
 	LabelId int64
 }
@@ -645,6 +722,40 @@ func (k SongsKey) BoolExpr() spansql.BoolExpr {
 		LHS: b,
 		RHS: cmp2,
 	}
+	return spansql.Paren{Expr: b}
+}
+
+type PlaylistsKey struct {
+	Id int64
+}
+
+func (k PlaylistsKey) SpannerKey() spanner.Key {
+	return spanner.Key{
+		k.Id,
+	}
+}
+
+func (k PlaylistsKey) SpannerKeySet() spanner.KeySet {
+	return k.SpannerKey()
+}
+
+func (k PlaylistsKey) Delete() *spanner.Mutation {
+	return spanner.Delete("Playlists", k.SpannerKey())
+}
+
+func (PlaylistsKey) Order() []spansql.Order {
+	return []spansql.Order{
+		{Expr: spansql.ID("Id"), Desc: false},
+	}
+}
+
+func (k PlaylistsKey) BoolExpr() spansql.BoolExpr {
+	cmp0 := spansql.BoolExpr(spansql.ComparisonOp{
+		Op:  spansql.Eq,
+		LHS: spansql.ID("Id"),
+		RHS: spansql.IntegerLiteral(k.Id),
+	})
+	b := cmp0
 	return spansql.Paren{Expr: b}
 }
 
@@ -951,6 +1062,82 @@ func (i *bufferedSongsRowIterator) Do(f func(row *SongsRow) error) error {
 }
 
 func (i *bufferedSongsRowIterator) Stop() {}
+
+type PlaylistsRowIterator interface {
+	Next() (*PlaylistsRow, error)
+	Do(f func(row *PlaylistsRow) error) error
+	Stop()
+	Count() int64
+}
+
+type streamingPlaylistsRowIterator struct {
+	*spanner.RowIterator
+}
+
+func (i *streamingPlaylistsRowIterator) Next() (*PlaylistsRow, error) {
+	spannerRow, err := i.RowIterator.Next()
+	if err != nil {
+		return nil, err
+	}
+	var row PlaylistsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (i *streamingPlaylistsRowIterator) Do(f func(row *PlaylistsRow) error) error {
+	return i.RowIterator.Do(func(spannerRow *spanner.Row) error {
+		var row PlaylistsRow
+		if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+			return err
+		}
+		return f(&row)
+	})
+}
+
+func (i *streamingPlaylistsRowIterator) Count() int64 {
+	return i.RowCount
+}
+
+type bufferedPlaylistsRowIterator struct {
+	rows []*PlaylistsRow
+	err  error
+}
+
+func (i *bufferedPlaylistsRowIterator) Next() (*PlaylistsRow, error) {
+	if i.err != nil {
+		return nil, i.err
+	}
+	if len(i.rows) == 0 {
+		return nil, iterator.Done
+	}
+	next := i.rows[0]
+	i.rows = i.rows[1:]
+	return next, nil
+}
+
+func (i *bufferedPlaylistsRowIterator) Count() int64 {
+	return int64(len(i.rows))
+}
+
+func (i *bufferedPlaylistsRowIterator) Do(f func(row *PlaylistsRow) error) error {
+	for {
+		row, err := i.Next()
+		switch err {
+		case iterator.Done:
+			return nil
+		case nil:
+			if err = f(row); err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+}
+
+func (i *bufferedPlaylistsRowIterator) Stop() {}
 
 type ReadTransaction struct {
 	Tx SpannerReadTransaction
@@ -1638,6 +1825,116 @@ func (t ReadTransaction) ListSongsRows(
 		Params: params,
 	}
 	iter := &streamingSongsRowIterator{
+		RowIterator: t.Tx.Query(ctx, stmt),
+	}
+	return iter
+}
+
+func (t ReadTransaction) ReadPlaylistsRows(
+	ctx context.Context,
+	keySet spanner.KeySet,
+) PlaylistsRowIterator {
+	return &streamingPlaylistsRowIterator{
+		RowIterator: t.Tx.Read(
+			ctx,
+			"Playlists",
+			keySet,
+			((*PlaylistsRow)(nil)).ColumnNames(),
+		),
+	}
+}
+
+type GetPlaylistsRowQuery struct {
+	Key PlaylistsKey
+}
+
+func (t ReadTransaction) GetPlaylistsRow(
+	ctx context.Context,
+	query GetPlaylistsRowQuery,
+) (*PlaylistsRow, error) {
+	spannerRow, err := t.Tx.ReadRow(
+		ctx,
+		"Playlists",
+		query.Key.SpannerKey(),
+		((*PlaylistsRow)(nil)).ColumnNames(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	var row PlaylistsRow
+	if err := row.UnmarshalSpannerRow(spannerRow); err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+type BatchGetPlaylistsRowsQuery struct {
+	Keys []PlaylistsKey
+}
+
+func (t ReadTransaction) BatchGetPlaylistsRows(
+	ctx context.Context,
+	query BatchGetPlaylistsRowsQuery,
+) (map[PlaylistsKey]*PlaylistsRow, error) {
+	spannerKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	spannerPrefixKeys := make([]spanner.KeySet, 0, len(query.Keys))
+	for _, key := range query.Keys {
+		spannerKeys = append(spannerKeys, key.SpannerKey())
+		spannerPrefixKeys = append(spannerPrefixKeys, key.SpannerKey().AsPrefix())
+	}
+	foundRows := make(map[PlaylistsKey]*PlaylistsRow, len(query.Keys))
+	if err := t.ReadPlaylistsRows(ctx, spanner.KeySets(spannerKeys...)).Do(func(row *PlaylistsRow) error {
+		foundRows[row.Key()] = row
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return foundRows, nil
+}
+
+type ListPlaylistsRowsQuery struct {
+	Where  spansql.BoolExpr
+	Order  []spansql.Order
+	Limit  int32
+	Offset int64
+	Params map[string]interface{}
+}
+
+func (t ReadTransaction) ListPlaylistsRows(
+	ctx context.Context,
+	query ListPlaylistsRowsQuery,
+) PlaylistsRowIterator {
+	if len(query.Order) == 0 {
+		query.Order = PlaylistsKey{}.Order()
+	}
+	params := make(map[string]interface{}, len(query.Params)+2)
+	params["__limit"] = int64(query.Limit)
+	params["__offset"] = int64(query.Offset)
+	for param, value := range query.Params {
+		if _, ok := params[param]; ok {
+			panic(fmt.Errorf("invalid param: %s", param))
+		}
+		params[param] = value
+	}
+	if query.Where == nil {
+		query.Where = spansql.True
+	}
+	stmt := spanner.Statement{
+		SQL: spansql.Query{
+			Select: spansql.Select{
+				List: ((*PlaylistsRow)(nil)).ColumnExprs(),
+				From: []spansql.SelectFrom{
+					spansql.SelectFromTable{Table: "Playlists"},
+				},
+				Where: query.Where,
+			},
+			Order:  query.Order,
+			Limit:  spansql.Param("__limit"),
+			Offset: spansql.Param("__offset"),
+		}.SQL(),
+		Params: params,
+	}
+	iter := &streamingPlaylistsRowIterator{
 		RowIterator: t.Tx.Query(ctx, stmt),
 	}
 	return iter

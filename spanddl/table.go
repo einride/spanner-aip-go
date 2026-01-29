@@ -34,6 +34,8 @@ func (t *Table) applyAlterTable(stmt *spansql.AlterTable) error {
 		return t.applyAddRowDeletionPolicy(alteration)
 	case spansql.ReplaceRowDeletionPolicy:
 		return t.applyReplaceRowDeletionPolicy(alteration)
+	case spansql.RenameTo:
+		return t.applyRenameToAlteration(alteration)
 	default:
 		return fmt.Errorf("unhandled alteration (%s)", alteration.SQL())
 	}
@@ -151,6 +153,16 @@ func (t *Table) applyReplaceRowDeletionPolicy(alteration spansql.ReplaceRowDelet
 		return fmt.Errorf("column %s does not exist", alteration.RowDeletionPolicy.Column)
 	}
 	t.RowDeletionPolicy = &alteration.RowDeletionPolicy
+	return nil
+}
+
+func (t *Table) applyRenameToAlteration(alteration spansql.RenameTo) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("apply RENAME TO: %w", err)
+		}
+	}()
+	t.Name = alteration.ToName
 	return nil
 }
 
