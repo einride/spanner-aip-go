@@ -106,6 +106,15 @@ var descriptor = databaseDescriptor{
 			allowCommitTimestamp: false,
 		},
 	},
+	playlists: playlistsTableDescriptor{
+		tableID: "Playlists",
+		id: columnDescriptor{
+			columnID:             "Id",
+			columnType:           spansql.Type{Array: false, Base: 1, Len: 0, ProtoRef: ""},
+			notNull:              true,
+			allowCommitTimestamp: false,
+		},
+	},
 }
 
 type DatabaseDescriptor interface {
@@ -113,13 +122,15 @@ type DatabaseDescriptor interface {
 	Singers() SingersTableDescriptor
 	Albums() AlbumsTableDescriptor
 	Songs() SongsTableDescriptor
+	Playlists() PlaylistsTableDescriptor
 }
 
 type databaseDescriptor struct {
-	labels  labelsTableDescriptor
-	singers singersTableDescriptor
-	albums  albumsTableDescriptor
-	songs   songsTableDescriptor
+	labels    labelsTableDescriptor
+	singers   singersTableDescriptor
+	albums    albumsTableDescriptor
+	songs     songsTableDescriptor
+	playlists playlistsTableDescriptor
 }
 
 func (d *databaseDescriptor) Labels() LabelsTableDescriptor {
@@ -136,6 +147,10 @@ func (d *databaseDescriptor) Albums() AlbumsTableDescriptor {
 
 func (d *databaseDescriptor) Songs() SongsTableDescriptor {
 	return &d.songs
+}
+
+func (d *databaseDescriptor) Playlists() PlaylistsTableDescriptor {
+	return &d.playlists
 }
 
 type LabelsTableDescriptor interface {
@@ -402,6 +417,50 @@ func (d *songsTableDescriptor) TrackId() ColumnDescriptor {
 
 func (d *songsTableDescriptor) SongName() ColumnDescriptor {
 	return &d.songName
+}
+
+type PlaylistsTableDescriptor interface {
+	TableName() string
+	TableID() spansql.ID
+	ColumnNames() []string
+	ColumnIDs() []spansql.ID
+	ColumnExprs() []spansql.Expr
+	Id() ColumnDescriptor
+}
+
+type playlistsTableDescriptor struct {
+	tableID spansql.ID
+	id      columnDescriptor
+}
+
+func (d *playlistsTableDescriptor) TableName() string {
+	return string(d.tableID)
+}
+
+func (d *playlistsTableDescriptor) TableID() spansql.ID {
+	return d.tableID
+}
+
+func (d *playlistsTableDescriptor) ColumnNames() []string {
+	return []string{
+		"Id",
+	}
+}
+
+func (d *playlistsTableDescriptor) ColumnIDs() []spansql.ID {
+	return []spansql.ID{
+		"Id",
+	}
+}
+
+func (d *playlistsTableDescriptor) ColumnExprs() []spansql.Expr {
+	return []spansql.Expr{
+		spansql.ID("Id"),
+	}
+}
+
+func (d *playlistsTableDescriptor) Id() ColumnDescriptor {
+	return &d.id
 }
 
 type ColumnDescriptor interface {
