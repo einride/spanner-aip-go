@@ -125,6 +125,8 @@ func (t *Transpiler) transpileCallExpr(e *expr.Expr) (spansql.Expr, error) {
 		return t.transpileNotCallExpr(e)
 	case filtering.FunctionTimestamp:
 		return t.transpileTimestampCallExpr(e)
+	case filtering.FunctionFuzzySearch:
+		return t.transpileFuzzySearchCallExpr(e)
 	default:
 		return nil, fmt.Errorf("unsupported function call: %s", e.GetCallExpr().GetFunction())
 	}
@@ -348,6 +350,45 @@ func (t *Transpiler) transpileTimestampCallExpr(e *expr.Expr) (spansql.Expr, err
 		return nil, fmt.Errorf("invalid string arg to %s: %w", callExpr.GetFunction(), err)
 	}
 	return t.param(timeArg), nil
+}
+
+func (t *Transpiler) transpileFuzzySearchCallExpr(e *expr.Expr) (spansql.Expr, error) {
+	callExpr := e.GetCallExpr()
+	if len(callExpr.GetArgs()) != 2 {
+		return nil, fmt.Errorf(
+			"unexpected number of arguments to `%s`: %d", callExpr.GetFunction(), len(callExpr.GetArgs()),
+		)
+	}
+	columnsArg, ok := callExpr.GetArgs()[0].GetExprKind().(*expr.Expr_IdentExpr)
+	if !ok {
+		return nil, fmt.Errorf("expected constant string arg to %s", callExpr.GetFunction())
+	}
+
+	var searchKeyString string
+	if constExpr := callExpr.GetArgs()[1].GetConstExpr(); constExpr != nil {
+		searchKeyString = constExpr.GetStringValue()
+	}
+	if len(searchKeyString) < 2 {
+		return nil, fmt.Errorf("expected string with len >=2 as arg to %s", callExpr.GetFunction())
+	}
+
+	searchKey, err := t.transpileConstExpr(callExpr.GetArgs()[1])
+	if err != nil {
+		return nil, err
+	}
+
+	// This expression assumes that a column exists in the database which:
+	// - is named like the proto field being fuzzy searched, with a "_tokens" suffix, e.g.:
+	//    display_name -> display_name_tokens
+	// - stores the tokenized text for the proto field being fuzzy searched, e.g.:
+	//    TOKENIZE_SUBSTRING(display_name, ...)
+	return spansql.Func{
+		Name: "SEARCH_NGRAMS",
+		Args: []spansql.Expr{
+			spansql.ID(columnsArg.IdentExpr.GetName() + "_tokens"),
+			searchKey,
+		},
+	}, nil
 }
 
 func (t *Transpiler) param(param interface{}) spansql.Param {

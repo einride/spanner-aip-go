@@ -80,6 +80,36 @@ func TestTranspileFilter(t *testing.T) {
 		},
 
 		{
+			name:   "fuzzySearch",
+			filter: `fuzzySearch(display_name, "abc")`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name", filtering.TypeString),
+			},
+			expectedSQL: `(SEARCH_NGRAMS(display_name_token, @param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
+			},
+		},
+		{
+			name:   "invalid fuzzySearch input - non string",
+			filter: `fuzzySearch(display_name, 5)`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name_token", filtering.TypeString),
+			},
+			errorContains: "no matching overload found for calling 'fuzzySearch'",
+		},
+		{
+			name:   "invalid fuzzySearch input - short string",
+			filter: `fuzzySearch(display_name_token, "a")`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name_token", filtering.TypeString),
+			},
+			errorContains: "expected string with len >=2 as arg to fuzzySearch",
+		},
+		{
 			name:   "enum equality",
 			filter: `example_enum = ENUM_ONE`,
 			declarations: []filtering.DeclarationOption{
