@@ -130,6 +130,26 @@ func TestTranspileFilter(t *testing.T) {
 		},
 
 		{
+			name:   "has: field presence (field:* per AIP-160)",
+			filter: `optional_field:*`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("optional_field", filtering.TypeString),
+			},
+			expectedSQL: `(optional_field IS NOT NULL)`,
+		},
+
+		{
+			name:   "has: field is not present (field:* per AIP-160)",
+			filter: `NOT optional_field:*`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("optional_field", filtering.TypeString),
+			},
+			expectedSQL: `(NOT (optional_field IS NOT NULL))`,
+		},
+
+		{
 			name:   "empty filter",
 			filter: ``,
 			declarations: []filtering.DeclarationOption{

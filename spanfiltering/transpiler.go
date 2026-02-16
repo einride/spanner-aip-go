@@ -296,11 +296,24 @@ func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 	}
 	identExpr := callExpr.GetArgs()[0]
 	constExpr := callExpr.GetArgs()[1]
-	if identExpr.GetIdentExpr() == nil {
-		return nil, fmt.Errorf("TODO: add support for transpiling `:` where LHS is other than Ident")
-	}
 	if constExpr.GetConstExpr() == nil {
 		return nil, fmt.Errorf("TODO: add support for transpiling `:` where RHS is other than Const")
+	}
+	// AIP-160: field:* means "has" / presence check — true if field is set (IS NOT NULL in SQL).
+	if rhsString, ok := constExpr.GetConstExpr().GetConstantKind().(*expr.Constant_StringValue); ok &&
+		rhsString.StringValue == "*" {
+		lhsExpr, err := t.transpileExpr(identExpr)
+		if err != nil {
+			return nil, err
+		}
+		return spansql.IsOp{
+			LHS: lhsExpr,
+			Neg: true,
+			RHS: spansql.Null,
+		}, nil
+	}
+	if identExpr.GetIdentExpr() == nil {
+		return nil, fmt.Errorf("TODO: add support for transpiling `:` where LHS is other than Ident")
 	}
 	identType, ok := t.filter.CheckedExpr.GetTypeMap()[callExpr.GetArgs()[0].GetId()]
 	if !ok {
