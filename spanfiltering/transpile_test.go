@@ -1,11 +1,14 @@
 package spanfiltering
 
 import (
+	"errors"
 	"testing"
 	"time"
 
+	"cloud.google.com/go/spanner/spansql"
 	"go.einride.tech/aip/filtering"
 	syntaxv1 "go.einride.tech/aip/proto/gen/einride/example/syntax/v1"
+	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"gotest.tools/v3/assert"
 )
 
@@ -160,6 +163,41 @@ func TestTranspileFilter(t *testing.T) {
 			},
 			errorContains: "wildcard only supported in leading or trailing positions",
 		},
+		{
+			name:   "custom function",
+			filter: `hello("abc")`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareFunction("hello",
+					filtering.NewFunctionOverload(
+						"hallo_overload_1",
+						filtering.TypeBool,
+						filtering.TypeString,
+					),
+				),
+			},
+			expectedSQL: "(SQL_HALLO(@param_0))",
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
+			},
+			options: []TranspileOption{
+				WithCustomFunction("hello", transpileHelloFunction),
+			},
+		},
+		{
+			name:   "custom function can't override standard functions",
+			filter: `create_time > timestamp("2021-02-14T14:49:34+01:00")`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
+			},
+			expectedSQL: `(create_time > (@param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": mustParseTime(t, "2021-02-14T14:49:34+01:00"),
+			},
+			options: []TranspileOption{
+				WithCustomFunction("timestamp", transpileCustomTimestampFunction),
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -196,4 +234,27 @@ type mockRequest struct {
 
 func (m *mockRequest) GetFilter() string {
 	return m.filter
+}
+
+func transpileHelloFunction(transpiler *Transpiler, exp *expr.Expr) (spansql.Expr, error) {
+	callExpr := exp.GetCallExpr()
+	if len(callExpr.GetArgs()) != 1 {
+		return nil, errors.New("unexpected number of arguments")
+	}
+	val, err := transpiler.TranspileConstExpr(callExpr.GetArgs()[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return spansql.Func{
+		Name: "SQL_HALLO",
+		Args: []spansql.Expr{val},
+	}, nil
+}
+
+func transpileCustomTimestampFunction(_ *Transpiler, _ *expr.Expr) (spansql.Expr, error) {
+	return spansql.Func{
+		Name: "MY_OTHER_TIMESTAMP_FUNC",
+		Args: []spansql.Expr{},
+	}, nil
 }

@@ -28,14 +28,24 @@ func WithEnumValuesAsStrings() TranspileOption {
 	}
 }
 
+func WithCustomFunction(name string, impl func(*Transpiler, *expr.Expr) (spansql.Expr, error)) TranspileOption {
+	return func(options *transpileOptions) {
+		options.customFunctions[name] = impl
+	}
+}
+
 type transpileOptions struct {
 	enumValuesAsStrings bool
+	customFunctions     map[string](func(*Transpiler, *expr.Expr) (spansql.Expr, error))
 }
 
 func (t *Transpiler) Init(filter filtering.Filter, options ...TranspileOption) {
 	*t = Transpiler{
 		filter: filter,
 		params: make(map[string]interface{}),
+		options: transpileOptions{
+			customFunctions: map[string]func(*Transpiler, *expr.Expr) (spansql.Expr, error){},
+		},
 	}
 	for _, option := range options {
 		option(&t.options)
@@ -74,13 +84,13 @@ func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
 	case *expr.Expr_SelectExpr:
 		return t.transpileSelectExpr(e)
 	case *expr.Expr_ConstExpr:
-		return t.transpileConstExpr(e)
+		return t.TranspileConstExpr(e)
 	default:
 		return nil, fmt.Errorf("unsupported expr: %v", e)
 	}
 }
 
-func (t *Transpiler) transpileConstExpr(e *expr.Expr) (spansql.Expr, error) {
+func (t *Transpiler) TranspileConstExpr(e *expr.Expr) (spansql.Expr, error) {
 	switch kind := e.GetConstExpr().GetConstantKind().(type) {
 	case *expr.Constant_BoolValue:
 		return t.param(kind.BoolValue), nil
@@ -126,8 +136,23 @@ func (t *Transpiler) transpileCallExpr(e *expr.Expr) (spansql.Expr, error) {
 	case filtering.FunctionTimestamp:
 		return t.transpileTimestampCallExpr(e)
 	default:
+		expr, err := t.transpileCustomFunctionCallExpr(e)
+		if err != nil {
+			return nil, err
+		}
+		if expr != nil {
+			return expr, nil
+		}
 		return nil, fmt.Errorf("unsupported function call: %s", e.GetCallExpr().GetFunction())
 	}
+}
+
+func (t *Transpiler) transpileCustomFunctionCallExpr(e *expr.Expr) (spansql.Expr, error) {
+	functionName := e.GetCallExpr().GetFunction()
+	if customFunc, ok := t.options.customFunctions[functionName]; ok {
+		return customFunc(t, e)
+	}
+	return nil, nil
 }
 
 func (t *Transpiler) transpileIdentExpr(e *expr.Expr) (spansql.Expr, error) {
@@ -314,7 +339,7 @@ func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 		if err != nil {
 			return nil, err
 		}
-		con, err := t.transpileConstExpr(constExpr)
+		con, err := t.TranspileConstExpr(constExpr)
 		if err != nil {
 			return nil, err
 		}
