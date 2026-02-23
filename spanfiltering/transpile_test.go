@@ -241,7 +241,7 @@ func transpileHelloFunction(transpiler *Transpiler, exp *expr.Expr) (spansql.Exp
 	if len(callExpr.GetArgs()) != 1 {
 		return nil, errors.New("unexpected number of arguments")
 	}
-	val, err := transpiler.transpileConstExpr(callExpr.GetArgs()[0])
+	val, err := transpiler.TranspileConstExpr(callExpr.GetArgs()[0])
 	if err != nil {
 		return nil, err
 	}

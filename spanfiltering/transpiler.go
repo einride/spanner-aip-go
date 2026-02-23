@@ -84,13 +84,13 @@ func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
 	case *expr.Expr_SelectExpr:
 		return t.transpileSelectExpr(e)
 	case *expr.Expr_ConstExpr:
-		return t.transpileConstExpr(e)
+		return t.TranspileConstExpr(e)
 	default:
 		return nil, fmt.Errorf("unsupported expr: %v", e)
 	}
 }
 
-func (t *Transpiler) transpileConstExpr(e *expr.Expr) (spansql.Expr, error) {
+func (t *Transpiler) TranspileConstExpr(e *expr.Expr) (spansql.Expr, error) {
 	switch kind := e.GetConstExpr().GetConstantKind().(type) {
 	case *expr.Constant_BoolValue:
 		return t.param(kind.BoolValue), nil
@@ -339,7 +339,7 @@ func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 		if err != nil {
 			return nil, err
 		}
-		con, err := t.transpileConstExpr(constExpr)
+		con, err := t.TranspileConstExpr(constExpr)
 		if err != nil {
 			return nil, err
 		}
