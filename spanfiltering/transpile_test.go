@@ -160,6 +160,84 @@ func TestTranspileFilter(t *testing.T) {
 			},
 			errorContains: "wildcard only supported in leading or trailing positions",
 		},
+
+		{
+			name:   "searchNgrams: 2-arg basic",
+			filter: `searchNgrams(display_name, "abc")`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name", filtering.TypeString),
+				DeclareSearchNgramsFunction(),
+			},
+			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
+			},
+		},
+
+		{
+			name:   "searchNgrams: 5-arg all set",
+			filter: `searchNgrams(display_name, "abc", "en", 3, 0.8)`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name", filtering.TypeString),
+				DeclareSearchNgramsFunction(),
+			},
+			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0, ` +
+				`language_tag => @param_1, min_ngrams => @param_2, ` +
+				`min_ngrams_percent => @param_3))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
+				"param_1": "en",
+				"param_2": int64(3),
+				"param_3": float64(0.8),
+			},
+		},
+
+		{
+			name:   "searchNgrams: 5-arg skip language_tag",
+			filter: `searchNgrams(display_name, "abc", "", 3, 0.0)`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name", filtering.TypeString),
+				DeclareSearchNgramsFunction(),
+			},
+			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0, min_ngrams => @param_1))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
+				"param_1": int64(3),
+			},
+		},
+
+		{
+			name:   "searchNgrams: 5-arg skip all optional",
+			filter: `searchNgrams(display_name, "abc", "", 0, 0.0)`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name", filtering.TypeString),
+				DeclareSearchNgramsFunction(),
+			},
+			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
+			},
+		},
+
+		{
+			name:   "searchNgrams: combined with AND",
+			filter: `searchNgrams(display_name, "abc") AND author = "Karin Boye"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name", filtering.TypeString),
+				filtering.DeclareIdent("author", filtering.TypeString),
+				DeclareSearchNgramsFunction(),
+			},
+			expectedSQL: `((SEARCH_NGRAMS(display_name_tokens, @param_0)) AND (author = @param_1))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
+				"param_1": "Karin Boye",
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
