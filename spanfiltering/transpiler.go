@@ -13,6 +13,33 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
+// FunctionSearchNgrams is the function name for SEARCH_NGRAMS in filter expressions.
+const FunctionSearchNgrams = "searchNgrams"
+
+const (
+	tokenColumnSuffix = "_tokens"
+)
+
+// DeclareSearchNgramsFunction declares the searchNgrams function for use in filter expressions.
+// It declares two overloads:
+//   - 2-arg: searchNgrams(column, query) — required params only
+//   - 5-arg: searchNgrams(column, query, language_tag, min_ngrams, min_ngrams_percent) — all params
+func DeclareSearchNgramsFunction() filtering.DeclarationOption {
+	return filtering.DeclareFunction(
+		FunctionSearchNgrams,
+		filtering.NewFunctionOverload(
+			FunctionSearchNgrams+"_2",
+			filtering.TypeBool,
+			filtering.TypeString, filtering.TypeString,
+		),
+		filtering.NewFunctionOverload(
+			FunctionSearchNgrams+"_5",
+			filtering.TypeBool,
+			filtering.TypeString, filtering.TypeString, filtering.TypeString, filtering.TypeInt, filtering.TypeFloat,
+		),
+	)
+}
+
 type Transpiler struct {
 	filter       filtering.Filter
 	params       map[string]interface{}
@@ -125,6 +152,8 @@ func (t *Transpiler) transpileCallExpr(e *expr.Expr) (spansql.Expr, error) {
 		return t.transpileNotCallExpr(e)
 	case filtering.FunctionTimestamp:
 		return t.transpileTimestampCallExpr(e)
+	case FunctionSearchNgrams:
+		return t.transpileSearchNgramsCallExpr(e)
 	default:
 		return nil, fmt.Errorf("unsupported function call: %s", e.GetCallExpr().GetFunction())
 	}
@@ -360,4 +389,72 @@ func (t *Transpiler) nextParam() string {
 	param := "param_" + strconv.Itoa(t.paramCounter)
 	t.paramCounter++
 	return param
+}
+
+func (t *Transpiler) transpileSearchNgramsCallExpr(e *expr.Expr) (spansql.BoolExpr, error) {
+	callExpr := e.GetCallExpr()
+	args := callExpr.GetArgs()
+	if len(args) != 2 && len(args) != 5 {
+		return nil, fmt.Errorf(
+			"unexpected number of arguments to %s: %d (expected 2 or 5)",
+			callExpr.GetFunction(), len(args),
+		)
+	}
+	// Arg 0: column identifier → append _tokens suffix.
+	identExpr := args[0].GetIdentExpr()
+	if identExpr == nil {
+		return nil, fmt.Errorf("first argument to %s must be an identifier", callExpr.GetFunction())
+	}
+	tokenColumn := spansql.ID(identExpr.GetName() + tokenColumnSuffix)
+	// Arg 1: ngrams_query string, must be at least 2 characters.
+	queryConst := args[1].GetConstExpr()
+	if queryConst == nil {
+		return nil, fmt.Errorf("second argument to %s must be a string constant", callExpr.GetFunction())
+	}
+	_, ok := queryConst.GetConstantKind().(*expr.Constant_StringValue)
+	if !ok {
+		return nil, fmt.Errorf("second argument to %s must be a string constant", callExpr.GetFunction())
+	}
+	queryParam, err := t.transpileConstExpr(args[1])
+	if err != nil {
+		return nil, err
+	}
+	sqlArgs := []spansql.Expr{tokenColumn, queryParam}
+	// 5-arg form: optional named parameters.
+	if len(args) == 5 {
+		// Arg 2: language_tag (string, skip if empty).
+		langConst, ok := args[2].GetConstExpr().GetConstantKind().(*expr.Constant_StringValue)
+		if ok && langConst.StringValue != "" {
+			langParam, err := t.transpileConstExpr(args[2])
+			if err != nil {
+				return nil, err
+			}
+			sqlArgs = append(sqlArgs, spansql.DefinitionExpr{
+				Key: "language_tag", Value: langParam,
+			})
+		}
+		// Arg 3: min_ngrams (int64, skip if zero).
+		minConst, ok := args[3].GetConstExpr().GetConstantKind().(*expr.Constant_Int64Value)
+		if ok && minConst.Int64Value != 0 {
+			minParam, err := t.transpileConstExpr(args[3])
+			if err != nil {
+				return nil, err
+			}
+			sqlArgs = append(sqlArgs, spansql.DefinitionExpr{
+				Key: "min_ngrams", Value: minParam,
+			})
+		}
+		// Arg 4: min_ngrams_percent (float64, skip if zero).
+		pctConst, ok := args[4].GetConstExpr().GetConstantKind().(*expr.Constant_DoubleValue)
+		if ok && pctConst.DoubleValue != 0 {
+			pctParam, err := t.transpileConstExpr(args[4])
+			if err != nil {
+				return nil, err
+			}
+			sqlArgs = append(sqlArgs, spansql.DefinitionExpr{
+				Key: "min_ngrams_percent", Value: pctParam,
+			})
+		}
+	}
+	return spansql.Func{Name: "SEARCH_NGRAMS", Args: sqlArgs}, nil
 }
