@@ -16,10 +16,6 @@ import (
 // FunctionSearchNgrams is the function name for SEARCH_NGRAMS in filter expressions.
 const FunctionSearchNgrams = "searchNgrams"
 
-const (
-	tokenColumnSuffix = "_tokens"
-)
-
 // DeclareSearchNgramsFunction declares the searchNgrams function for use in filter expressions.
 // It declares two overloads:
 //   - 2-arg: searchNgrams(column, query) — required params only
@@ -400,12 +396,12 @@ func (t *Transpiler) transpileSearchNgramsCallExpr(e *expr.Expr) (spansql.BoolEx
 			callExpr.GetFunction(), len(args),
 		)
 	}
-	// Arg 0: column identifier → append _tokens suffix.
+	// Arg 0: column identifier
 	identExpr := args[0].GetIdentExpr()
 	if identExpr == nil {
 		return nil, fmt.Errorf("first argument to %s must be an identifier", callExpr.GetFunction())
 	}
-	tokenColumn := spansql.ID(identExpr.GetName() + tokenColumnSuffix)
+	tokenColumn := spansql.ID(identExpr.GetName())
 	// Arg 1: ngrams_query string, must be at least 2 characters.
 	queryConst := args[1].GetConstExpr()
 	if queryConst == nil {

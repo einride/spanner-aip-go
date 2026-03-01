@@ -163,10 +163,10 @@ func TestTranspileFilter(t *testing.T) {
 
 		{
 			name:   "searchNgrams: 2-arg basic",
-			filter: `searchNgrams(display_name, "abc")`,
+			filter: `searchNgrams(display_name_tokens, "abc")`,
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareStandardFunctions(),
-				filtering.DeclareIdent("display_name", filtering.TypeString),
+				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
 			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0))`,
@@ -177,10 +177,10 @@ func TestTranspileFilter(t *testing.T) {
 
 		{
 			name:   "searchNgrams: 5-arg all set",
-			filter: `searchNgrams(display_name, "abc", "en", 3, 0.8)`,
+			filter: `searchNgrams(display_name_tokens, "abc", "en", 3, 0.8)`,
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareStandardFunctions(),
-				filtering.DeclareIdent("display_name", filtering.TypeString),
+				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
 			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0, ` +
@@ -196,10 +196,10 @@ func TestTranspileFilter(t *testing.T) {
 
 		{
 			name:   "searchNgrams: 5-arg skip language_tag",
-			filter: `searchNgrams(display_name, "abc", "", 3, 0.0)`,
+			filter: `searchNgrams(display_name_tokens, "abc", "", 3, 0.0)`,
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareStandardFunctions(),
-				filtering.DeclareIdent("display_name", filtering.TypeString),
+				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
 			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0, min_ngrams => @param_1))`,
@@ -211,10 +211,10 @@ func TestTranspileFilter(t *testing.T) {
 
 		{
 			name:   "searchNgrams: 5-arg skip all optional",
-			filter: `searchNgrams(display_name, "abc", "", 0, 0.0)`,
+			filter: `searchNgrams(display_name_tokens, "abc", "", 0, 0.0)`,
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareStandardFunctions(),
-				filtering.DeclareIdent("display_name", filtering.TypeString),
+				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
 			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0))`,
@@ -225,10 +225,10 @@ func TestTranspileFilter(t *testing.T) {
 
 		{
 			name:   "searchNgrams: combined with AND",
-			filter: `searchNgrams(display_name, "abc") AND author = "Karin Boye"`,
+			filter: `searchNgrams(display_name_tokens, "abc") AND author = "Karin Boye"`,
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareStandardFunctions(),
-				filtering.DeclareIdent("display_name", filtering.TypeString),
+				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				filtering.DeclareIdent("author", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
