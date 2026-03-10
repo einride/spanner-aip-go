@@ -314,6 +314,11 @@ func (t *Transpiler) transpileBinaryLogicalCallExpr(
 	}, nil
 }
 
+func isHasWildcard(e *expr.Expr) bool {
+	sv, ok := e.GetConstExpr().GetConstantKind().(*expr.Constant_StringValue)
+	return ok && sv.StringValue == "*"
+}
+
 func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error) {
 	callExpr := e.GetCallExpr()
 	if len(callExpr.GetArgs()) != 2 {
@@ -348,8 +353,39 @@ func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 			LHS:    con,
 			RHS:    []spansql.Expr{iden},
 		}, nil
+	// String: wildcard checks presence (non-null and non-empty, i.e. not the proto default).
+	case identType.GetPrimitive() == expr.Type_STRING:
+		if !isHasWildcard(constExpr) {
+			return nil, fmt.Errorf("unsupported: HAS operator on string only supports wildcard (:*)")
+		}
+		col, err := t.transpileIdentExpr(identExpr)
+		if err != nil {
+			return nil, err
+		}
+		return spansql.LogicalOp{
+			Op:  spansql.And,
+			LHS: spansql.IsOp{LHS: col, Neg: true, RHS: spansql.Null},
+			RHS: spansql.ComparisonOp{Op: spansql.Ne, LHS: col, RHS: t.param("")},
+		}, nil
+	// Timestamp: wildcard checks presence (non-null and not the proto default).
+	// The proto default for google.protobuf.Timestamp is UTC Epoch (seconds: 0, nanos: 0).
+	case identType.GetWellKnown() == expr.Type_TIMESTAMP:
+		if !isHasWildcard(constExpr) {
+			return nil, fmt.Errorf("unsupported: HAS operator on timestamp only supports wildcard (:*)")
+		}
+		col, err := t.transpileIdentExpr(identExpr)
+		if err != nil {
+			return nil, err
+		}
+		return spansql.LogicalOp{
+			Op:  spansql.And,
+			LHS: spansql.IsOp{LHS: col, Neg: true, RHS: spansql.Null},
+			RHS: spansql.ComparisonOp{Op: spansql.Ne, LHS: col, RHS: t.param(time.Unix(0, 0).UTC())},
+		}, nil
 	default:
-		return nil, fmt.Errorf("TODO: add support for transpiling `:` on other types than repeated primitives")
+		return nil, fmt.Errorf(
+			"TODO: add support for transpiling `:` on other types than repeated primitives, strings and timestamps",
+		)
 	}
 }
 

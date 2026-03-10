@@ -162,6 +162,88 @@ func TestTranspileFilter(t *testing.T) {
 		},
 
 		{
+			name:   "has: timestamp wildcard",
+			filter: `create_time:*`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
+			},
+			expectedSQL: `(create_time IS NOT NULL AND create_time != @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": time.Unix(0, 0).UTC(),
+			},
+		},
+
+		{
+			name:   "has: timestamp exact match",
+			filter: `create_time:"2021-02-14T14:49:34+01:00"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
+			},
+			errorContains: "only supports wildcard",
+		},
+
+		{
+			name:   "has: negated timestamp wildcard",
+			filter: `NOT create_time:*`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
+			},
+			expectedSQL: `(NOT (create_time IS NOT NULL AND create_time != @param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": time.Unix(0, 0).UTC(),
+			},
+		},
+
+		{
+			name:   "has: negated timestamp exact match",
+			filter: `NOT create_time:"2021-02-14T14:49:34+01:00"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
+			},
+			errorContains: "only supports wildcard",
+		},
+
+		{
+			name:   "has: string wildcard",
+			filter: `name:*`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("name", filtering.TypeString),
+			},
+			expectedSQL: `(name IS NOT NULL AND name != @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": "",
+			},
+		},
+
+		{
+			name:   "has: negated string wildcard",
+			filter: `NOT name:*`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("name", filtering.TypeString),
+			},
+			expectedSQL: `(NOT (name IS NOT NULL AND name != @param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "",
+			},
+		},
+
+		{
+			name:   "has: string exact match",
+			filter: `name:"John"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("name", filtering.TypeString),
+			},
+			errorContains: "only supports wildcard",
+		},
+
+		{
 			name:   "searchNgrams: 2-arg basic",
 			filter: `searchNgrams(display_name_tokens, "abc")`,
 			declarations: []filtering.DeclarationOption{
