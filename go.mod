@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/spanner v1.86.1
 	github.com/google/go-cmp v0.7.0
 	github.com/stoewer/go-strcase v1.3.1
-	go.einride.tech/aip v0.75.0
+	go.einride.tech/aip v0.82.0
 	golang.org/x/sync v0.18.0
 	google.golang.org/api v0.256.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba
