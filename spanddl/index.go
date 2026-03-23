@@ -11,3 +11,16 @@ type Index struct {
 	Storing      []spansql.ID
 	Interleave   spansql.ID
 }
+
+type SearchIndex struct {
+	Name    spansql.ID
+	Table   spansql.ID
+	Columns []spansql.KeyPart
+
+	Storing        []spansql.ID
+	PartitionBy    []spansql.ID
+	OrderBy        []spansql.Order
+	WhereIsNotNull []spansql.ID
+	Interleave     spansql.ID
+	Options        spansql.SearchIndexOptions
+}

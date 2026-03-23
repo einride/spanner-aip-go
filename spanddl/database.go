@@ -13,6 +13,8 @@ type Database struct {
 	Tables []*Table
 	// Indexes in the database.
 	Indexes []*Index
+	// Search indexes in the database
+	SearchIndexes []*SearchIndex
 }
 
 // Table looks up a table with the provided name.
@@ -28,6 +30,16 @@ func (d *Database) Table(name spansql.ID) (*Table, bool) {
 // Index looks up an index with the provided name.
 func (d *Database) Index(name spansql.ID) (*Index, bool) {
 	for _, index := range d.Indexes {
+		if index.Name == name {
+			return index, true
+		}
+	}
+	return nil, false
+}
+
+// Index looks up an index with the provided name.
+func (d *Database) SearchIndex(name spansql.ID) (*SearchIndex, bool) {
+	for _, index := range d.SearchIndexes {
 		if index.Name == name {
 			return index, true
 		}
@@ -57,6 +69,10 @@ func (d *Database) applyDDLStmt(stmt spansql.DDLStmt) error {
 		return d.applyCreateIndex(stmt)
 	case *spansql.DropIndex:
 		return d.applyDropIndex(stmt)
+	case *spansql.CreateSearchIndex:
+		return d.applyCreateSearchIndex(stmt)
+	case *spansql.DropSearchIndex:
+		return d.applyDropSearchIndex(stmt)
 	default:
 		return fmt.Errorf("unsupported DDL statement: (%s)", stmt.SQL())
 	}
@@ -180,6 +196,55 @@ func (d *Database) indexOfTable(name spansql.ID) int {
 
 func (d *Database) indexOfIndex(name spansql.ID) int {
 	for i, index := range d.Indexes {
+		if index.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+func (d *Database) applyCreateSearchIndex(stmt *spansql.CreateSearchIndex) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("CREATE SEARCH INDEX: %w", err)
+		}
+	}()
+	if _, ok := d.SearchIndex(stmt.Name); ok {
+		return fmt.Errorf("search index %s already exists", stmt.Name)
+	}
+	if _, ok := d.Table(stmt.Table); !ok {
+		return fmt.Errorf("table %s does not exist", stmt.Table)
+	}
+	d.SearchIndexes = append(d.SearchIndexes, &SearchIndex{
+		Name:           stmt.Name,
+		Table:          stmt.Table,
+		Columns:        stmt.Columns,
+		Storing:        stmt.Storing,
+		Interleave:     stmt.Interleave,
+		PartitionBy:    stmt.PartitionBy,
+		OrderBy:        stmt.OrderBy,
+		WhereIsNotNull: stmt.WhereIsNotNull,
+		Options:        stmt.Options,
+	})
+	return nil
+}
+
+func (d *Database) applyDropSearchIndex(stmt *spansql.DropSearchIndex) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("DROP SEARCH INDEX: %w", err)
+		}
+	}()
+	i := d.indexOfSearchIndex(stmt.Name)
+	if i == -1 {
+		return fmt.Errorf("search index %s does not exist", stmt.Name)
+	}
+	d.SearchIndexes = append(d.SearchIndexes[:i], d.SearchIndexes[i+1:]...)
+	return nil
+}
+
+func (d *Database) indexOfSearchIndex(name spansql.ID) int {
+	for i, index := range d.SearchIndexes {
 		if index.Name == name {
 			return i
 		}

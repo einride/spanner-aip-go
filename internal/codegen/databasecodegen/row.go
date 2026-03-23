@@ -51,7 +51,7 @@ func (g RowCodeGenerator) Nil() string {
 func (g RowCodeGenerator) GenerateCode(f *codegen.File) {
 	f.P()
 	f.P("type ", g.Type(), " struct {")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		g.generateColumn(f, column)
 	}
 	for _, interleavedTable := range g.Table.InterleavedTables {
@@ -82,7 +82,7 @@ func (g RowCodeGenerator) generateValidateFunction(f *codegen.File) {
 	fmtPkg := f.Import("fmt")
 	f.P()
 	f.P("func (r *", g.Type(), ") Validate() error {")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		if column.Type.Array && column.NotNull {
 			f.P("if r.", g.ColumnFieldName(column), " == nil {")
 			f.P(`return `, fmtPkg, `.Errorf("array column `, column.Name, ` is nil")`)
@@ -116,7 +116,7 @@ func (g RowCodeGenerator) generateUnmarshalFunction(f *codegen.File) {
 	f.P("func (r *", g.Type(), ") UnmarshalSpannerRow(row *", spannerPkg, ".Row) error {")
 	f.P("for i := 0; i < row.Size(); i++ {")
 	f.P("switch row.ColumnName(i) {")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P("case ", strconv.Quote(string(column.Name)), ":")
 		f.P("if err := row.Column(i, &r.", g.ColumnFieldName(column), "); err != nil {")
 		f.P(`return `, fmtPkg, `.Errorf("unmarshal `, g.Table.Name, ` row: `, column.Name, ` column: %w", err)`)
@@ -143,7 +143,7 @@ func (g RowCodeGenerator) generateMutationFunction(f *codegen.File) {
 	f.P()
 	f.P("func (r *", g.Type(), ") Mutate() (string, []string, []interface{}) {")
 	f.P("return ", strconv.Quote(string(g.Table.Name)), ", r.", g.ColumnNamesMethod(), "(), []interface{}{")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P("r.", g.ColumnFieldName(column), ",")
 	}
 	f.P("}")
@@ -160,7 +160,7 @@ func (g RowCodeGenerator) generateMutationForColumnsFunction(f *codegen.File) {
 	f.P("values := make([]interface{}, 0, len(columns))")
 	f.P("for _, column := range columns {")
 	f.P("switch column {")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P("case ", strconv.Quote(string(column.Name)), ":")
 		f.P("values = append(values, r.", g.ColumnFieldName(column), ")")
 	}
@@ -179,14 +179,14 @@ func (g RowCodeGenerator) generateMutationForPresentColumnsFunction(f *codegen.F
 	// non-nullable fields
 	f.P("columns = append(")
 	f.P("columns,")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		if column.NotNull {
 			f.P(strconv.Quote(string(column.Name)), ",")
 		}
 	}
 	f.P(")")
 	// nullable fields
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		if column.NotNull {
 			continue
 		}
@@ -217,7 +217,7 @@ func (g RowCodeGenerator) generateColumnNamesFunctions(f *codegen.File) {
 	f.P()
 	f.P("func (*", g.Type(), ") ", g.ColumnNamesMethod(), "() []string {")
 	f.P("return []string{")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P(strconv.Quote(string(column.Name)), ",")
 	}
 	f.P("}")
@@ -225,7 +225,7 @@ func (g RowCodeGenerator) generateColumnNamesFunctions(f *codegen.File) {
 	f.P()
 	f.P("func (*", g.Type(), ") ", g.ColumnIDsMethod(), "() []", spansqlPkg, ".ID {")
 	f.P("return []", spansqlPkg, ".ID{")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P(strconv.Quote(string(column.Name)), ",")
 	}
 	f.P("}")
@@ -233,7 +233,7 @@ func (g RowCodeGenerator) generateColumnNamesFunctions(f *codegen.File) {
 	f.P()
 	f.P("func (*", g.Type(), ") ", g.ColumnExprsMethod(), "() []", spansqlPkg, ".Expr {")
 	f.P("return []", spansqlPkg, ".Expr{")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P("", spansqlPkg, ".ID(", strconv.Quote(string(column.Name)), "),")
 	}
 	f.P("}")

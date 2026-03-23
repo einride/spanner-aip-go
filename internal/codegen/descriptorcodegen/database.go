@@ -110,7 +110,7 @@ func (g DatabaseDescriptorCodeGenerator) generateGlobalVariable(f *codegen.File)
 		tableDescriptor := TableDescriptorCodeGenerator{Table: table}
 		f.P(g.tableDescriptorField(table), ": ", tableDescriptor.StructType(), "{")
 		f.P("tableID: ", strconv.Quote(string(table.Name)), ",")
-		for _, column := range table.Columns {
+		for column := range table.QueryableColumns() {
 			columnDescriptor := GenericColumnDescriptorCodeGenerator{}
 			f.P(g.columnDescriptorField(column), ": ", columnDescriptor.StructType(), "{")
 			f.P("columnID: ", strconv.Quote(string(column.Name)), ",")
