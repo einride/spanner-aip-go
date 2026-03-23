@@ -59,7 +59,7 @@ func (g TableDescriptorCodeGenerator) generateInterface(f *codegen.File) {
 	f.P(g.ColumnNamesMethod(), "() []string")
 	f.P(g.ColumnIDsMethod(), "() []", spansqlPkg, ".ID")
 	f.P(g.ColumnExprsMethod(), "() []", spansqlPkg, ".Expr")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P(g.ColumnDescriptorMethod(column), "() ", genericColumnDescriptor.InterfaceType())
 	}
 	f.P("}")
@@ -71,7 +71,7 @@ func (g TableDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	f.P()
 	f.P("type ", g.StructType(), " struct {")
 	f.P("tableID ", spansqlPkg, ".ID")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P(g.columnDescriptorField(column), " ", genericColumnDescriptor.StructType())
 	}
 	f.P("}")
@@ -86,7 +86,7 @@ func (g TableDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	f.P()
 	f.P("func (d *", g.StructType(), ") ", g.ColumnNamesMethod(), "() []string {")
 	f.P("return []string{")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P(strconv.Quote(string(column.Name)), ",")
 	}
 	f.P("}")
@@ -94,7 +94,7 @@ func (g TableDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	f.P()
 	f.P("func (d *", g.StructType(), ") ", g.ColumnIDsMethod(), "() []", spansqlPkg, ".ID {")
 	f.P("return []", spansqlPkg, ".ID{")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P(strconv.Quote(string(column.Name)), ",")
 	}
 	f.P("}")
@@ -102,12 +102,12 @@ func (g TableDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	f.P()
 	f.P("func (d *", g.StructType(), ") ", g.ColumnExprsMethod(), "() []", spansqlPkg, ".Expr {")
 	f.P("return []", spansqlPkg, ".Expr{")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P(spansqlPkg, ".ID(", strconv.Quote(string(column.Name)), "),")
 	}
 	f.P("}")
 	f.P("}")
-	for _, column := range g.Table.Columns {
+	for column := range g.Table.QueryableColumns() {
 		f.P()
 		f.P("func (d *", g.StructType(), ") ", g.ColumnDescriptorMethod(column), "() ColumnDescriptor", " {")
 		f.P("return &d.", g.columnDescriptorField(column))

@@ -2,6 +2,7 @@ package spanddl
 
 import (
 	"fmt"
+	"iter"
 
 	"cloud.google.com/go/spanner/spansql"
 )
@@ -48,6 +49,26 @@ func (t *Table) Column(name spansql.ID) (*Column, bool) {
 		}
 	}
 	return nil, false
+}
+
+// QueryableColumns returns all columns from the parsed DDL that are available in  SELECT statements.
+func (t *Table) QueryableColumns() iter.Seq[*Column] {
+	return func(yield func(*Column) bool) {
+		for _, column := range t.Columns {
+			// Tokenlist columns exist to support spanner full-text-search
+			// https://docs.cloud.google.com/spanner/docs/full-text-search/tokenization
+			// And are not declared as a Data Type in GoogleSQL for spanner
+			// https://docs.cloud.google.com/spanner/docs/reference/standard-sql/data-types
+			// It is therefore appropriate for most purposes to ignore such columns,
+			// e.g. for code generation purposes.
+			if column.Type.Base == spansql.Tokenlist {
+				continue
+			}
+			if !yield(column) {
+				return
+			}
+		}
+	}
 }
 
 func (t *Table) applyAddColumnAlteration(alteration spansql.AddColumn) (err error) {

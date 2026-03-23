@@ -440,6 +440,116 @@ func TestDatabase_ApplyDDL(t *testing.T) {
 				Indexes: []*Index{},
 			},
 		},
+		{
+			name: "create table with tokenlist column",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  SingerId   INT64 NOT NULL,
+					SingerIdTokens TOKENLIST AS (TOKENIZE_NGRAMS(SingerId)) HIDDEN,
+				) PRIMARY KEY(SingerId);`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+							{Name: "SingerIdTokens", Type: spansql.Type{Base: spansql.Tokenlist}},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "alter table with tokenlist column",
+			ddls: []string{
+				`CREATE TABLE Singers (
+				  SingerId   INT64 NOT NULL,
+				) PRIMARY KEY(SingerId);`,
+
+				`ALTER TABLE Singers ADD COLUMN SingerIdTokens TOKENLIST AS (TOKENIZE_NGRAMS(SingerId)) HIDDEN;`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+							{Name: "SingerIdTokens", Type: spansql.Type{Base: spansql.Tokenlist}},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create search index",
+			ddls: []string{
+				`CREATE TABLE Singers (
+						  SingerId   INT64 NOT NULL,
+							SingerIdTokens TOKENLIST AS (TOKENIZE_NGRAMS(SingerId)) HIDDEN,
+						) PRIMARY KEY(SingerId);`,
+				`CREATE SEARCH INDEX SingerIdTokensIndex ON Singers(SingerIdTokens);`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+							{Name: "SingerIdTokens", Type: spansql.Type{Base: spansql.Tokenlist}},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+					},
+				},
+				SearchIndexes: []*SearchIndex{
+					{
+						Name:  "SingerIdTokensIndex",
+						Table: "Singers",
+						Columns: []spansql.KeyPart{
+							{Column: "SingerIdTokens"},
+						},
+					},
+				},
+			},
+			errorDdlIndex: 0,
+			errorContains: "",
+		},
+		{
+			name: "drop search index",
+			ddls: []string{
+				`CREATE TABLE Singers (
+						  SingerId   INT64 NOT NULL,
+							SingerIdTokens TOKENLIST AS (TOKENIZE_NGRAMS(SingerId)) HIDDEN,
+						) PRIMARY KEY(SingerId);`,
+				`CREATE SEARCH INDEX SingerIdTokensIndex ON Singers(SingerIdTokens);`,
+				`DROP SEARCH INDEX SingerIdTokensIndex;`,
+			},
+			expected: &Database{
+				Tables: []*Table{
+					{
+						Name: "Singers",
+						Columns: []*Column{
+							{Name: "SingerId", Type: spansql.Type{Base: spansql.Int64}, NotNull: true},
+							{Name: "SingerIdTokens", Type: spansql.Type{Base: spansql.Tokenlist}},
+						},
+						PrimaryKey: []spansql.KeyPart{
+							{Column: "SingerId"},
+						},
+					},
+				},
+				SearchIndexes: []*SearchIndex{},
+			},
+			errorDdlIndex: 0,
+			errorContains: "",
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
