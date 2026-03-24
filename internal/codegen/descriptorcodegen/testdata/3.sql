@@ -3,6 +3,9 @@ CREATE TABLE Singers (
   FirstName  STRING(1024),
   LastName   STRING(1024),
   SingerInfo BYTES(MAX),
+  FirstNameTokens TOKENLIST AS (TOKENIZE_SUBSTRING(FirstName)) HIDDEN,
 ) PRIMARY KEY (SingerId);
 
 CREATE INDEX SingersByFirstLastName ON Singers(FirstName, LastName);
+
+CREATE SEARCH INDEX SingersFirstNameTokens ON Singers(FirstNameTokens);

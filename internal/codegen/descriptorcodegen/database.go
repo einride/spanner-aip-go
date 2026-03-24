@@ -34,6 +34,10 @@ func (g DatabaseDescriptorCodeGenerator) IndexDescriptorMethod(index *spanddl.In
 	return strcase.UpperCamelCase(string(index.Name))
 }
 
+func (g DatabaseDescriptorCodeGenerator) SearchIndexDescriptorMethod(index *spanddl.SearchIndex) string {
+	return strcase.UpperCamelCase(string(index.Name))
+}
+
 func (g DatabaseDescriptorCodeGenerator) GenerateCode(f *codegen.File) {
 	g.generateGlobalFunction(f)
 	g.generateGlobalVariable(f)
@@ -44,6 +48,9 @@ func (g DatabaseDescriptorCodeGenerator) GenerateCode(f *codegen.File) {
 	}
 	for _, index := range g.Database.Indexes {
 		IndexDescriptorCodeGenerator{Index: index}.GenerateCode(f)
+	}
+	for _, searchIndex := range g.Database.SearchIndexes {
+		SearchIndexDescriptorCodeGenerator{SeachIndex: searchIndex}.GenerateCode(f)
 	}
 	GenericColumnDescriptorCodeGenerator{}.GenerateCode(f)
 }
@@ -66,6 +73,10 @@ func (g DatabaseDescriptorCodeGenerator) generateInterface(f *codegen.File) {
 		indexDescriptor := IndexDescriptorCodeGenerator{Index: index}
 		f.P(g.IndexDescriptorMethod(index), "() ", indexDescriptor.InterfaceType())
 	}
+	for _, searchIndex := range g.Database.SearchIndexes {
+		searchIndexDescriptor := SearchIndexDescriptorCodeGenerator{SeachIndex: searchIndex}
+		f.P(g.SearchIndexDescriptorMethod(searchIndex), "() ", searchIndexDescriptor.InterfaceType())
+	}
 	f.P("}")
 }
 
@@ -79,6 +90,10 @@ func (g DatabaseDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	for _, index := range g.Database.Indexes {
 		indexDescriptor := IndexDescriptorCodeGenerator{Index: index}
 		f.P(g.indexDescriptorField(index), " ", indexDescriptor.StructType())
+	}
+	for _, searchIndex := range g.Database.SearchIndexes {
+		searchIndexDescriptor := SearchIndexDescriptorCodeGenerator{SeachIndex: searchIndex}
+		f.P(g.searchIndexDescriptorField(searchIndex), " ", searchIndexDescriptor.StructType())
 	}
 	f.P("}")
 	for _, table := range g.Database.Tables {
@@ -101,6 +116,16 @@ func (g DatabaseDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 		f.P("return &d.", g.indexDescriptorField(index))
 		f.P("}")
 	}
+	for _, searchIndex := range g.Database.SearchIndexes {
+		indexDescriptor := SearchIndexDescriptorCodeGenerator{SeachIndex: searchIndex}
+		f.P()
+		f.P(
+			"func (d *", g.StructType(), ") ",
+			g.SearchIndexDescriptorMethod(searchIndex), "() ", indexDescriptor.InterfaceType(), " {",
+		)
+		f.P("return &d.", g.searchIndexDescriptorField(searchIndex))
+		f.P("}")
+	}
 }
 
 func (g DatabaseDescriptorCodeGenerator) generateGlobalVariable(f *codegen.File) {
@@ -110,7 +135,7 @@ func (g DatabaseDescriptorCodeGenerator) generateGlobalVariable(f *codegen.File)
 		tableDescriptor := TableDescriptorCodeGenerator{Table: table}
 		f.P(g.tableDescriptorField(table), ": ", tableDescriptor.StructType(), "{")
 		f.P("tableID: ", strconv.Quote(string(table.Name)), ",")
-		for column := range table.QueryableColumns() {
+		for _, column := range table.Columns {
 			columnDescriptor := GenericColumnDescriptorCodeGenerator{}
 			f.P(g.columnDescriptorField(column), ": ", columnDescriptor.StructType(), "{")
 			f.P("columnID: ", strconv.Quote(string(column.Name)), ",")
@@ -135,6 +160,12 @@ func (g DatabaseDescriptorCodeGenerator) generateGlobalVariable(f *codegen.File)
 		}
 		f.P("},")
 	}
+	for _, searchIndex := range g.Database.SearchIndexes {
+		indexDescriptor := SearchIndexDescriptorCodeGenerator{SeachIndex: searchIndex}
+		f.P(g.searchIndexDescriptorField(searchIndex), ": ", indexDescriptor.StructType(), "{")
+		f.P("indexID: ", strconv.Quote(string(searchIndex.Name)), ",")
+		f.P("},")
+	}
 	f.P("}")
 }
 
@@ -143,6 +174,10 @@ func (g DatabaseDescriptorCodeGenerator) tableDescriptorField(table *spanddl.Tab
 }
 
 func (g DatabaseDescriptorCodeGenerator) indexDescriptorField(index *spanddl.Index) string {
+	return strcase.LowerCamelCase(string(index.Name))
+}
+
+func (g DatabaseDescriptorCodeGenerator) searchIndexDescriptorField(index *spanddl.SearchIndex) string {
 	return strcase.LowerCamelCase(string(index.Name))
 }
 

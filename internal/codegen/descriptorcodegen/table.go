@@ -59,7 +59,7 @@ func (g TableDescriptorCodeGenerator) generateInterface(f *codegen.File) {
 	f.P(g.ColumnNamesMethod(), "() []string")
 	f.P(g.ColumnIDsMethod(), "() []", spansqlPkg, ".ID")
 	f.P(g.ColumnExprsMethod(), "() []", spansqlPkg, ".Expr")
-	for column := range g.Table.QueryableColumns() {
+	for _, column := range g.Table.Columns {
 		f.P(g.ColumnDescriptorMethod(column), "() ", genericColumnDescriptor.InterfaceType())
 	}
 	f.P("}")
@@ -71,7 +71,7 @@ func (g TableDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	f.P()
 	f.P("type ", g.StructType(), " struct {")
 	f.P("tableID ", spansqlPkg, ".ID")
-	for column := range g.Table.QueryableColumns() {
+	for _, column := range g.Table.Columns {
 		f.P(g.columnDescriptorField(column), " ", genericColumnDescriptor.StructType())
 	}
 	f.P("}")
@@ -107,7 +107,7 @@ func (g TableDescriptorCodeGenerator) generateStruct(f *codegen.File) {
 	}
 	f.P("}")
 	f.P("}")
-	for column := range g.Table.QueryableColumns() {
+	for _, column := range g.Table.Columns {
 		f.P()
 		f.P("func (d *", g.StructType(), ") ", g.ColumnDescriptorMethod(column), "() ColumnDescriptor", " {")
 		f.P("return &d.", g.columnDescriptorField(column))

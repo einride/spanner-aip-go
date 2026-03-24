@@ -18,14 +18,16 @@ type SingersTableDescriptor interface {
 	FirstName() ColumnDescriptor
 	LastName() ColumnDescriptor
 	SingerInfo() ColumnDescriptor
+	FirstNameTokens() ColumnDescriptor
 }
 
 type singersTableDescriptor struct {
-	tableID    spansql.ID
-	singerId   columnDescriptor
-	firstName  columnDescriptor
-	lastName   columnDescriptor
-	singerInfo columnDescriptor
+	tableID         spansql.ID
+	singerId        columnDescriptor
+	firstName       columnDescriptor
+	lastName        columnDescriptor
+	singerInfo      columnDescriptor
+	firstNameTokens columnDescriptor
 }
 
 func (d *singersTableDescriptor) TableName() string {
@@ -77,6 +79,10 @@ func (d *singersTableDescriptor) LastName() ColumnDescriptor {
 
 func (d *singersTableDescriptor) SingerInfo() ColumnDescriptor {
 	return &d.singerInfo
+}
+
+func (d *singersTableDescriptor) FirstNameTokens() ColumnDescriptor {
+	return &d.firstNameTokens
 }
 
 type ColumnDescriptor interface {
