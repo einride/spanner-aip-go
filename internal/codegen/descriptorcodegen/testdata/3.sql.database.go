@@ -39,6 +39,12 @@ var descriptor = databaseDescriptor{
 			notNull:              false,
 			allowCommitTimestamp: false,
 		},
+		firstNameTokens: columnDescriptor{
+			columnID:             "FirstNameTokens",
+			columnType:           spansql.Type{Array: false, Base: 11, Len: 0, ProtoRef: ""},
+			notNull:              false,
+			allowCommitTimestamp: false,
+		},
 	},
 	singersByFirstLastName: singersByFirstLastNameIndexDescriptor{
 		indexID: "SingersByFirstLastName",
@@ -49,16 +55,21 @@ var descriptor = databaseDescriptor{
 			columnID: "LastName",
 		},
 	},
+	singersFirstNameTokens: singersFirstNameTokensSearchIndexDescriptor{
+		indexID: "SingersFirstNameTokens",
+	},
 }
 
 type DatabaseDescriptor interface {
 	Singers() SingersTableDescriptor
 	SingersByFirstLastName() SingersByFirstLastNameIndexDescriptor
+	SingersFirstNameTokens() SingersFirstNameTokensSearchIndexDescriptor
 }
 
 type databaseDescriptor struct {
 	singers                singersTableDescriptor
 	singersByFirstLastName singersByFirstLastNameIndexDescriptor
+	singersFirstNameTokens singersFirstNameTokensSearchIndexDescriptor
 }
 
 func (d *databaseDescriptor) Singers() SingersTableDescriptor {
@@ -67,6 +78,10 @@ func (d *databaseDescriptor) Singers() SingersTableDescriptor {
 
 func (d *databaseDescriptor) SingersByFirstLastName() SingersByFirstLastNameIndexDescriptor {
 	return &d.singersByFirstLastName
+}
+
+func (d *databaseDescriptor) SingersFirstNameTokens() SingersFirstNameTokensSearchIndexDescriptor {
+	return &d.singersFirstNameTokens
 }
 
 type SingersTableDescriptor interface {
@@ -79,14 +94,16 @@ type SingersTableDescriptor interface {
 	FirstName() ColumnDescriptor
 	LastName() ColumnDescriptor
 	SingerInfo() ColumnDescriptor
+	FirstNameTokens() ColumnDescriptor
 }
 
 type singersTableDescriptor struct {
-	tableID    spansql.ID
-	singerId   columnDescriptor
-	firstName  columnDescriptor
-	lastName   columnDescriptor
-	singerInfo columnDescriptor
+	tableID         spansql.ID
+	singerId        columnDescriptor
+	firstName       columnDescriptor
+	lastName        columnDescriptor
+	singerInfo      columnDescriptor
+	firstNameTokens columnDescriptor
 }
 
 func (d *singersTableDescriptor) TableName() string {
@@ -140,6 +157,10 @@ func (d *singersTableDescriptor) SingerInfo() ColumnDescriptor {
 	return &d.singerInfo
 }
 
+func (d *singersTableDescriptor) FirstNameTokens() ColumnDescriptor {
+	return &d.firstNameTokens
+}
+
 type SingersByFirstLastNameIndexDescriptor interface {
 	IndexName() string
 	IndexID() spansql.ID
@@ -191,6 +212,23 @@ func (d *singersByFirstLastNameIndexDescriptor) FirstName() ColumnDescriptor {
 
 func (d *singersByFirstLastNameIndexDescriptor) LastName() ColumnDescriptor {
 	return &d.lastName
+}
+
+type SingersFirstNameTokensSearchIndexDescriptor interface {
+	IndexName() string
+	IndexID() spansql.ID
+}
+
+type singersFirstNameTokensSearchIndexDescriptor struct {
+	indexID spansql.ID
+}
+
+func (d *singersFirstNameTokensSearchIndexDescriptor) IndexName() string {
+	return string(d.indexID)
+}
+
+func (d *singersFirstNameTokensSearchIndexDescriptor) IndexID() spansql.ID {
+	return d.indexID
 }
 
 type ColumnDescriptor interface {
