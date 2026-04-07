@@ -28,7 +28,6 @@ func TestTranspileFilter(t *testing.T) {
 			},
 			expectedSQL: "read",
 		},
-
 		{
 			name:   "negated simple flag",
 			filter: "NOT read",
@@ -101,6 +100,77 @@ func TestTranspileFilter(t *testing.T) {
 			expectedSQL: `(example_enum = @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "ENUM_ONE",
+			},
+		},
+
+		{
+			name:    "enum equality as strings with table alias",
+			options: []TranspileOption{WithEnumValuesAsStrings(), WithTableAlias("t")},
+			filter:  `example_enum = ENUM_ONE`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
+			},
+			expectedSQL: `(t.example_enum = @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": "ENUM_ONE",
+			},
+		},
+
+		{
+			name:    "string equality with table alias",
+			options: []TranspileOption{WithTableAlias("t")},
+			filter:  `author = "Karin Boye" AND NOT read`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+				filtering.DeclareIdent("read", filtering.TypeBool),
+			},
+			expectedSQL: `((t.author = @param_0) AND (NOT (t.read)))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "Karin Boye",
+			},
+		},
+
+		{
+			name:    "substring matching with table alias",
+			options: []TranspileOption{WithTableAlias("t")},
+			filter:  `author = "*Boye*"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+			},
+			expectedSQL: `(t.author LIKE @param_0)`,
+			expectedParams: map[string]interface{}{
+				"param_0": "%Boye%",
+			},
+		},
+
+		{
+			name:    "has repeated string with table alias",
+			options: []TranspileOption{WithTableAlias("t")},
+			filter:  `repeated_string:"value"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("repeated_string", filtering.TypeList(filtering.TypeString)),
+			},
+			expectedSQL: `(@param_0 IN UNNEST(t.repeated_string))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "value",
+			},
+		},
+
+		{
+			name:    "searchNgrams with table alias",
+			options: []TranspileOption{WithTableAlias("t")},
+			filter:  `searchNgrams(display_name_tokens, "abc")`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
+				DeclareSearchNgramsFunction(),
+			},
+			expectedSQL: `(SEARCH_NGRAMS(t.display_name_tokens, @param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "abc",
 			},
 		},
 
