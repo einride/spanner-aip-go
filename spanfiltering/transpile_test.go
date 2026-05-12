@@ -1,6 +1,8 @@
 package spanfiltering
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -320,6 +322,129 @@ func TestTranspileFilter(t *testing.T) {
 				"param_1": "Karin Boye",
 			},
 		},
+
+		{
+			name:   "or-fold: same column two strings",
+			filter: `id = "a" OR id = "b"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("id", filtering.TypeString),
+			},
+			expectedSQL: `(id IN UNNEST(@param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": []string{"a", "b"},
+			},
+		},
+
+		{
+			name:   "or-fold: preserves value order",
+			filter: `id = "b" OR id = "a"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("id", filtering.TypeString),
+			},
+			expectedSQL: `(id IN UNNEST(@param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": []string{"b", "a"},
+			},
+		},
+
+		{
+			name:   "or-fold: int64",
+			filter: `count = 1 OR count = 2 OR count = 3`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("count", filtering.TypeInt),
+			},
+			expectedSQL: `(count IN UNNEST(@param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": []int64{1, 2, 3},
+			},
+		},
+
+		{
+			name:   "or-fold: mixed columns",
+			filter: `a = 1 OR b = 2 OR a = 3`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("a", filtering.TypeInt),
+				filtering.DeclareIdent("b", filtering.TypeInt),
+			},
+			expectedSQL: `((a IN UNNEST(@param_0)) OR (b = @param_1))`,
+			expectedParams: map[string]interface{}{
+				"param_0": []int64{1, 3},
+				"param_1": int64(2),
+			},
+		},
+
+		{
+			name:   "or-no-fold: mixed ops same column",
+			filter: `id = "a" OR id > "b"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("id", filtering.TypeString),
+			},
+			expectedSQL: `((id = @param_0) OR (id > @param_1))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "a",
+				"param_1": "b",
+			},
+		},
+
+		{
+			name:   "or-fold: nested in AND",
+			filter: `(id = "a" OR id = "b") AND read`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("id", filtering.TypeString),
+				filtering.DeclareIdent("read", filtering.TypeBool),
+			},
+			expectedSQL: `((id IN UNNEST(@param_0)) AND read)`,
+			expectedParams: map[string]interface{}{
+				"param_0": []string{"a", "b"},
+			},
+		},
+
+		{
+			name:   "or-fold: enum values as int",
+			filter: `example_enum = ENUM_ONE OR example_enum = ENUM_TWO`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
+			},
+			expectedSQL: `(example_enum IN UNNEST(@param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": []int64{1, 2},
+			},
+		},
+
+		{
+			name:    "or-fold: enum values as strings",
+			options: []TranspileOption{WithEnumValuesAsStrings()},
+			filter:  `example_enum = ENUM_ONE OR example_enum = ENUM_TWO`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
+			},
+			expectedSQL: `(example_enum IN UNNEST(@param_0))`,
+			expectedParams: map[string]interface{}{
+				"param_0": []string{"ENUM_ONE", "ENUM_TWO"},
+			},
+		},
+
+		{
+			name:   "or-no-fold: substring match in chain",
+			filter: `author = "*x*" OR author = "y"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+			},
+			expectedSQL: `((author LIKE @param_0) OR (author = @param_1))`,
+			expectedParams: map[string]interface{}{
+				"param_0": "%x%",
+				"param_1": "y",
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -341,6 +466,35 @@ func TestTranspileFilter(t *testing.T) {
 			assert.DeepEqual(t, tt.expectedParams, params)
 		})
 	}
+}
+
+// TestTranspileFilter_LargeOrChainFoldsToInUnnest exercises the 75-OR
+// Spanner planner limit. Without the OR fold, a chain of 80 equality
+// disjuncts on the same column would emit 79 nested LogicalOp{Or} nodes
+// and Spanner would reject the query with "Number of nested boolean
+// predicates exceeds the maximum allowed limit of 75".
+func TestTranspileFilter_LargeOrChainFoldsToInUnnest(t *testing.T) {
+	t.Parallel()
+	const n = 80
+	ids := make([]string, n)
+	parts := make([]string, n)
+	for i := 0; i < n; i++ {
+		ids[i] = fmt.Sprintf("id-%02d", i)
+		parts[i] = fmt.Sprintf(`correlation_id = "id-%02d"`, i)
+	}
+	filterStr := strings.Join(parts, " OR ")
+	declarations, err := filtering.NewDeclarations(
+		filtering.DeclareStandardFunctions(),
+		filtering.DeclareIdent("correlation_id", filtering.TypeString),
+	)
+	assert.NilError(t, err)
+	filter, err := filtering.ParseFilter(&mockRequest{filter: filterStr}, declarations)
+	assert.NilError(t, err)
+	actual, params, err := TranspileFilter(filter)
+	assert.NilError(t, err)
+	assert.Equal(t, `(correlation_id IN UNNEST(@param_0))`, actual.SQL())
+	assert.Equal(t, 0, strings.Count(actual.SQL(), " OR "))
+	assert.DeepEqual(t, map[string]interface{}{"param_0": ids}, params)
 }
 
 func mustParseTime(t *testing.T, s string) time.Time {

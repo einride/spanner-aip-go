@@ -291,6 +291,9 @@ func (t *Transpiler) transpileBinaryLogicalCallExpr(
 			len(callExpr.GetArgs()),
 		)
 	}
+	if op == spansql.Or {
+		return t.transpileOrCallExpr(e)
+	}
 	lhsExpr, err := t.transpileExpr(callExpr.GetArgs()[0])
 	if err != nil {
 		return nil, err
@@ -318,6 +321,261 @@ func isHasWildcard(e *expr.Expr) bool {
 	sv, ok := e.GetConstExpr().GetConstantKind().(*expr.Constant_StringValue)
 	return ok && sv.StringValue == "*"
 }
+
+// transpileOrCallExpr collapses chains of `col = X OR col = Y OR …` on the
+// same column into a single `col IN UNNEST(@param)` predicate. This keeps
+// the resulting spansql tree shallow and side-steps Spanner's 75-deep limit
+// on nested boolean function calls. Leaves that don't match the foldable
+// `column = constant` shape are passed through unchanged.
+func (t *Transpiler) transpileOrCallExpr(e *expr.Expr) (spansql.BoolExpr, error) {
+	leaves := flattenOr(e)
+	type bucket struct {
+		colExpr    *expr.Expr
+		kind       valueKind
+		values     []interface{}
+		origLeaves []*expr.Expr
+	}
+	buckets := map[string]*bucket{}
+	type slot struct {
+		bucketKey string
+		leaf      *expr.Expr
+	}
+	var slots []slot
+	seen := map[string]struct{}{}
+	for _, leaf := range leaves {
+		key, k, v, colExpr, ok := t.classifyEqLeaf(leaf)
+		if !ok {
+			slots = append(slots, slot{leaf: leaf})
+			continue
+		}
+		b, exists := buckets[key]
+		if !exists {
+			b = &bucket{colExpr: colExpr, kind: k}
+			buckets[key] = b
+		} else if b.kind != k {
+			slots = append(slots, slot{leaf: leaf})
+			continue
+		}
+		b.values = append(b.values, v)
+		b.origLeaves = append(b.origLeaves, leaf)
+		if _, ok := seen[key]; !ok {
+			seen[key] = struct{}{}
+			slots = append(slots, slot{bucketKey: key})
+		}
+	}
+	disjuncts := make([]spansql.BoolExpr, 0, len(slots))
+	for _, s := range slots {
+		if s.bucketKey != "" {
+			b := buckets[s.bucketKey]
+			if len(b.values) >= 2 {
+				col, err := t.transpileExpr(b.colExpr)
+				if err != nil {
+					return nil, err
+				}
+				arr, err := t.arrayParam(b.values, b.kind)
+				if err != nil {
+					return nil, err
+				}
+				disjuncts = append(disjuncts, spansql.InOp{
+					Unnest: true,
+					LHS:    col,
+					RHS:    []spansql.Expr{arr},
+				})
+				continue
+			}
+			tr, err := t.transpileExpr(b.origLeaves[0])
+			if err != nil {
+				return nil, err
+			}
+			be, ok := tr.(spansql.BoolExpr)
+			if !ok {
+				return nil, fmt.Errorf("unexpected argument to `%s`: not a bool expr", filtering.FunctionOr)
+			}
+			disjuncts = append(disjuncts, be)
+			continue
+		}
+		tr, err := t.transpileExpr(s.leaf)
+		if err != nil {
+			return nil, err
+		}
+		be, ok := tr.(spansql.BoolExpr)
+		if !ok {
+			return nil, fmt.Errorf("unexpected argument to `%s`: not a bool expr", filtering.FunctionOr)
+		}
+		disjuncts = append(disjuncts, be)
+	}
+	// Raw InOp disjuncts are emitted without parens; transpileExpr wraps
+	// CallExpr results in Paren, but the OR fold short-circuits that path.
+	// When joining multiple disjuncts, wrap each InOp explicitly so the
+	// output style matches ((a = @p0) OR (b = @p1)).
+	if len(disjuncts) > 1 {
+		for i := range disjuncts {
+			if _, isIn := disjuncts[i].(spansql.InOp); isIn {
+				disjuncts[i] = spansql.Paren{Expr: disjuncts[i]}
+			}
+		}
+	}
+	return joinOr(disjuncts), nil
+}
+
+// classifyEqLeaf reports whether leaf is a foldable `column = constant`
+// expression. When true it returns the column-path key, the value kind, the
+// extracted scalar value, and the column subexpression.
+func (t *Transpiler) classifyEqLeaf(leaf *expr.Expr) (string, valueKind, interface{}, *expr.Expr, bool) {
+	call := leaf.GetCallExpr()
+	if call == nil || call.GetFunction() != filtering.FunctionEquals || len(call.GetArgs()) != 2 {
+		return "", 0, nil, nil, false
+	}
+	if t.isSubstringMatchExpr(leaf) {
+		return "", 0, nil, nil, false
+	}
+	lhs := call.GetArgs()[0]
+	key, ok := columnPathKey(lhs)
+	if !ok {
+		return "", 0, nil, nil, false
+	}
+	v, kind, ok := t.extractEqRHSValue(call.GetArgs()[1])
+	if !ok {
+		return "", 0, nil, nil, false
+	}
+	return key, kind, v, lhs, true
+}
+
+// flattenOr walks an OR-tree depth-first and returns its leaves in source
+// order. A leaf is any node whose call expression is not filtering.FunctionOr.
+func flattenOr(e *expr.Expr) []*expr.Expr {
+	var leaves []*expr.Expr
+	var walk func(*expr.Expr)
+	walk = func(n *expr.Expr) {
+		call := n.GetCallExpr()
+		if call != nil && call.GetFunction() == filtering.FunctionOr && len(call.GetArgs()) == 2 {
+			walk(call.GetArgs()[0])
+			walk(call.GetArgs()[1])
+			return
+		}
+		leaves = append(leaves, n)
+	}
+	walk(e)
+	return leaves
+}
+
+// columnPathKey returns a stable dotted string key for a column path
+// expression (chained SelectExpr over IdentExpr, or plain IdentExpr) and
+// ok=true. For any other shape it returns ok=false.
+func columnPathKey(e *expr.Expr) (string, bool) {
+	if ident := e.GetIdentExpr(); ident != nil {
+		return ident.GetName(), true
+	}
+	if sel := e.GetSelectExpr(); sel != nil {
+		parent, ok := columnPathKey(sel.GetOperand())
+		if !ok {
+			return "", false
+		}
+		return parent + "." + sel.GetField(), true
+	}
+	return "", false
+}
+
+// extractEqRHSValue returns the scalar Go value (and its kind) that the
+// given RHS of an = comparison would bind. It handles ConstExpr literals
+// and enum IdentExpr values, mirroring the enum-resolution branch of
+// transpileIdentExpr. Returns ok=false for anything else.
+func (t *Transpiler) extractEqRHSValue(rhs *expr.Expr) (interface{}, valueKind, bool) {
+	if c := rhs.GetConstExpr(); c != nil {
+		switch v := c.GetConstantKind().(type) {
+		case *expr.Constant_StringValue:
+			return v.StringValue, kindString, true
+		case *expr.Constant_Int64Value:
+			return v.Int64Value, kindInt64, true
+		case *expr.Constant_Uint64Value:
+			return int64(v.Uint64Value), kindInt64, true
+		case *expr.Constant_DoubleValue:
+			return v.DoubleValue, kindDouble, true
+		case *expr.Constant_BoolValue:
+			return v.BoolValue, kindBool, true
+		}
+		return nil, 0, false
+	}
+	ident := rhs.GetIdentExpr()
+	if ident == nil {
+		return nil, 0, false
+	}
+	rhsType, ok := t.filter.CheckedExpr.GetTypeMap()[rhs.GetId()]
+	if !ok {
+		return nil, 0, false
+	}
+	msgName := rhsType.GetMessageType()
+	if msgName == "" {
+		return nil, 0, false
+	}
+	enumType, err := protoregistry.GlobalTypes.FindEnumByName(protoreflect.FullName(msgName))
+	if err != nil {
+		return nil, 0, false
+	}
+	enumValue := enumType.Descriptor().Values().ByName(protoreflect.Name(ident.GetName()))
+	if enumValue == nil {
+		return nil, 0, false
+	}
+	if t.options.enumValuesAsStrings {
+		return string(enumValue.Name()), kindString, true
+	}
+	return int64(enumValue.Number()), kindInt64, true
+}
+
+// arrayParam binds a homogeneous slice of values as a single ARRAY param
+// and returns its reference. The kind determines the concrete slice type.
+func (t *Transpiler) arrayParam(values []interface{}, kind valueKind) (spansql.Param, error) {
+	switch kind {
+	case kindString:
+		s := make([]string, len(values))
+		for i, v := range values {
+			s[i] = v.(string)
+		}
+		return t.param(s), nil
+	case kindInt64:
+		s := make([]int64, len(values))
+		for i, v := range values {
+			s[i] = v.(int64)
+		}
+		return t.param(s), nil
+	case kindDouble:
+		s := make([]float64, len(values))
+		for i, v := range values {
+			s[i] = v.(float64)
+		}
+		return t.param(s), nil
+	case kindBool:
+		s := make([]bool, len(values))
+		for i, v := range values {
+			s[i] = v.(bool)
+		}
+		return t.param(s), nil
+	}
+	return "", fmt.Errorf("arrayParam: unsupported value kind %d", kind)
+}
+
+// joinOr reduces a slice of disjuncts into a left-skewed LogicalOp{Or}
+// chain. A single element is returned unwrapped.
+func joinOr(disjuncts []spansql.BoolExpr) spansql.BoolExpr {
+	result := disjuncts[0]
+	for i := 1; i < len(disjuncts); i++ {
+		result = spansql.LogicalOp{
+			Op:  spansql.Or,
+			LHS: result,
+			RHS: disjuncts[i],
+		}
+	}
+	return result
+}
+
+type valueKind int
+
+const (
+	kindString valueKind = iota + 1
+	kindInt64
+	kindDouble
+	kindBool
+)
 
 func (t *Transpiler) transpileHasCallExpr(e *expr.Expr) (spansql.BoolExpr, error) {
 	callExpr := e.GetCallExpr()
