@@ -87,11 +87,12 @@ func (t *Transpiler) Transpile() (spansql.BoolExpr, map[string]interface{}, erro
 func (t *Transpiler) transpileExpr(e *expr.Expr) (spansql.Expr, error) {
 	switch e.GetExprKind().(type) {
 	case *expr.Expr_CallExpr:
-		result, err := t.transpileCallExpr(e)
-		if err != nil {
-			return nil, err
-		}
-		return spansql.Paren{Expr: result}, nil
+		// Parentheses are added where needed for precedence in
+		// transpileBinaryLogicalCallExpr and transpileNotCallExpr, so the call
+		// expression is returned as-is here. Adding parentheses around every
+		// call would defeat Spanner's flattening of associative AND/OR chains
+		// and make long filters hit the nested-predicate depth limit.
+		return t.transpileCallExpr(e)
 	case *expr.Expr_IdentExpr:
 		return t.transpileIdentExpr(e)
 	case *expr.Expr_SelectExpr:
@@ -210,8 +211,42 @@ func (t *Transpiler) transpileNotCallExpr(e *expr.Expr) (spansql.BoolExpr, error
 	}
 	return spansql.LogicalOp{
 		Op:  spansql.Not,
-		RHS: rhsBoolExpr,
+		RHS: parenthesize(rhsBoolExpr, logicalPrecedence(spansql.LogicalOp{Op: spansql.Not})),
 	}, nil
+}
+
+// logicalPrecedence returns the binding precedence of a bool expression, used to
+// decide where parentheses are required. Higher binds tighter. Only the logical
+// operators OR/AND/NOT need disambiguation; comparisons, IN, IS, function calls
+// and atoms all bind tighter than any logical operator.
+// Note that Spanner and AIP has different precedence rules for AND vs OR: Spanner
+// binds AND tighter, while AIP binds them equally and evaluates left-to-right.
+// AIP: https://google.aip.dev/160#logical-operators
+// Spanner: https://docs.cloud.google.com/spanner/docs/reference/standard-sql/operators
+func logicalPrecedence(e spansql.BoolExpr) int {
+	if op, ok := e.(spansql.LogicalOp); ok {
+		switch op.Op {
+		case spansql.Or:
+			return 1
+		case spansql.And:
+			return 2
+		case spansql.Not:
+			return 3
+		}
+	}
+	return 4
+}
+
+// parenthesize wraps child in parentheses only when its operator binds looser
+// than the parent context requires. This preserves semantics while omitting
+// redundant parentheses, which would otherwise defeat Spanner's flattening of
+// associative AND/OR chains and make long filters hit the nested-predicate
+// depth limit.
+func parenthesize(child spansql.BoolExpr, parentPrecedence int) spansql.BoolExpr {
+	if logicalPrecedence(child) < parentPrecedence {
+		return spansql.Paren{Expr: child}
+	}
+	return child
 }
 
 func (t *Transpiler) transpileComparisonCallExpr(
@@ -307,10 +342,11 @@ func (t *Transpiler) transpileBinaryLogicalCallExpr(
 	if !ok {
 		return nil, fmt.Errorf("unexpected arguments to `%s` rhs not a bool expr", callExpr.GetFunction())
 	}
+	precedence := logicalPrecedence(spansql.LogicalOp{Op: op})
 	return spansql.LogicalOp{
 		Op:  op,
-		LHS: lhsBoolExpr,
-		RHS: rhsBoolExpr,
+		LHS: parenthesize(lhsBoolExpr, precedence),
+		RHS: parenthesize(rhsBoolExpr, precedence),
 	}, nil
 }
 

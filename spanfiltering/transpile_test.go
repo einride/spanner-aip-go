@@ -36,7 +36,22 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("read", filtering.TypeBool),
 			},
-			expectedSQL: "(NOT read)",
+			expectedSQL: "NOT read",
+		},
+
+		{
+			name:   "negated comparison drops parentheses",
+			filter: `NOT author = "Karin Boye"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+			},
+			// A comparison binds tighter than NOT, so the parentheses the
+			// transpiler used to emit are redundant and are now omitted.
+			expectedSQL: `NOT author = @param_0`,
+			expectedParams: map[string]interface{}{
+				"param_0": "Karin Boye",
+			},
 		},
 
 		{
@@ -47,9 +62,44 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("author", filtering.TypeString),
 				filtering.DeclareIdent("read", filtering.TypeBool),
 			},
-			expectedSQL: `((author = @param_0) AND (NOT read))`,
+			expectedSQL: `author = @param_0 AND NOT read`,
 			expectedParams: map[string]interface{}{
 				"param_0": "Karin Boye",
+			},
+		},
+
+		{
+			name:   "or chain flattens without parentheses",
+			filter: `author = "a" OR author = "b" OR author = "c"`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+			},
+			// Flat (unparenthesized) so Spanner can flatten the associative OR
+			// chain instead of counting it toward the nested-predicate limit.
+			expectedSQL: `author = @param_0 OR author = @param_1 OR author = @param_2`,
+			expectedParams: map[string]interface{}{
+				"param_0": "a",
+				"param_1": "b",
+				"param_2": "c",
+			},
+		},
+
+		{
+			name:   "precedence-significant parentheses are kept",
+			filter: `author = "a" OR author = "b" AND read`,
+			declarations: []filtering.DeclarationOption{
+				filtering.DeclareStandardFunctions(),
+				filtering.DeclareIdent("author", filtering.TypeString),
+				filtering.DeclareIdent("read", filtering.TypeBool),
+			},
+			// AIP-160 binds OR tighter than AND, so this parses as
+			// (author = a OR author = b) AND read; the paren must survive into
+			// SQL, where AND binds tighter.
+			expectedSQL: `(author = @param_0 OR author = @param_1) AND read`,
+			expectedParams: map[string]interface{}{
+				"param_0": "a",
+				"param_1": "b",
 			},
 		},
 
@@ -60,7 +110,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("author", filtering.TypeString),
 			},
-			expectedSQL: `(author != @param_0)`,
+			expectedSQL: `author != @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": "Karin Boye",
 			},
@@ -73,7 +123,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
 			},
-			expectedSQL: `(create_time > (@param_0))`,
+			expectedSQL: `create_time > @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": mustParseTime(t, "2021-02-14T14:49:34+01:00"),
 			},
@@ -85,7 +135,7 @@ func TestTranspileFilter(t *testing.T) {
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
 			},
-			expectedSQL: `(example_enum = @param_0)`,
+			expectedSQL: `example_enum = @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": int64(1),
 			},
@@ -98,7 +148,7 @@ func TestTranspileFilter(t *testing.T) {
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
 			},
-			expectedSQL: `(example_enum = @param_0)`,
+			expectedSQL: `example_enum = @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": "ENUM_ONE",
 			},
@@ -110,7 +160,7 @@ func TestTranspileFilter(t *testing.T) {
 			declarations: []filtering.DeclarationOption{
 				filtering.DeclareEnumIdent("example_enum", syntaxv1.Enum(0).Type()),
 			},
-			expectedSQL: `(example_enum != @param_0)`,
+			expectedSQL: `example_enum != @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": int64(1),
 			},
@@ -123,7 +173,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("repeated_string", filtering.TypeList(filtering.TypeString)),
 			},
-			expectedSQL: `(@param_0 IN UNNEST(repeated_string))`,
+			expectedSQL: `@param_0 IN UNNEST(repeated_string)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "value",
 			},
@@ -145,7 +195,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("author", filtering.TypeString),
 			},
-			expectedSQL: `(author LIKE @param_0)`,
+			expectedSQL: `author LIKE @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": "%Boye%",
 			},
@@ -168,7 +218,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
 			},
-			expectedSQL: `(create_time IS NOT NULL AND create_time != @param_0)`,
+			expectedSQL: `create_time IS NOT NULL AND create_time != @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": time.Unix(0, 0).UTC(),
 			},
@@ -191,7 +241,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
 			},
-			expectedSQL: `(NOT (create_time IS NOT NULL AND create_time != @param_0))`,
+			expectedSQL: `NOT (create_time IS NOT NULL AND create_time != @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": time.Unix(0, 0).UTC(),
 			},
@@ -214,7 +264,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("name", filtering.TypeString),
 			},
-			expectedSQL: `(name IS NOT NULL AND name != @param_0)`,
+			expectedSQL: `name IS NOT NULL AND name != @param_0`,
 			expectedParams: map[string]interface{}{
 				"param_0": "",
 			},
@@ -227,7 +277,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("name", filtering.TypeString),
 			},
-			expectedSQL: `(NOT (name IS NOT NULL AND name != @param_0))`,
+			expectedSQL: `NOT (name IS NOT NULL AND name != @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "",
 			},
@@ -251,7 +301,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
-			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0))`,
+			expectedSQL: `SEARCH_NGRAMS(display_name_tokens, @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "abc",
 			},
@@ -265,9 +315,9 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
-			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0, ` +
+			expectedSQL: `SEARCH_NGRAMS(display_name_tokens, @param_0, ` +
 				`language_tag => @param_1, min_ngrams => @param_2, ` +
-				`min_ngrams_percent => @param_3))`,
+				`min_ngrams_percent => @param_3)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "abc",
 				"param_1": "en",
@@ -284,7 +334,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
-			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0, min_ngrams => @param_1))`,
+			expectedSQL: `SEARCH_NGRAMS(display_name_tokens, @param_0, min_ngrams => @param_1)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "abc",
 				"param_1": int64(3),
@@ -299,7 +349,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("display_name_tokens", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
-			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0))`,
+			expectedSQL: `SEARCH_NGRAMS(display_name_tokens, @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "abc",
 			},
@@ -314,7 +364,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("author", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
-			expectedSQL: `((SEARCH_NGRAMS(display_name_tokens, @param_0)) AND (author = @param_1))`,
+			expectedSQL: `SEARCH_NGRAMS(display_name_tokens, @param_0) AND author = @param_1`,
 			expectedParams: map[string]interface{}{
 				"param_0": "abc",
 				"param_1": "Karin Boye",
