@@ -77,6 +77,14 @@ func (t *Transpiler) Transpile() (spansql.BoolExpr, map[string]interface{}, erro
 	if !ok {
 		return nil, nil, fmt.Errorf("not a bool expr")
 	}
+	// Parenthesize a top-level AND/OR so callers can safely embed the result
+	// in a larger clause (e.g. `base_condition AND <result>`) without the
+	// surrounding operators capturing its operands. The single wrapping adds
+	// only one level toward Spanner's nested-predicate limit. A top-level NOT
+	// binds tighter than AND and OR and needs no wrapping.
+	if op, ok := resultBoolExpr.(spansql.LogicalOp); ok && op.Op != spansql.Not {
+		resultBoolExpr = spansql.Paren{Expr: resultBoolExpr}
+	}
 	params := t.params
 	if t.paramCounter == 0 {
 		params = nil

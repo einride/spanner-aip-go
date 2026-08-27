@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/spanner/spansql"
 	"go.einride.tech/aip/filtering"
 	syntaxv1 "go.einride.tech/aip/proto/gen/einride/example/syntax/v1"
 	"gotest.tools/v3/assert"
@@ -62,7 +63,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("author", filtering.TypeString),
 				filtering.DeclareIdent("read", filtering.TypeBool),
 			},
-			expectedSQL: `author = @param_0 AND NOT read`,
+			expectedSQL: `(author = @param_0 AND NOT read)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "Karin Boye",
 			},
@@ -75,9 +76,11 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("author", filtering.TypeString),
 			},
-			// Flat (unparenthesized) so Spanner can flatten the associative OR
+			// The OR chain is flat so Spanner can flatten the associative
 			// chain instead of counting it toward the nested-predicate limit.
-			expectedSQL: `author = @param_0 OR author = @param_1 OR author = @param_2`,
+			// A single top-level paren makes the result safe to embed in a
+			// larger clause and adds only one level toward the limit.
+			expectedSQL: `(author = @param_0 OR author = @param_1 OR author = @param_2)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "a",
 				"param_1": "b",
@@ -96,7 +99,7 @@ func TestTranspileFilter(t *testing.T) {
 			// AIP-160 binds OR tighter than AND, so this parses as
 			// (author = a OR author = b) AND read; the paren must survive into
 			// SQL, where AND binds tighter.
-			expectedSQL: `(author = @param_0 OR author = @param_1) AND read`,
+			expectedSQL: `((author = @param_0 OR author = @param_1) AND read)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "a",
 				"param_1": "b",
@@ -218,7 +221,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("create_time", filtering.TypeTimestamp),
 			},
-			expectedSQL: `create_time IS NOT NULL AND create_time != @param_0`,
+			expectedSQL: `(create_time IS NOT NULL AND create_time != @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": time.Unix(0, 0).UTC(),
 			},
@@ -264,7 +267,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareStandardFunctions(),
 				filtering.DeclareIdent("name", filtering.TypeString),
 			},
-			expectedSQL: `name IS NOT NULL AND name != @param_0`,
+			expectedSQL: `(name IS NOT NULL AND name != @param_0)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "",
 			},
@@ -364,7 +367,7 @@ func TestTranspileFilter(t *testing.T) {
 				filtering.DeclareIdent("author", filtering.TypeString),
 				DeclareSearchNgramsFunction(),
 			},
-			expectedSQL: `SEARCH_NGRAMS(display_name_tokens, @param_0) AND author = @param_1`,
+			expectedSQL: `(SEARCH_NGRAMS(display_name_tokens, @param_0) AND author = @param_1)`,
 			expectedParams: map[string]interface{}{
 				"param_0": "abc",
 				"param_1": "Karin Boye",
@@ -391,6 +394,35 @@ func TestTranspileFilter(t *testing.T) {
 			assert.DeepEqual(t, tt.expectedParams, params)
 		})
 	}
+}
+
+// TestTranspileFilter_EmbedInLargerClause verifies the documented guarantee
+// that the transpiled expression can be embedded in a larger clause without
+// changing its meaning. spansql.LogicalOp does not parenthesize its operands
+// when rendering SQL, so an unparenthesized top-level OR would leak out of the
+// embedding (`base AND a OR b` parses as `(base AND a) OR b`) — a common
+// consumer pattern for combining a user filter with scoping conditions such as
+// tenant or soft-delete clauses.
+func TestTranspileFilter_EmbedInLargerClause(t *testing.T) {
+	t.Parallel()
+	declarations, err := filtering.NewDeclarations(
+		filtering.DeclareStandardFunctions(),
+		filtering.DeclareIdent("author", filtering.TypeString),
+	)
+	assert.NilError(t, err)
+	filter, err := filtering.ParseFilter(&mockRequest{filter: `author = "a" OR author = "b"`}, declarations)
+	assert.NilError(t, err)
+	transpiled, _, err := TranspileFilter(filter)
+	assert.NilError(t, err)
+	combined := spansql.LogicalOp{
+		Op: spansql.And,
+		LHS: spansql.IsOp{
+			LHS: spansql.ID("delete_time"),
+			RHS: spansql.Null,
+		},
+		RHS: transpiled,
+	}
+	assert.Equal(t, `delete_time IS NULL AND (author = @param_0 OR author = @param_1)`, combined.SQL())
 }
 
 func mustParseTime(t *testing.T, s string) time.Time {
